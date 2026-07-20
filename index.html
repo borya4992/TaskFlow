@@ -676,7 +676,7 @@ async function addAppUser() {
   try {
     await adminManageAuthUser('create', email, display_name);
   } catch (e) {
-    toast('User qo\'shildi, lekin Auth parol yaratilmadi: ' + e.message);
+    alert('User jadvalga qo\'shildi, lekin kirish paroli yaratilmadi:\n' + e.message + '\n\nJadvaldagi "Parolni tiklash" tugmasini bosing.\nVercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY');
     await renderUsersTable();
     return;
   }
@@ -696,9 +696,10 @@ async function resetUserPassword(email) {
   if (!confirm(email + ' uchun parolni 123456 ga tiklashni xohlaysizmi?')) return;
   try {
     await adminManageAuthUser('reset', email);
-    toast('Parol tiklandi: 123456');
+    toast('Parol tiklandi: 123456 — endi user shu parol bilan kira oladi');
   } catch (e) {
     toast('Tiklash xatosi: ' + e.message);
+    alert('Parol tiklanmadi:\n' + e.message + '\n\nVercel → Settings → Environment Variables da SUPABASE_URL va SUPABASE_SERVICE_ROLE_KEY borligini tekshiring.');
   }
 }
 

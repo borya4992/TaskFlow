@@ -4,7 +4,7 @@
 
 const DEFAULT_PASSWORD = '123456';
 
-async function supabaseHeaders(serviceKey, extra = {}) {
+function headers(serviceKey, extra = {}) {
   return {
     apikey: serviceKey,
     Authorization: `Bearer ${serviceKey}`,
@@ -13,45 +13,120 @@ async function supabaseHeaders(serviceKey, extra = {}) {
   };
 }
 
-async function getAuthUserByJwt(supabaseUrl, anonOrServiceKey, jwt) {
+async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
   const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      apikey: anonOrServiceKey,
-      Authorization: `Bearer ${jwt}`,
-    },
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` },
   });
   if (!res.ok) return null;
   return res.json();
 }
 
-async function isAdminUser(supabaseUrl, serviceKey, authUserId) {
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/app_users?auth_user_id=eq.${authUserId}&role=eq.admin&is_active=eq.true&select=id`,
-    { headers: await supabaseHeaders(serviceKey) }
+async function isAdminUser(supabaseUrl, serviceKey, me) {
+  // 1) auth_user_id bog'langan bo'lsa
+  const byId = await fetch(
+    `${supabaseUrl}/rest/v1/app_users?auth_user_id=eq.${me.id}&role=eq.admin&is_active=eq.true&select=id`,
+    { headers: headers(serviceKey) }
   );
-  const rows = await res.json();
-  return Array.isArray(rows) && rows.length > 0;
+  const idRows = await byId.json();
+  if (Array.isArray(idRows) && idRows.length > 0) return true;
+
+  // 2) email orqali admin (auth_user_id hali bog'lanmagan bo'lsa ham)
+  const email = (me.email || '').toLowerCase();
+  if (!email) return false;
+  const byEmail = await fetch(
+    `${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(email)}&role=eq.admin&is_active=eq.true&select=id`,
+    { headers: headers(serviceKey) }
+  );
+  const emailRows = await byEmail.json();
+  return Array.isArray(emailRows) && emailRows.length > 0;
 }
 
 async function findAuthUserByEmail(supabaseUrl, serviceKey, email) {
-  // Prefer list filter if available; fallback scan
-  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?per_page=200`, {
-    headers: await supabaseHeaders(serviceKey),
+  const target = email.toLowerCase();
+  // Bir necha sahifa bo'ylab qidirish
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=200`, {
+      headers: headers(serviceKey),
+    });
+    const data = await res.json();
+    const users = data.users || [];
+    const found = users.find((u) => (u.email || '').toLowerCase() === target);
+    if (found) return found;
+    if (users.length < 200) break;
+  }
+  return null;
+}
+
+async function setPassword(supabaseUrl, serviceKey, userId, display_name) {
+  const body = { password: DEFAULT_PASSWORD, email_confirm: true };
+  if (display_name) body.user_metadata = { display_name };
+  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+    method: 'PUT',
+    headers: headers(serviceKey),
+    body: JSON.stringify(body),
   });
-  const data = await res.json();
-  const users = data.users || [];
-  return users.find((u) => (u.email || '').toLowerCase() === email.toLowerCase()) || null;
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
+}
+
+async function createAuthUser(supabaseUrl, serviceKey, email, display_name) {
+  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: headers(serviceKey),
+    body: JSON.stringify({
+      email,
+      password: DEFAULT_PASSWORD,
+      email_confirm: true,
+      user_metadata: { display_name: display_name || '' },
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data, status: res.status };
 }
 
 async function linkAppUser(supabaseUrl, serviceKey, email, authUserId) {
-  await fetch(`${supabaseUrl}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}`, {
+  await fetch(`${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(email)}`, {
     method: 'PATCH',
-    headers: {
-      ...(await supabaseHeaders(serviceKey)),
-      Prefer: 'return=minimal',
-    },
+    headers: { ...headers(serviceKey), Prefer: 'return=minimal' },
     body: JSON.stringify({ auth_user_id: authUserId }),
   });
+}
+
+async function ensurePasswordUser(supabaseUrl, serviceKey, email, display_name) {
+  let user = await findAuthUserByEmail(supabaseUrl, serviceKey, email);
+  if (user) {
+    const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name);
+    if (!upd.ok) {
+      return { ok: false, error: upd.data.msg || upd.data.message || 'Parol o‘rnatilmadi' };
+    }
+    await linkAppUser(supabaseUrl, serviceKey, email, user.id);
+    return { ok: true, auth_user_id: user.id };
+  }
+
+  const created = await createAuthUser(supabaseUrl, serviceKey, email, display_name);
+  if (created.ok && created.data?.id) {
+    await linkAppUser(supabaseUrl, serviceKey, email, created.data.id);
+    return { ok: true, auth_user_id: created.data.id };
+  }
+
+  // Allaqachon mavjud bo'lishi mumkin — qayta qidirib parol qo'yamiz
+  const msg = (created.data.msg || created.data.message || '').toLowerCase();
+  if (msg.includes('already') || msg.includes('registered') || created.status === 422) {
+    user = await findAuthUserByEmail(supabaseUrl, serviceKey, email);
+    if (user) {
+      const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name);
+      if (!upd.ok) {
+        return { ok: false, error: upd.data.msg || upd.data.message || 'Parol o‘rnatilmadi' };
+      }
+      await linkAppUser(supabaseUrl, serviceKey, email, user.id);
+      return { ok: true, auth_user_id: user.id };
+    }
+  }
+
+  return {
+    ok: false,
+    error: created.data.msg || created.data.message || 'Auth user yaratilmadi. Vercel SUPABASE_SERVICE_ROLE_KEY ni tekshiring.',
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -63,7 +138,10 @@ module.exports = async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    res.status(500).json({ ok: false, error: 'Server sozlanmagan (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    res.status(500).json({
+      ok: false,
+      error: 'Server sozlanmagan: Vercel Environment Variables ga SUPABASE_URL va SUPABASE_SERVICE_ROLE_KEY qo‘ying',
+    });
     return;
   }
 
@@ -80,8 +158,11 @@ module.exports = async function handler(req, res) {
       res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
       return;
     }
-    if (!(await isAdminUser(supabaseUrl, serviceKey, me.id))) {
-      res.status(403).json({ ok: false, error: 'Faqat admin' });
+    if (!(await isAdminUser(supabaseUrl, serviceKey, me))) {
+      res.status(403).json({
+        ok: false,
+        error: 'Faqat admin. app_users da emailingiz role=admin ekanini tekshiring.',
+      });
       return;
     }
 
@@ -91,83 +172,22 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ ok: false, error: 'Email kerak' });
       return;
     }
-
-    if (action === 'create') {
-      let user = await findAuthUserByEmail(supabaseUrl, serviceKey, normalizedEmail);
-      if (user) {
-        await fetch(`${supabaseUrl}/auth/v1/admin/users/${user.id}`, {
-          method: 'PUT',
-          headers: await supabaseHeaders(serviceKey),
-          body: JSON.stringify({
-            password: DEFAULT_PASSWORD,
-            email_confirm: true,
-            user_metadata: { display_name: display_name || user.user_metadata?.display_name || '' },
-          }),
-        });
-      } else {
-        const createRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-          method: 'POST',
-          headers: await supabaseHeaders(serviceKey),
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password: DEFAULT_PASSWORD,
-            email_confirm: true,
-            user_metadata: { display_name: display_name || '' },
-          }),
-        });
-        const created = await createRes.json();
-        if (!createRes.ok) {
-          res.status(500).json({
-            ok: false,
-            error: created.msg || created.message || 'Auth user yaratilmadi (parol uzunligi 4+ bo‘lishi kerak — Supabase Auth sozlamalarini tekshiring)',
-          });
-          return;
-        }
-        user = created;
-      }
-      await linkAppUser(supabaseUrl, serviceKey, normalizedEmail, user.id);
-      res.status(200).json({ ok: true, auth_user_id: user.id, default_password: DEFAULT_PASSWORD });
+    if (action !== 'create' && action !== 'reset') {
+      res.status(400).json({ ok: false, error: 'action: create | reset' });
       return;
     }
 
-    if (action === 'reset') {
-      const user = await findAuthUserByEmail(supabaseUrl, serviceKey, normalizedEmail);
-      if (!user) {
-        // Create if missing
-        const createRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-          method: 'POST',
-          headers: await supabaseHeaders(serviceKey),
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password: DEFAULT_PASSWORD,
-            email_confirm: true,
-          }),
-        });
-        const created = await createRes.json();
-        if (!createRes.ok) {
-          res.status(500).json({ ok: false, error: created.msg || created.message || 'User topilmadi va yaratilmadi' });
-          return;
-        }
-        await linkAppUser(supabaseUrl, serviceKey, normalizedEmail, created.id);
-        res.status(200).json({ ok: true, reset: true, default_password: DEFAULT_PASSWORD });
-        return;
-      }
-      const upd = await fetch(`${supabaseUrl}/auth/v1/admin/users/${user.id}`, {
-        method: 'PUT',
-        headers: await supabaseHeaders(serviceKey),
-        body: JSON.stringify({ password: DEFAULT_PASSWORD, email_confirm: true }),
-      });
-      const updData = await upd.json();
-      if (!upd.ok) {
-        res.status(500).json({ ok: false, error: updData.msg || updData.message || 'Parol tiklanmadi' });
-        return;
-      }
-      await linkAppUser(supabaseUrl, serviceKey, normalizedEmail, user.id);
-      res.status(200).json({ ok: true, reset: true, default_password: DEFAULT_PASSWORD });
+    const result = await ensurePasswordUser(supabaseUrl, serviceKey, normalizedEmail, display_name);
+    if (!result.ok) {
+      res.status(500).json({ ok: false, error: result.error });
       return;
     }
-
-    res.status(400).json({ ok: false, error: 'action: create | reset' });
+    res.status(200).json({
+      ok: true,
+      auth_user_id: result.auth_user_id,
+      default_password: DEFAULT_PASSWORD,
+      reset: action === 'reset',
+    });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
