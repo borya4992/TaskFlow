@@ -180,33 +180,18 @@
     <h1>📋 TaskFlow</h1>
     <p class="auth-sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
     <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="admin" onclick="switchAuthTab('admin')">Admin</button>
-      <button class="auth-tab" data-tab="email" onclick="switchAuthTab('email')">Email</button>
-      <button class="auth-tab" data-tab="phone" onclick="switchAuthTab('phone')">Telefon</button>
+      <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')">Parol</button>
       <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')">Telegram</button>
     </div>
-    <div id="auth-panel-admin">
-      <div class="auth-field"><label>Admin email</label><input type="email" id="admin-email" placeholder="timekeeper.1120@gmail.com" value="timekeeper.1120@gmail.com"></div>
-      <div class="auth-field"><label>Parol</label><input type="password" id="admin-password" placeholder="Parolingiz" autocomplete="current-password"></div>
-      <button class="auth-btn" onclick="loginAdminPassword()">Kirish</button>
-      <p class="auth-hint" style="margin-top:10px;">OTP limi bo‘lmaydi. Parolni bir marta Supabase → Authentication → Users dan o‘rnating.</p>
-    </div>
-    <div id="auth-panel-email" class="hidden">
-      <div class="auth-field"><label>Email manzil</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz"></div>
-      <button class="auth-btn" onclick="sendEmailOtp()">Kod yuborish</button>
-    </div>
-    <div id="auth-panel-phone" class="hidden">
-      <div class="auth-field"><label>Telefon raqam</label><input type="tel" id="login-phone" placeholder="+998901234567"></div>
-      <button class="auth-btn" onclick="sendPhoneOtp()">SMS kod yuborish</button>
+    <div id="auth-panel-password">
+      <div class="auth-field"><label>Email</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
+      <div class="auth-field"><label>Parol</label><input type="password" id="login-password" placeholder="Parol" autocomplete="current-password"></div>
+      <button class="auth-btn" onclick="loginWithPassword()">Kirish</button>
+      <p class="auth-hint" style="margin-top:10px;">Birinchi marta: standart parol <b>7777</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
     </div>
     <div id="auth-panel-telegram" class="hidden">
       <div class="auth-telegram-wrap" id="telegram-login-container"></div>
       <p class="auth-hint">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
-    </div>
-    <div id="auth-panel-otp" class="hidden">
-      <div class="auth-field"><label>Tasdiqlash kodi</label><input type="text" id="login-otp" placeholder="6 xonali kod" maxlength="8"></div>
-      <button class="auth-btn" onclick="verifyOtp()">Tasdiqlash va kirish</button>
-      <button class="btn-ghost" style="width:100%;margin-top:8px;padding:9px;" onclick="cancelOtp()">Orqaga</button>
     </div>
     <p class="auth-hint" id="auth-message"></p>
   </div>
@@ -221,6 +206,7 @@
     </div>
     <div class="user-bar">
       <span class="user-chip" id="user-chip"></span>
+      <button class="btn-ghost" onclick="toggleProfilePanel()" style="padding:7px 12px;font-size:12px;">Profil</button>
       <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
     </div>
     <div class="kpi-row">
@@ -245,9 +231,20 @@
     <button class="btn-blue" onclick="refreshFromDB()">🔄 Yangilash</button>
   </div>
 
+  <div class="panel hidden" id="profile-panel">
+    <h2><span class="dot" style="background:var(--blue)"></span> Shaxsiy profil — parolni o'zgartirish</h2>
+    <p class="help-text" style="margin-top:0;" id="profile-info"></p>
+    <div class="user-form">
+      <div class="auth-field"><label>Joriy parol</label><input type="password" id="pwd-current" autocomplete="current-password"></div>
+      <div class="auth-field"><label>Yangi parol</label><input type="password" id="pwd-new" autocomplete="new-password"></div>
+      <div class="auth-field full"><label>Yangi parolni tasdiqlang</label><input type="password" id="pwd-confirm" autocomplete="new-password"></div>
+      <div class="full"><button class="btn-blue" onclick="changeMyPassword()">Parolni saqlash</button></div>
+    </div>
+  </div>
+
   <div class="panel hidden" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;">Foydalanuvchini email, telefon yoki Telegram ID orqali qo'shing. <b>Telegram ID</b> bildirishnomalar uchun majburiy. Rollar: <b>Ijrochi</b> — topshiriq bajaradi; <b>Direktor</b> — topshiriq yaratadi va tekshiradi; <b>Admin</b> — hammasini boshqaradi.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>7777</b>. Telegram ID — bildirishnomalar uchun. Rollar: Ijrochi / Direktor / Admin.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
@@ -257,7 +254,7 @@
           <option value="admin">Admin</option>
         </select>
       </div>
-      <div class="auth-field"><label>Email</label><input type="email" id="u-email" placeholder="email@example.com"></div>
+      <div class="auth-field"><label>Email *</label><input type="email" id="u-email" placeholder="email@example.com"></div>
       <div class="auth-field"><label>Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
       <div class="auth-field full"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
       <div class="full"><button class="btn-blue" onclick="addAppUser()">Foydalanuvchi qo'shish</button></div>
@@ -347,12 +344,14 @@ function initSupabase() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+const DEFAULT_USER_PASSWORD = '7777';
+
 /* =========================================================
    AUTH
 ========================================================= */
 function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['admin','email','phone','telegram','otp'].forEach(t => {
+  ['password','telegram'].forEach(t => {
     const el = document.getElementById('auth-panel-' + t);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
@@ -365,13 +364,6 @@ function setAuthMessage(msg, isError) {
   if (!el) return;
   el.textContent = msg || '';
   el.style.color = isError ? 'var(--red)' : 'var(--text-faint)';
-}
-
-function cancelOtp() {
-  const method = pendingOtp.method || 'email';
-  pendingOtp = { method: '', contact: '' };
-  document.getElementById('login-otp').value = '';
-  switchAuthTab(method);
 }
 
 function normalizePhone(raw) {
@@ -391,81 +383,49 @@ async function checkInvited(method, contact) {
   return !!data;
 }
 
-async function loginAdminPassword() {
-  const email = document.getElementById('admin-email').value.trim().toLowerCase();
-  const password = document.getElementById('admin-password').value;
+async function getAccessToken() {
+  const { data } = await sb.auth.getSession();
+  return data?.session?.access_token || null;
+}
+
+async function adminManageAuthUser(action, email, display_name) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Sessiya yo\'q');
+  const res = await fetch('/api/manage-auth-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ action, email, display_name }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Auth API xatosi');
+  return data;
+}
+
+async function loginWithPassword() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
   if (!email || !password) { setAuthMessage('Email va parolni kiriting', true); return; }
   if (!await checkInvited('email', email)) {
-    setAuthMessage('Bu email tizimga kiritilmagan (app_users).', true);
+    setAuthMessage('Bu email tizimga kiritilmagan. Admin bilan bog\'laning.', true);
     return;
   }
   setAuthMessage('Kirilmoqda...');
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    setAuthMessage(error.message + ' — Avval Supabase Auth’da user yaratib parol qo‘ying.', true);
+    setAuthMessage('Login xato. Standart parol 7777. Admin parolni tiklashi mumkin.', true);
     return;
   }
   pendingOtp = { method: 'email', contact: email };
   const linked = await linkProfile();
   if (!linked) {
     await sb.auth.signOut();
-    setAuthMessage('Profil topilmadi. app_users da email admin sifatida borligini tekshiring.', true);
+    setAuthMessage('Profil topilmadi — admin emailni app_users ga qo\'shganini tekshiring.', true);
     return;
   }
-  if (currentProfile.role !== 'admin') {
-    await sb.auth.signOut();
-    currentProfile = null;
-    setAuthMessage('Bu bo\'lim faqat Admin uchun.', true);
-    return;
-  }
-  document.getElementById('admin-password').value = '';
-  await enterApp();
-}
-
-async function sendEmailOtp() {
-  const email = document.getElementById('login-email').value.trim().toLowerCase();
-  if (!email) { setAuthMessage('Email kiriting', true); return; }
-  if (!await checkInvited('email', email)) {
-    setAuthMessage('Bu email tizimga kiritilmagan. Admin bilan bog\'laning.', true);
-    return;
-  }
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-  if (error) { setAuthMessage(error.message, true); return; }
-  pendingOtp = { method: 'email', contact: email };
-  document.getElementById('auth-panel-email').classList.add('hidden');
-  document.getElementById('auth-panel-otp').classList.remove('hidden');
-  setAuthMessage('Emailingizga kod yuborildi');
-}
-
-async function sendPhoneOtp() {
-  const phone = normalizePhone(document.getElementById('login-phone').value.trim());
-  if (!phone) { setAuthMessage('Telefon raqam kiriting', true); return; }
-  if (!await checkInvited('phone', phone)) {
-    setAuthMessage('Bu telefon tizimga kiritilmagan. Admin bilan bog\'laning.', true);
-    return;
-  }
-  const { error } = await sb.auth.signInWithOtp({ phone, options: { shouldCreateUser: true } });
-  if (error) { setAuthMessage(error.message, true); return; }
-  pendingOtp = { method: 'phone', contact: phone };
-  document.getElementById('auth-panel-phone').classList.add('hidden');
-  document.getElementById('auth-panel-otp').classList.remove('hidden');
-  setAuthMessage('SMS kod yuborildi');
-}
-
-async function verifyOtp() {
-  const token = document.getElementById('login-otp').value.trim();
-  if (!token) { setAuthMessage('Kodni kiriting', true); return; }
-  const payload = pendingOtp.method === 'email'
-    ? { email: pendingOtp.contact, token, type: 'email' }
-    : { phone: pendingOtp.contact, token, type: 'sms' };
-  const { error } = await sb.auth.verifyOtp(payload);
-  if (error) { setAuthMessage(error.message, true); return; }
-  const linked = await linkProfile();
-  if (!linked) {
-    await sb.auth.signOut();
-    setAuthMessage('Kirish rad etildi — siz ro\'yxatda emassiz.', true);
-    return;
-  }
+  document.getElementById('login-password').value = '';
   await enterApp();
 }
 
@@ -580,6 +540,13 @@ function showApp() {
   if (chip && currentProfile) {
     chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role);
   }
+  const profileInfo = document.getElementById('profile-info');
+  if (profileInfo && currentProfile) {
+    profileInfo.innerHTML = 'Foydalanuvchi: <b>' + escapeHtml(currentProfile.display_name) + '</b>' +
+      (currentProfile.email ? ' · ' + escapeHtml(currentProfile.email) : '') +
+      ' · Rol: ' + roleLabel(currentProfile.role);
+  }
+  document.getElementById('profile-panel').classList.add('hidden');
   document.getElementById('admin-panel').classList.toggle('hidden', !canManageUsers());
   document.getElementById('settings-panel').classList.toggle('hidden', !canManageUsers());
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
@@ -589,6 +556,33 @@ function showApp() {
   document.getElementById('review-list').classList.toggle('hidden', !canApproveTasks());
   if (canManageUsers()) renderUsersTable();
   renderExecutorSelect();
+}
+
+function toggleProfilePanel() {
+  const panel = document.getElementById('profile-panel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+async function changeMyPassword() {
+  const current = document.getElementById('pwd-current').value;
+  const next = document.getElementById('pwd-new').value;
+  const confirmPwd = document.getElementById('pwd-confirm').value;
+  const email = (currentProfile?.email || '').toLowerCase();
+  if (!email) { toast('Profilingizda email yo\'q — parolni email orqali o\'zgartirish mumkin emas'); return; }
+  if (!current || !next) { toast('Joriy va yangi parolni kiriting'); return; }
+  if (next.length < 4) { toast('Yangi parol kamida 4 belgi bo\'lsin'); return; }
+  if (next !== confirmPwd) { toast('Yangi parol tasdiqi mos kelmadi'); return; }
+  const { error: reAuthErr } = await sb.auth.signInWithPassword({ email, password: current });
+  if (reAuthErr) { toast('Joriy parol noto\'g\'ri'); return; }
+  const { error } = await sb.auth.updateUser({ password: next });
+  if (error) { toast('Xatolik: ' + error.message); return; }
+  document.getElementById('pwd-current').value = '';
+  document.getElementById('pwd-new').value = '';
+  document.getElementById('pwd-confirm').value = '';
+  toast('Parol yangilandi');
 }
 
 async function enterApp() {
@@ -639,15 +633,24 @@ async function renderUsersTable() {
   const users = await fetchAppUsers();
   const tbody = document.getElementById('users-tbody');
   if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
-  tbody.innerHTML = users.map(u => `
+  tbody.innerHTML = users.map(u => {
+    const actions = [];
+    if (u.email) {
+      actions.push(`<button class="btn-ghost" style="padding:6px 10px;font-size:11px;margin-right:4px;" onclick="resetUserPassword('${escapeHtml(u.email)}')">Parolni tiklash</button>`);
+    }
+    if (u.id !== currentProfile?.id) {
+      actions.push(`<button class="btn-red-tint" onclick="deactivateUser('${u.id}')">O'chirish</button>`);
+    }
+    return `
     <tr>
       <td>${escapeHtml(u.display_name)}</td>
       <td>${escapeHtml(u.email || '—')}</td>
       <td>${escapeHtml(u.phone || '—')}</td>
       <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
       <td>${roleLabel(u.role)}</td>
-      <td>${u.id !== currentProfile?.id ? `<button class="btn-red-tint" onclick="deactivateUser('${u.id}')">O'chirish</button>` : '—'}</td>
-    </tr>`).join('');
+      <td>${actions.length ? actions.join('') : '—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderExecutorSelect() {
@@ -667,9 +670,16 @@ async function addAppUser() {
   const telegram_id = document.getElementById('u-telegram').value.trim() || null;
   const role = document.getElementById('u-role').value;
   if (!display_name) { toast('Ism kiriting'); return; }
-  if (!email && !phone && !telegram_id) { toast('Kamida bitta: email, telefon yoki Telegram ID'); return; }
+  if (!email) { toast('Email majburiy (parol orqali kirish uchun)'); return; }
   const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, is_active: true }]);
   if (error) { toast('Xatolik: ' + error.message); return; }
+  try {
+    await adminManageAuthUser('create', email, display_name);
+  } catch (e) {
+    toast('User qo\'shildi, lekin Auth parol yaratilmadi: ' + e.message);
+    await renderUsersTable();
+    return;
+  }
   document.getElementById('u-name').value = '';
   document.getElementById('u-email').value = '';
   document.getElementById('u-phone').value = '';
@@ -678,7 +688,18 @@ async function addAppUser() {
   state.appUsers = await fetchTeamUsers();
   renderExecutorSelect();
   await renderUsersTable();
-  toast('Foydalanuvchi qo\'shildi');
+  toast('Foydalanuvchi qo\'shildi. Standart parol: ' + DEFAULT_USER_PASSWORD);
+}
+
+async function resetUserPassword(email) {
+  if (!email) { toast('Email yo\'q'); return; }
+  if (!confirm(email + ' uchun parolni 7777 ga tiklashni xohlaysizmi?')) return;
+  try {
+    await adminManageAuthUser('reset', email);
+    toast('Parol tiklandi: 7777');
+  } catch (e) {
+    toast('Tiklash xatosi: ' + e.message);
+  }
 }
 
 async function deactivateUser(id) {
