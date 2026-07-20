@@ -250,7 +250,7 @@
   <div class="panel hidden" id="create-task-panel">
     <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
     <div class="add-row">
-      <select id="new-executor"><option value="">Ijrochini tanlang…</option></select>
+      <select id="new-executor"><option value="">Bajaruvchini tanlang…</option></select>
       <input type="text" id="new-title" placeholder="Topshiriq matni">
       <select id="new-priority">
         <option value="">Ustuvorlik yo'q</option>
@@ -262,7 +262,7 @@
       <input type="date" id="new-deadline">
       <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Ijrochi Telegram orqali xabar oladi (Telegram ID kiritilgan bo'lsa).</p>
+    <p class="help-text" style="margin:8px 0 0;">Bajaruvchi: Ijrochi, Direktor yoki Admin. Telegram ID bo'lsa xabar yuboriladi.</p>
   </div>
 
   <div class="section-title hidden" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Tekshiruvdagi topshiriqlar</div>
@@ -543,10 +543,17 @@ function canCreateTasks() { return isAdmin() || isDirector(); }
 function canApproveTasks() { return isAdmin() || isDirector(); }
 function canManageUsers() { return isAdmin(); }
 function getExecutors() {
-  return state.appUsers.filter(u => u.role === 'executor' || u.role === 'admin');
+  // Admin va direktorlar ham bir-biriga / o'ziga topshiriq bera oladi
+  return state.appUsers
+    .filter(u => u.role === 'executor' || u.role === 'admin' || u.role === 'director')
+    .slice()
+    .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
 }
 function getDirectors() {
   return state.appUsers.filter(u => u.role === 'director' || u.role === 'admin');
+}
+function assigneeOptionLabel(u) {
+  return escapeHtml(u.display_name) + ' (' + roleLabel(u.role) + ')';
 }
 function userById(id) {
   return state.appUsers.find(u => u.id === id);
@@ -685,8 +692,8 @@ function renderExecutorSelect() {
   if (!sel) return;
   const cur = sel.value;
   const executors = getExecutors();
-  sel.innerHTML = '<option value="">Ijrochini tanlang…</option>' +
-    executors.map(u => `<option value="${u.id}">${escapeHtml(u.display_name)}${u.role === 'admin' ? ' (Admin)' : ''}</option>`).join('');
+  sel.innerHTML = '<option value="">Bajaruvchini tanlang…</option>' +
+    executors.map(u => `<option value="${u.id}">${assigneeOptionLabel(u)}</option>`).join('');
   sel.value = cur;
 }
 
@@ -1063,13 +1070,13 @@ function openEditModal(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t || !canCreateTasks()) return;
   const executorOptions = getExecutors().map(u =>
-    `<option value="${u.id}" ${u.id===t.assignee_user_id?'selected':''}>${escapeHtml(u.display_name)}</option>`
+    `<option value="${u.id}" ${u.id===t.assignee_user_id?'selected':''}>${assigneeOptionLabel(u)}</option>`
   ).join('');
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h3>Topshiriqni tahrirlash</h3>
-        <div class="field"><label>Ijrochi</label><select id="e-executor">${executorOptions}</select></div>
+        <div class="field"><label>Bajaruvchi</label><select id="e-executor">${executorOptions}</select></div>
         <div class="field"><label>Topshiriq matni</label><input type="text" id="e-title" value="${escapeHtml(t.title)}"></div>
         <div class="field"><label>Muddat</label><input type="date" id="e-deadline" value="${t.deadline || ''}"></div>
         <div class="field"><label>Holat</label>
