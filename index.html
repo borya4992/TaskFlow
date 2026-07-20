@@ -187,7 +187,7 @@
       <div class="auth-field"><label>Email</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
       <div class="auth-field"><label>Parol</label><input type="password" id="login-password" placeholder="Parol" autocomplete="current-password"></div>
       <button class="auth-btn" onclick="loginWithPassword()">Kirish</button>
-      <p class="auth-hint" style="margin-top:10px;">Birinchi marta: standart parol <b>7777</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
+      <p class="auth-hint" style="margin-top:10px;">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
     </div>
     <div id="auth-panel-telegram" class="hidden">
       <div class="auth-telegram-wrap" id="telegram-login-container"></div>
@@ -244,7 +244,7 @@
 
   <div class="panel hidden" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>7777</b>. Telegram ID — bildirishnomalar uchun. Rollar: Ijrochi / Direktor / Admin.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Telegram ID — bildirishnomalar uchun. Rollar: Ijrochi / Direktor / Admin.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
@@ -344,7 +344,7 @@ function initSupabase() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-const DEFAULT_USER_PASSWORD = '7777';
+const DEFAULT_USER_PASSWORD = '123456';
 
 /* =========================================================
    AUTH
@@ -415,7 +415,7 @@ async function loginWithPassword() {
   setAuthMessage('Kirilmoqda...');
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    setAuthMessage('Login xato. Standart parol 7777. Admin parolni tiklashi mumkin.', true);
+    setAuthMessage('Login xato. Standart parol 123456. Admin parolni tiklashi mumkin.', true);
     return;
   }
   pendingOtp = { method: 'email', contact: email };
@@ -573,7 +573,7 @@ async function changeMyPassword() {
   const email = (currentProfile?.email || '').toLowerCase();
   if (!email) { toast('Profilingizda email yo\'q — parolni email orqali o\'zgartirish mumkin emas'); return; }
   if (!current || !next) { toast('Joriy va yangi parolni kiriting'); return; }
-  if (next.length < 4) { toast('Yangi parol kamida 4 belgi bo\'lsin'); return; }
+  if (next.length < 6) { toast('Yangi parol kamida 6 belgi bo\'lsin'); return; }
   if (next !== confirmPwd) { toast('Yangi parol tasdiqi mos kelmadi'); return; }
   const { error: reAuthErr } = await sb.auth.signInWithPassword({ email, password: current });
   if (reAuthErr) { toast('Joriy parol noto\'g\'ri'); return; }
@@ -693,10 +693,10 @@ async function addAppUser() {
 
 async function resetUserPassword(email) {
   if (!email) { toast('Email yo\'q'); return; }
-  if (!confirm(email + ' uchun parolni 7777 ga tiklashni xohlaysizmi?')) return;
+  if (!confirm(email + ' uchun parolni 123456 ga tiklashni xohlaysizmi?')) return;
   try {
     await adminManageAuthUser('reset', email);
-    toast('Parol tiklandi: 7777');
+    toast('Parol tiklandi: 123456');
   } catch (e) {
     toast('Tiklash xatosi: ' + e.message);
   }

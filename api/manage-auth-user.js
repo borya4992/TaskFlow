@@ -1,8 +1,8 @@
-// Auth user yaratish / parolni 7777 ga tiklash (service role).
+// Auth user yaratish / parolni 123456 ga tiklash (service role).
 // Vercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Client Authorization: Bearer <user access_token> (faqat admin)
 
-const DEFAULT_PASSWORD = '7777';
+const DEFAULT_PASSWORD = '123456';
 
 async function supabaseHeaders(serviceKey, extra = {}) {
   return {
