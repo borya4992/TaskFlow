@@ -151,7 +151,7 @@
   .auth-card h1{margin:0 0 6px;font-size:22px;text-align:center;}
   .auth-sub{text-align:center;color:var(--text-faint);font-size:12.5px;margin:0 0 22px;}
   .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--panel-2);border-radius:10px;padding:4px;}
-  .auth-tab{flex:1;background:transparent;color:var(--text-soft);padding:8px 6px;font-size:12px;border-radius:8px;}
+  .auth-tab{flex:1;background:transparent;color:var(--text-soft);padding:8px 4px;font-size:11px;border-radius:8px;}
   .auth-tab.active{background:var(--blue);color:#fff;}
   .auth-field{margin-bottom:12px;}
   .auth-field label{display:block;font-size:11px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
@@ -180,11 +180,18 @@
     <h1>📋 TaskFlow</h1>
     <p class="auth-sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
     <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="email" onclick="switchAuthTab('email')">Email</button>
+      <button class="auth-tab active" data-tab="admin" onclick="switchAuthTab('admin')">Admin</button>
+      <button class="auth-tab" data-tab="email" onclick="switchAuthTab('email')">Email</button>
       <button class="auth-tab" data-tab="phone" onclick="switchAuthTab('phone')">Telefon</button>
       <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')">Telegram</button>
     </div>
-    <div id="auth-panel-email">
+    <div id="auth-panel-admin">
+      <div class="auth-field"><label>Admin email</label><input type="email" id="admin-email" placeholder="timekeeper.1120@gmail.com" value="timekeeper.1120@gmail.com"></div>
+      <div class="auth-field"><label>Parol</label><input type="password" id="admin-password" placeholder="Parolingiz" autocomplete="current-password"></div>
+      <button class="auth-btn" onclick="loginAdminPassword()">Kirish</button>
+      <p class="auth-hint" style="margin-top:10px;">OTP limi bo‘lmaydi. Parolni bir marta Supabase → Authentication → Users dan o‘rnating.</p>
+    </div>
+    <div id="auth-panel-email" class="hidden">
       <div class="auth-field"><label>Email manzil</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz"></div>
       <button class="auth-btn" onclick="sendEmailOtp()">Kod yuborish</button>
     </div>
@@ -346,7 +353,7 @@ function initSupabase() {
 ========================================================= */
 function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['email','phone','telegram','otp'].forEach(t => {
+  ['admin','email','phone','telegram','otp'].forEach(t => {
     const el = document.getElementById('auth-panel-' + t);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
@@ -383,6 +390,37 @@ async function checkInvited(method, contact) {
   const { data, error } = await sb.rpc('is_user_invited', params);
   if (error) { console.error(error); return false; }
   return !!data;
+}
+
+async function loginAdminPassword() {
+  const email = document.getElementById('admin-email').value.trim().toLowerCase();
+  const password = document.getElementById('admin-password').value;
+  if (!email || !password) { setAuthMessage('Email va parolni kiriting', true); return; }
+  if (!await checkInvited('email', email)) {
+    setAuthMessage('Bu email tizimga kiritilmagan (app_users).', true);
+    return;
+  }
+  setAuthMessage('Kirilmoqda...');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    setAuthMessage(error.message + ' — Avval Supabase Auth’da user yaratib parol qo‘ying.', true);
+    return;
+  }
+  pendingOtp = { method: 'email', contact: email };
+  const linked = await linkProfile();
+  if (!linked) {
+    await sb.auth.signOut();
+    setAuthMessage('Profil topilmadi. app_users da email admin sifatida borligini tekshiring.', true);
+    return;
+  }
+  if (currentProfile.role !== 'admin') {
+    await sb.auth.signOut();
+    currentProfile = null;
+    setAuthMessage('Bu bo\'lim faqat Admin uchun.', true);
+    return;
+  }
+  document.getElementById('admin-password').value = '';
+  await enterApp();
 }
 
 async function sendEmailOtp() {

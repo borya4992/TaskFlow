@@ -207,11 +207,17 @@ as $$
 $$;
 
 -- ============================================================
--- 5) BIRINCHI ADMIN
+-- 5) BIRINCHI ADMIN (timekeeper.1120@gmail.com)
 -- ============================================================
 insert into app_users (display_name, email, role, is_active)
-values ('Admin', 'timekeeper.1120@gmail.com', 'admin', true)
-on conflict do nothing;
+select 'Admin', 'timekeeper.1120@gmail.com', 'admin', true
+where not exists (
+  select 1 from app_users where lower(email) = lower('timekeeper.1120@gmail.com')
+);
+
+update app_users
+set role = 'admin', is_active = true, display_name = coalesce(nullif(display_name, ''), 'Admin')
+where lower(email) = lower('timekeeper.1120@gmail.com');
 
 -- ============================================================
 -- 6) ROW LEVEL SECURITY
