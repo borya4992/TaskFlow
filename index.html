@@ -2,8 +2,18 @@
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Topshiriqlar monitoringi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TaskFlow — Topshiriqlar monitoringi</title>
+<meta name="description" content="Jamoa topshiriqlarini monitoring qilish ilovasi">
+<meta name="theme-color" content="#0B0F17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TaskFlow">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -215,6 +225,7 @@
     </div>
     <div class="user-bar">
       <span class="user-chip" id="user-chip"></span>
+      <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;">Ilovani o'rnatish</button>
       <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
     </div>
     <div class="kpi-row">
@@ -1204,9 +1215,45 @@ function toast(msg) {
 }
 
 /* =========================================================
+   PWA — desktop/mobile ilova
+========================================================= */
+let deferredInstallPrompt = null;
+
+function setupPwaInstall() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-install-app');
+    if (btn) btn.classList.remove('hidden');
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-install-app');
+    if (btn) btn.classList.add('hidden');
+    toast('TaskFlow ilova sifatida o\'rnatildi');
+  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('SW:', err));
+  }
+}
+
+async function installPwa() {
+  if (!deferredInstallPrompt) {
+    toast('Brauzer menyusidan «Ilovani o\'rnatish / Install app» ni tanlang');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.add('hidden');
+}
+
+/* =========================================================
    INIT
 ========================================================= */
 async function init() {
+  setupPwaInstall();
   initSupabase();
 
   if (usingLocalFallback) {
