@@ -15,6 +15,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0B0F17;
@@ -189,6 +190,12 @@
   .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
   .view-pane{display:none;}
   .view-pane.active{display:block;}
+  .smart-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+  .smart-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+  .smart-charts .panel{margin-bottom:0;}
+  .chart-wrap{position:relative;height:280px;}
+  @media(max-width:900px){.smart-charts{grid-template-columns:1fr;}}
+  .add-row input[type=datetime-local]{min-width:190px;}
 </style>
 </head>
 <body>
@@ -239,6 +246,7 @@
 
   <div class="app-nav" id="app-nav">
     <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')">Monitoring</button>
+    <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')">SMART</button>
     <button type="button" class="app-nav-btn" data-view="profile" onclick="switchAppView('profile')">Profil</button>
     <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')">Boshqaruv</button>
   </div>
@@ -270,7 +278,7 @@
         <option value="O'rta">O'rta</option>
         <option value="Past">Past</option>
       </select>
-      <input type="date" id="new-deadline">
+      <input type="datetime-local" id="new-deadline" title="Muddat (sana va soat)">
       <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
     </div>
     <p class="help-text" style="margin:8px 0 0;">Bajaruvchi: Ijrochi, Direktor yoki Admin. Telegram ID bo'lsa xabar yuboriladi.</p>
@@ -284,6 +292,35 @@
 
   <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
   <div class="task-list" id="task-list"></div>
+  </div>
+
+  <!-- SMART ANALYTICS -->
+  <div id="view-smart" class="view-pane">
+    <div class="panel">
+      <h2><span class="dot" style="background:var(--green)"></span> SMART Task Monitoring</h2>
+      <p class="help-text" style="margin-top:0;">Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.</p>
+      <div class="smart-stats" id="smart-stats"></div>
+    </div>
+    <div class="smart-charts">
+      <div class="panel">
+        <h2><span class="dot"></span> SMART kriteriy ballari</h2>
+        <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2><span class="dot" style="background:var(--amber)"></span> Holat taqsimoti</h2>
+        <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot" style="background:var(--purple)"></span> Ijrochi kesimida monitoring</h2>
+      <table class="users-table">
+        <thead>
+          <tr><th>Bajaruvchi</th><th>Jami</th><th>Jarayonda</th><th>Tekshiruv</th><th>Bajarildi</th><th>Kechikkan</th><th>SMART risk</th></tr>
+        </thead>
+        <tbody id="smart-assignee-tbody"></tbody>
+      </table>
+      <p class="help-text" id="smart-insight" style="margin-top:12px;"></p>
+    </div>
   </div>
 
   <!-- PROFIL -->
@@ -599,7 +636,7 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'profile', 'admin'];
+  const allowed = ['monitoring', 'smart', 'profile', 'admin'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   document.querySelectorAll('.view-pane').forEach(el => {
@@ -609,6 +646,7 @@ function switchAppView(view) {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
   if (view === 'admin' && canManageUsers()) renderUsersTable();
+  if (view === 'smart') renderSmartAnalytics();
 }
 
 async function changeMyPassword() {
@@ -765,6 +803,31 @@ let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_c
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function pad2(n){ return String(n).padStart(2, '0'); }
+function toDatetimeLocal(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    // eski date-only format
+    const m = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] + 'T23:59' : '';
+  }
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) +
+    'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function fromDatetimeLocal(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+function formatDeadlineDisplay(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  return pad2(d.getDate()) + '.' + pad2(d.getMonth()+1) + '.' + d.getFullYear() +
+    ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
 function initials(name){ return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase(); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function priorityClass(p){
@@ -841,9 +904,8 @@ async function saveSettings(patch) {
 function effectiveStatus(t) {
   if (t.status === 'bajarildi') return 'bajarildi';
   if (t.status === 'tekshiruvda') return 'tekshiruvda';
-  const today = new Date(todayISO());
   const dl = t.deadline ? new Date(t.deadline) : null;
-  if (dl && dl < today) return 'muddati_otgan';
+  if (dl && !isNaN(dl.getTime()) && dl < new Date()) return 'muddati_otgan';
   return 'jarayonda';
 }
 function statusLabel(eff) {
@@ -858,12 +920,21 @@ function deadlineInfo(t) {
   if (t.status === 'bajarildi') return { text: 'Bajarildi', cls: '' };
   if (t.status === 'tekshiruvda') return { text: 'Tekshiruvda', cls: 'today' };
   if (!t.deadline) return { text: '—', cls: '' };
-  const today = new Date(todayISO());
+  const now = new Date();
   const dl = new Date(t.deadline);
-  const diff = Math.round((dl - today) / 86400000);
-  if (diff === 0) return { text: 'Bugun', cls: 'today' };
-  if (diff > 0) return { text: diff + ' kun qoldi', cls: '' };
-  return { text: Math.abs(diff) + ' kun o\'tdi', cls: 'overdue' };
+  if (isNaN(dl.getTime())) return { text: String(t.deadline), cls: '' };
+  const diffMs = dl - now;
+  const absMs = Math.abs(diffMs);
+  const hours = Math.floor(absMs / 3600000);
+  const days = Math.floor(absMs / 86400000);
+  const stamp = formatDeadlineDisplay(t.deadline);
+  if (diffMs >= 0) {
+    if (hours < 1) return { text: stamp + ' · <1 soat', cls: 'today' };
+    if (hours < 24) return { text: stamp + ' · ' + hours + ' soat', cls: 'today' };
+    return { text: stamp + ' · ' + days + ' kun', cls: '' };
+  }
+  if (hours < 24) return { text: stamp + ' · ' + hours + ' soat o\'tdi', cls: 'overdue' };
+  return { text: stamp + ' · ' + days + ' kun o\'tdi', cls: 'overdue' };
 }
 function matchesFilters(t) {
   if (state.filterPriority && t.priority !== state.filterPriority) return false;
@@ -998,6 +1069,8 @@ function renderAll() {
   renderExecCards();
   renderReviewList();
   renderTaskList();
+  const smartPane = document.getElementById('view-smart');
+  if (smartPane && smartPane.classList.contains('active')) renderSmartAnalytics();
 }
 function filterByStatus(status) {
   state.filterStatus = status || '';
@@ -1032,7 +1105,7 @@ async function addTask() {
   const executorId = document.getElementById('new-executor').value;
   const title = document.getElementById('new-title').value.trim();
   const priority = document.getElementById('new-priority').value;
-  const deadline = document.getElementById('new-deadline').value || null;
+  const deadline = fromDatetimeLocal(document.getElementById('new-deadline').value);
   const executor = userById(executorId);
   if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
   await insertTask({
@@ -1089,7 +1162,7 @@ function openEditModal(id) {
         <h3>Topshiriqni tahrirlash</h3>
         <div class="field"><label>Bajaruvchi</label><select id="e-executor">${executorOptions}</select></div>
         <div class="field"><label>Topshiriq matni</label><input type="text" id="e-title" value="${escapeHtml(t.title)}"></div>
-        <div class="field"><label>Muddat</label><input type="date" id="e-deadline" value="${t.deadline || ''}"></div>
+        <div class="field"><label>Muddat (sana va soat)</label><input type="datetime-local" id="e-deadline" value="${toDatetimeLocal(t.deadline)}"></div>
         <div class="field"><label>Holat</label>
           <select id="e-status">
             <option value="jarayonda" ${t.status==='jarayonda'?'selected':''}>Jarayonda</option>
@@ -1113,7 +1186,7 @@ async function saveEdit(id) {
     assignee_user_id: executorId,
     assignee: executor ? executor.display_name : '',
     title: document.getElementById('e-title').value.trim(),
-    deadline: document.getElementById('e-deadline').value || null,
+    deadline: fromDatetimeLocal(document.getElementById('e-deadline').value),
     status: document.getElementById('e-status').value,
     comment: document.getElementById('e-comment').value.trim()
   };
@@ -1168,7 +1241,7 @@ async function notifyUser(user, text) {
 }
 async function notifyExecutorNewTask(executor, title, deadline) {
   const creator = currentProfile?.display_name || 'Direktor';
-  const dl = deadline ? `\nMuddat: <b>${deadline}</b>` : '';
+  const dl = deadline ? `\nMuddat: <b>${formatDeadlineDisplay(deadline)}</b>` : '';
   const ok = await notifyUser(executor, `📋 <b>Yangi topshiriq</b>\n\n${title}${dl}\n\nYaratuvchi: ${creator}`);
   if (!ok && !executor.telegram_id) toast('Ijrochining Telegram ID kiritilmagan — xabar yuborilmadi');
 }
@@ -1201,6 +1274,152 @@ async function checkDeadlinesNow() {
     new Notification('Muddat eslatmasi', { body: (overdue.length + today.length) + " ta topshiriqqa e'tibor bering" });
   }
   toast('Tekshirildi va yuborildi');
+}
+
+/* =========================================================
+   SMART ANALYTICS (dashboard)
+========================================================= */
+let smartCharts = { smart: null, status: null };
+
+function destroySmartCharts() {
+  if (smartCharts.smart) { smartCharts.smart.destroy(); smartCharts.smart = null; }
+  if (smartCharts.status) { smartCharts.status.destroy(); smartCharts.status = null; }
+}
+
+function computeSmartMetrics(tasks) {
+  const total = tasks.length || 1;
+  const specific = tasks.filter(t => (t.title || '').trim().length >= 12).length;
+  const measurable = tasks.filter(t => !!(t.priority || '').trim()).length;
+  const timeBound = tasks.filter(t => !!t.deadline).length;
+  const relevant = tasks.filter(t => !!(t.assignee_user_id || t.assignee)).length;
+  const closed = tasks.filter(t => t.status === 'bajarildi');
+  const onTime = closed.filter(t => {
+    if (!t.deadline) return true;
+    // agar muddat o'tgan bo'lsa ham bajarilgan — kechikkan yopilish
+    return true;
+  }).length;
+  // Achievable: kechikmagan ochiq + o'z vaqtida yopilgan taxminiy
+  const overdue = tasks.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
+  const achievable = Math.max(0, tasks.length - overdue);
+
+  const scores = {
+    Specific: Math.round((specific / total) * 100),
+    Measurable: Math.round((measurable / total) * 100),
+    Achievable: Math.round((achievable / total) * 100),
+    Relevant: Math.round((relevant / total) * 100),
+    'Time-bound': Math.round((timeBound / total) * 100),
+  };
+  const avg = Math.round(Object.values(scores).reduce((a, b) => a + b, 0) / 5);
+  const review = tasks.filter(t => t.status === 'tekshiruvda').length;
+  const done = closed.length;
+  const reviewPct = tasks.length ? Math.round((review / tasks.length) * 100) : 0;
+  const donePct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  return { scores, avg, reviewPct, donePct, total: tasks.length, overdue, review, done, onTime };
+}
+
+function smartRiskForAssignee(own) {
+  const overdue = own.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
+  const review = own.filter(t => effectiveStatus(t) === 'tekshiruvda').length;
+  const noDeadline = own.filter(t => !t.deadline && t.status !== 'bajarildi').length;
+  const score = overdue * 3 + review + noDeadline;
+  if (score >= 4) return 'Yuqori';
+  if (score >= 2) return "O'rta";
+  return 'Past';
+}
+
+function renderSmartAnalytics() {
+  const tasks = visibleTasks();
+  const m = computeSmartMetrics(tasks);
+  const stats = document.getElementById('smart-stats');
+  if (stats) {
+    stats.innerHTML = `
+      <div class="kpi"><b>${m.avg}%</b><span>SMART o'rtacha</span></div>
+      <div class="kpi"><b>${m.total}</b><span>Jami topshiriq</span></div>
+      <div class="kpi k-review"><b>${m.reviewPct}%</b><span>Tekshiruv ulushi</span></div>
+      <div class="kpi k-done"><b>${m.donePct}%</b><span>Bajarilgan ulushi</span></div>
+      <div class="kpi k-overdue"><b>${m.overdue}</b><span>Kechikkan</span></div>`;
+  }
+
+  const names = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean))).sort();
+  const tbody = document.getElementById('smart-assignee-tbody');
+  if (tbody) {
+    if (!names.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Hali topshiriq yo\'q</td></tr>';
+    } else {
+      tbody.innerHTML = names.map(name => {
+        const own = tasks.filter(t => t.assignee === name);
+        return `<tr>
+          <td>${escapeHtml(name)}</td>
+          <td>${own.length}</td>
+          <td>${own.filter(t => effectiveStatus(t)==='jarayonda').length}</td>
+          <td>${own.filter(t => effectiveStatus(t)==='tekshiruvda').length}</td>
+          <td>${own.filter(t => effectiveStatus(t)==='bajarildi').length}</td>
+          <td>${own.filter(t => effectiveStatus(t)==='muddati_otgan').length}</td>
+          <td>${smartRiskForAssignee(own)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  const weakest = Object.entries(m.scores).sort((a,b) => a[1]-b[1])[0];
+  const insight = document.getElementById('smart-insight');
+  if (insight) {
+    insight.textContent = weakest
+      ? `Eng past SMART ko'rsatkich: ${weakest[0]} (${weakest[1]}%). Muddatga soat qo'yish va ustuvorlik belgilash Time-bound / Measurable ballarini oshiradi.`
+      : 'Hali tahlil uchun ma\'lumot yetarli emas.';
+  }
+
+  if (typeof Chart === 'undefined') return;
+  destroySmartCharts();
+  const smartCtx = document.getElementById('chart-smart');
+  const statusCtx = document.getElementById('chart-status');
+  if (smartCtx) {
+    smartCharts.smart = new Chart(smartCtx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(m.scores),
+        datasets: [{
+          label: 'SMART score (%)',
+          data: Object.values(m.scores),
+          backgroundColor: ['#4C8DFF', '#35C77A', '#F2B84B', '#9B6BEA', '#F2635C'],
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, max: 100, ticks: { color: '#93A0B4' }, grid: { color: '#232C3D' } },
+          x: { ticks: { color: '#93A0B4' }, grid: { display: false } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+  if (statusCtx) {
+    const jar = tasks.filter(t => effectiveStatus(t)==='jarayonda').length;
+    const tek = tasks.filter(t => effectiveStatus(t)==='tekshiruvda').length;
+    const baj = tasks.filter(t => effectiveStatus(t)==='bajarildi').length;
+    const kech = tasks.filter(t => effectiveStatus(t)==='muddati_otgan').length;
+    smartCharts.status = new Chart(statusCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Jarayonda', 'Tekshiruvda', 'Bajarildi', "Kechikkan"],
+        datasets: [{
+          data: [jar, tek, baj, kech],
+          backgroundColor: ['#4C8DFF', '#F2B84B', '#35C77A', '#F2635C'],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#93A0B4', boxWidth: 12 } }
+        }
+      }
+    });
+  }
 }
 
 /* =========================================================

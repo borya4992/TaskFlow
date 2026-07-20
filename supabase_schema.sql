@@ -47,7 +47,7 @@ create table if not exists tasks (
   title text not null,
   priority text default '',
   start_date date default current_date,
-  deadline date,
+  deadline timestamptz,
   status text default 'jarayonda',
   comment text default '',
   created_at timestamptz default now()
@@ -55,6 +55,23 @@ create table if not exists tasks (
 
 alter table tasks add column if not exists assignee_user_id uuid references app_users(id) on delete set null;
 alter table tasks add column if not exists created_by_user_id uuid references app_users(id) on delete set null;
+
+-- Muddatga soat qo'llab-quvvatlash (eski date → timestamptz)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'tasks'
+      and column_name = 'deadline' and data_type = 'date'
+  ) then
+    alter table tasks
+      alter column deadline type timestamptz
+      using case
+        when deadline is null then null
+        else (deadline::timestamp + time '23:59:00') at time zone 'Asia/Tashkent'
+      end;
+  end if;
+end $$;
 
 -- ============================================================
 -- 3) SOZLAMALAR
