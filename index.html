@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topshiriqlar monitoringi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0B0F17;
+    --panel:#121826;
+    --panel-2:#171F2E;
+    --border:#232C3D;
+    --text:#E7ECF3;
+    --text-soft:#93A0B4;
+    --text-faint:#5C6B80;
+    --blue:#4C8DFF;
+    --blue-dark:#2F6FE0;
+    --purple:#9B6BEA;
+    --green:#35C77A;
+    --green-tint:#12301F;
+    --amber:#F2B84B;
+    --amber-tint:#332507;
+    --red:#F2635C;
+    --red-tint:#341418;
+    --pink:#F49CA0;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.5;
+  }
+  .hidden{display:none !important;}
+  button,input,select,textarea{font-family:inherit;font-size:13.5px;}
+  input,select,textarea{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+    padding:9px 12px;outline:none;
+  }
+  input::placeholder,textarea::placeholder{color:var(--text-faint);}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+  button{cursor:pointer;border:none;border-radius:8px;font-weight:600;transition:filter .1s, transform .08s;}
+  button:active{transform:scale(.97);}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 26px 60px;}
+
+  /* header */
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:20px;}
+  header .titles{flex:1;min-width:240px;}
+  header h1{margin:0;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
+  header p{margin:4px 0 0;color:#E39BA6;font-size:12.5px;}
+  .kpi-row{display:flex;gap:10px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;}
+  .kpi b{display:block;font-size:20px;line-height:1.1;}
+  .kpi span{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .kpi.k-progress b{color:var(--blue);}
+  .kpi.k-done b{color:var(--green);}
+  .kpi.k-overdue b{color:var(--pink);}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+  .toolbar input[type=text]{flex:1;min-width:180px;}
+  .btn-blue{background:var(--blue);color:#fff;padding:9px 16px;}
+  .btn-blue:hover{background:var(--blue-dark);}
+  .btn-ghost{background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:9px 14px;}
+  .btn-ghost:hover{color:var(--text);}
+  .btn-green{background:var(--green);color:#04150C;padding:9px 14px;}
+  .btn-red-tint{background:var(--red-tint);color:var(--red);padding:8px 14px;font-size:12.5px;}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px;}
+  .panel h2{margin:0 0 14px;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+  .panel h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--purple);}
+
+  .notif-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .status-chip{font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:6px;}
+  .status-chip b{color:var(--green);}
+  .status-chip.off b{color:var(--text-faint);}
+  .telegram-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .telegram-row input{flex:1;min-width:220px;}
+  .help-text{font-size:11.5px;color:var(--text-faint);margin:6px 0 12px;}
+  .help-text a{color:var(--blue);text-decoration:none;}
+
+  .add-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .add-row input[type=text]{flex:2;min-width:160px;}
+  .add-row select{flex:1;min-width:140px;}
+  .add-row input[type=date]{min-width:150px;}
+
+  .section-title{font-size:15px;font-weight:700;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
+  .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);}
+
+  .exec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .exec-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;transition:border-color .12s;}
+  .exec-card:hover{border-color:var(--blue);}
+  .exec-name{font-weight:700;font-size:13.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .exec-avatar{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .exec-stats{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-faint);margin-bottom:8px;}
+  .exec-bar{height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;}
+  .exec-bar-fill{height:100%;background:var(--green);border-radius:20px;}
+
+  .task-list{display:flex;flex-direction:column;gap:8px;}
+  .task-row{
+    display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:11px 14px;flex-wrap:wrap;
+  }
+  .task-row .t-main{flex:1;min-width:220px;}
+  .task-row .t-title{font-weight:650;font-size:13.5px;}
+  .task-row .t-sub{font-size:11.5px;color:var(--text-faint);margin-top:3px;}
+  .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .p-shoshilinch{background:var(--red-tint);color:var(--red);}
+  .p-yuqori{background:var(--red-tint);color:var(--red);}
+  .p-orta{background:var(--amber-tint);color:var(--amber);}
+  .p-past{background:var(--panel-2);color:var(--text-faint);}
+  .p-{background:var(--panel-2);color:var(--text-faint);}
+  .s-jarayonda{background:#12253A;color:var(--blue);}
+  .s-tekshiruvda{background:var(--amber-tint);color:var(--amber);}
+  .s-bajarildi{background:var(--green-tint);color:var(--green);}
+  .s-muddati_otgan{background:var(--red-tint);color:var(--red);}
+  .role-badge{font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
+  .role-admin{background:var(--purple);color:#fff;}
+  .role-director{background:var(--amber);color:#1a1200;}
+  .role-executor{background:var(--blue);color:#fff;}
+  .btn-amber{background:var(--amber);color:#1a1200;padding:8px 12px;font-size:12px;}
+  .deadline-tag{font-size:11.5px;color:var(--text-faint);min-width:90px;text-align:right;}
+  .deadline-tag.overdue{color:var(--red);font-weight:700;}
+  .deadline-tag.today{color:var(--amber);font-weight:700;}
+  .task-actions{display:flex;gap:6px;}
+  .icon-btn{background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:6px 9px;font-size:12px;}
+  .icon-btn:hover{color:var(--text);}
+  .empty-msg{color:var(--text-faint);text-align:center;padding:26px;font-size:13px;}
+
+  #toast-root{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;}
+  .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:150;padding:16px;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:20px 22px;}
+  .modal h3{margin:0 0 14px;font-size:15px;}
+  .modal .field{margin-bottom:12px;}
+  .modal label{display:block;font-size:11.5px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+  .modal input,.modal select,.modal textarea{width:100%;}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+
+  @media(max-width:720px){
+    .wrap{padding:16px;}
+    .kpi-row{flex:1;}
+    .kpi{flex:1;min-width:0;padding:8px 6px;}
+  }
+
+  /* auth */
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 26px;width:100%;max-width:420px;}
+  .auth-card h1{margin:0 0 6px;font-size:22px;text-align:center;}
+  .auth-sub{text-align:center;color:var(--text-faint);font-size:12.5px;margin:0 0 22px;}
+  .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--panel-2);border-radius:10px;padding:4px;}
+  .auth-tab{flex:1;background:transparent;color:var(--text-soft);padding:8px 6px;font-size:12px;border-radius:8px;}
+  .auth-tab.active{background:var(--blue);color:#fff;}
+  .auth-field{margin-bottom:12px;}
+  .auth-field label{display:block;font-size:11px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+  .auth-field input{width:100%;}
+  .auth-btn{width:100%;background:var(--blue);color:#fff;padding:11px;margin-top:4px;}
+  .auth-btn:hover{background:var(--blue-dark);}
+  .auth-hint{font-size:11.5px;color:var(--text-faint);margin-top:14px;line-height:1.5;text-align:center;}
+  .auth-telegram-wrap{display:flex;justify-content:center;min-height:48px;align-items:center;}
+  .user-bar{display:flex;align-items:center;gap:10px;margin-left:auto;}
+  .user-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-soft);}
+  .user-chip b{color:var(--text);}
+  .admin-badge{background:var(--purple);color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
+  .users-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  .users-table th{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;}
+  .user-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .user-form .full{grid-column:1/-1;}
+  @media(max-width:600px){.user-form{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- KIRISH EKRANI -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <h1>📋 TaskFlow</h1>
+    <p class="auth-sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="email" onclick="switchAuthTab('email')">Email</button>
+      <button class="auth-tab" data-tab="phone" onclick="switchAuthTab('phone')">Telefon</button>
+      <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')">Telegram</button>
+    </div>
+    <div id="auth-panel-email">
+      <div class="auth-field"><label>Email manzil</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz"></div>
+      <button class="auth-btn" onclick="sendEmailOtp()">Kod yuborish</button>
+    </div>
+    <div id="auth-panel-phone" class="hidden">
+      <div class="auth-field"><label>Telefon raqam</label><input type="tel" id="login-phone" placeholder="+998901234567"></div>
+      <button class="auth-btn" onclick="sendPhoneOtp()">SMS kod yuborish</button>
+    </div>
+    <div id="auth-panel-telegram" class="hidden">
+      <div class="auth-telegram-wrap" id="telegram-login-container"></div>
+      <p class="auth-hint">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
+    </div>
+    <div id="auth-panel-otp" class="hidden">
+      <div class="auth-field"><label>Tasdiqlash kodi</label><input type="text" id="login-otp" placeholder="6 xonali kod" maxlength="8"></div>
+      <button class="auth-btn" onclick="verifyOtp()">Tasdiqlash va kirish</button>
+      <button class="btn-ghost" style="width:100%;margin-top:8px;padding:9px;" onclick="cancelOtp()">Orqaga</button>
+    </div>
+    <p class="auth-hint" id="auth-message"></p>
+  </div>
+</div>
+
+<div id="app-wrap" class="hidden">
+<div class="wrap">
+
+  <header>
+    <div class="titles">
+      <h1>📋 Topshiriqlar monitoringi</h1>
+      <p id="subtitle">Admin va direktorlar topshiriq yaratadi, ijrochilar bajaradi, direktorlar tasdiqlaydi</p>
+    </div>
+    <div class="user-bar">
+      <span class="user-chip" id="user-chip"></span>
+      <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><b id="kpi-total">0</b><span>Jami</span></div>
+      <div class="kpi k-progress"><b id="kpi-progress">0</b><span>Jarayonda</span></div>
+      <div class="kpi" style="--kpi-color:var(--amber)"><b id="kpi-review" style="color:var(--amber)">0</b><span>Tekshiruvda</span></div>
+      <div class="kpi k-done"><b id="kpi-done">0</b><span>Bajarildi</span></div>
+      <div class="kpi k-overdue"><b id="kpi-overdue">0</b><span>Kechikkan</span></div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
+    <select id="filter-assignee" onchange="onFilterAssignee(this.value)"><option value="">Barcha mas'ul shaxslar</option></select>
+    <select id="filter-priority" onchange="onFilterPriority(this.value)">
+      <option value="">Barcha ustuvorliklar</option>
+      <option value="Shoshilinch">Shoshilinch</option>
+      <option value="Yuqori">Yuqori</option>
+      <option value="O'rta">O'rta</option>
+      <option value="Past">Past</option>
+    </select>
+    <button class="btn-blue" onclick="refreshFromDB()">🔄 Yangilash</button>
+  </div>
+
+  <div class="panel hidden" id="admin-panel">
+    <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
+    <p class="help-text" style="margin-top:0;">Foydalanuvchini email, telefon yoki Telegram ID orqali qo'shing. <b>Telegram ID</b> bildirishnomalar uchun majburiy. Rollar: <b>Ijrochi</b> — topshiriq bajaradi; <b>Direktor</b> — topshiriq yaratadi va tekshiradi; <b>Admin</b> — hammasini boshqaradi.</p>
+    <div class="user-form">
+      <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
+      <div class="auth-field"><label>Rol</label>
+        <select id="u-role">
+          <option value="executor">Ijrochi</option>
+          <option value="director">Direktor</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="auth-field"><label>Email</label><input type="email" id="u-email" placeholder="email@example.com"></div>
+      <div class="auth-field"><label>Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
+      <div class="auth-field full"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
+      <div class="full"><button class="btn-blue" onclick="addAppUser()">Foydalanuvchi qo'shish</button></div>
+    </div>
+    <table class="users-table">
+      <thead><tr><th>Ism</th><th>Email</th><th>Telefon</th><th>Telegram</th><th>Rol</th><th></th></tr></thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="settings-panel">
+    <h2><span class="dot"></span> Bildirishnomalar sozlamalari</h2>
+    <div class="notif-row">
+      <button class="btn-ghost" onclick="toggleDesktopNotif()">🖥 Kompyuter bildirishnomasini yoqish</button>
+      <span class="status-chip" id="desktop-status">Holat: <b>o'chiq</b></span>
+    </div>
+    <div class="telegram-row">
+      <input type="text" id="tg-token" placeholder="Telegram Bot Token (masalan: 123456:ABC-DEF...)">
+      <input type="text" id="tg-chat" placeholder="Chat ID (masalan: 123456789)">
+      <input type="text" id="tg-bot-user" placeholder="Bot username (masalan: MyTaskBot)">
+      <button class="btn-blue" onclick="saveAndTestTelegram()">Saqlash va test yuborish</button>
+    </div>
+    <div class="help-text">
+      Telegram ulanmagan. Bot yaratish: <b>@BotFather</b> → token oling; keyin botga <b>/start</b> yozing va Chat ID'ni <b>@userinfobot</b> orqali toping.
+    </div>
+    <button class="btn-ghost" onclick="checkDeadlinesNow()">⏰ Hozir muddatlarni tekshirish</button>
+  </div>
+
+  <div class="panel hidden" id="create-task-panel">
+    <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
+    <div class="add-row">
+      <select id="new-executor"><option value="">Ijrochini tanlang…</option></select>
+      <input type="text" id="new-title" placeholder="Topshiriq matni">
+      <select id="new-priority">
+        <option value="">Ustuvorlik yo'q</option>
+        <option value="Shoshilinch">Shoshilinch</option>
+        <option value="Yuqori">Yuqori</option>
+        <option value="O'rta">O'rta</option>
+        <option value="Past">Past</option>
+      </select>
+      <input type="date" id="new-deadline">
+      <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
+    </div>
+    <p class="help-text" style="margin:8px 0 0;">Ijrochi Telegram orqali xabar oladi (Telegram ID kiritilgan bo'lsa).</p>
+  </div>
+
+  <div class="section-title hidden" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Tekshiruvdagi topshiriqlar</div>
+  <div class="task-list hidden" id="review-list"></div>
+
+  <div class="section-title hidden" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
+  <div class="exec-grid hidden" id="exec-grid"></div>
+
+  <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
+  <div class="task-list" id="task-list"></div>
+
+</div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+/* =========================================================
+   CONFIG — Supabase loyihangizni yaratgach shu ikki qatorni to'ldiring
+========================================================= */
+const SUPABASE_URL = "https://grmzxdzgxiphyxzcpoxq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybXp4ZHpneGlwaHl4emNwb3hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1MjE0MzUsImV4cCI6MjEwMDA5NzQzNX0.Mb5Mx3v5S2EK9v5_PNRokLpmlKHFNxQ1m-MExlY1ex0";
+// Telegram kirish tugmasi uchun bot username (@siz) — sozlamalarga kiritilguncha shu yerdan olinadi
+const TELEGRAM_BOT_USERNAME = "";
+
+let sb = null;
+let usingLocalFallback = false;
+let currentProfile = null;
+let pendingOtp = { method: '', contact: '' };
+
+/* ---- Local fallback (agar CONFIG to'ldirilmagan bo'lsa, brauzer xotirasida ishlaydi, faqat shu qurilmada) ---- */
+const LOCAL_KEY_TASKS = 'tm_local_tasks';
+const LOCAL_KEY_SETTINGS = 'tm_local_settings';
+const LOCAL_KEY_PROFILE = 'tm_local_profile';
+
+function initSupabase() {
+  if (SUPABASE_URL.startsWith('YOUR_') || SUPABASE_ANON_KEY.startsWith('YOUR_')) {
+    usingLocalFallback = true;
+    console.warn('Supabase sozlanmagan — vaqtinchalik lokal rejimda ishlayapti (faqat shu brauzerda saqlanadi).');
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+/* =========================================================
+   AUTH
+========================================================= */
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['email','phone','telegram','otp'].forEach(t => {
+    const el = document.getElementById('auth-panel-' + t);
+    if (el) el.classList.toggle('hidden', t !== tab);
+  });
+  if (tab === 'telegram') renderTelegramWidget();
+  setAuthMessage('');
+}
+
+function setAuthMessage(msg, isError) {
+  const el = document.getElementById('auth-message');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? 'var(--red)' : 'var(--text-faint)';
+}
+
+function cancelOtp() {
+  const method = pendingOtp.method || 'email';
+  pendingOtp = { method: '', contact: '' };
+  document.getElementById('login-otp').value = '';
+  switchAuthTab(method);
+}
+
+function normalizePhone(raw) {
+  let p = (raw || '').replace(/\s/g, '');
+  if (p.startsWith('8') && p.length === 12) p = '+998' + p.slice(1);
+  if (/^998\d{9}$/.test(p)) p = '+' + p;
+  if (/^\d{9}$/.test(p)) p = '+998' + p;
+  return p;
+}
+
+async function checkInvited(method, contact) {
+  if (usingLocalFallback) return true;
+  const params = method === 'email' ? { p_email: contact }
+    : method === 'phone' ? { p_phone: contact } : { p_telegram_id: contact };
+  const { data, error } = await sb.rpc('is_user_invited', params);
+  if (error) { console.error(error); return false; }
+  return !!data;
+}
+
+async function sendEmailOtp() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  if (!email) { setAuthMessage('Email kiriting', true); return; }
+  if (!await checkInvited('email', email)) {
+    setAuthMessage('Bu email tizimga kiritilmagan. Admin bilan bog\'laning.', true);
+    return;
+  }
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) { setAuthMessage(error.message, true); return; }
+  pendingOtp = { method: 'email', contact: email };
+  document.getElementById('auth-panel-email').classList.add('hidden');
+  document.getElementById('auth-panel-otp').classList.remove('hidden');
+  setAuthMessage('Emailingizga kod yuborildi');
+}
+
+async function sendPhoneOtp() {
+  const phone = normalizePhone(document.getElementById('login-phone').value.trim());
+  if (!phone) { setAuthMessage('Telefon raqam kiriting', true); return; }
+  if (!await checkInvited('phone', phone)) {
+    setAuthMessage('Bu telefon tizimga kiritilmagan. Admin bilan bog\'laning.', true);
+    return;
+  }
+  const { error } = await sb.auth.signInWithOtp({ phone, options: { shouldCreateUser: true } });
+  if (error) { setAuthMessage(error.message, true); return; }
+  pendingOtp = { method: 'phone', contact: phone };
+  document.getElementById('auth-panel-phone').classList.add('hidden');
+  document.getElementById('auth-panel-otp').classList.remove('hidden');
+  setAuthMessage('SMS kod yuborildi');
+}
+
+async function verifyOtp() {
+  const token = document.getElementById('login-otp').value.trim();
+  if (!token) { setAuthMessage('Kodni kiriting', true); return; }
+  const payload = pendingOtp.method === 'email'
+    ? { email: pendingOtp.contact, token, type: 'email' }
+    : { phone: pendingOtp.contact, token, type: 'sms' };
+  const { error } = await sb.auth.verifyOtp(payload);
+  if (error) { setAuthMessage(error.message, true); return; }
+  const linked = await linkProfile();
+  if (!linked) {
+    await sb.auth.signOut();
+    setAuthMessage('Kirish rad etildi — siz ro\'yxatda emassiz.', true);
+    return;
+  }
+  await enterApp();
+}
+
+async function linkProfile() {
+  if (usingLocalFallback) {
+    currentProfile = JSON.parse(localStorage.getItem(LOCAL_KEY_PROFILE) || '{"display_name":"Lokal foydalanuvchi","role":"admin"}');
+    return true;
+  }
+  const params = pendingOtp.method === 'email' ? { p_email: pendingOtp.contact }
+    : pendingOtp.method === 'phone' ? { p_phone: pendingOtp.contact } : {};
+  const { data, error } = await sb.rpc('link_current_user', params);
+  if (error) { console.error(error); return false; }
+  if (!data?.ok) return false;
+  currentProfile = data.user;
+  return true;
+}
+
+async function loadProfile() {
+  if (usingLocalFallback) {
+    currentProfile = JSON.parse(localStorage.getItem(LOCAL_KEY_PROFILE) || '{"display_name":"Lokal foydalanuvchi","role":"admin"}');
+    return !!currentProfile;
+  }
+  const { data: sessionData } = await sb.auth.getSession();
+  if (!sessionData?.session) return false;
+  const { data, error } = await sb.rpc('get_my_profile');
+  if (error || !data?.ok) {
+    await sb.auth.signOut();
+    return false;
+  }
+  currentProfile = data.user;
+  return true;
+}
+
+function renderTelegramWidget() {
+  const container = document.getElementById('telegram-login-container');
+  if (!container || container.dataset.loaded) return;
+  const botUser = (state.settings?.telegram_bot_username || TELEGRAM_BOT_USERNAME || '').replace('@', '');
+  if (!botUser) {
+    container.innerHTML = '<p class="auth-hint" style="margin:0">Admin avval Telegram bot username ni sozlamalarga kiritsin.</p>';
+    return;
+  }
+  window.onTelegramAuth = handleTelegramAuth;
+  container.innerHTML = '';
+  const script = document.createElement('script');
+  script.src = 'https://telegram.org/js/telegram-widget.js?22';
+  script.setAttribute('data-telegram-login', botUser);
+  script.setAttribute('data-size', 'large');
+  script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  script.setAttribute('data-request-access', 'write');
+  script.async = true;
+  container.appendChild(script);
+  container.dataset.loaded = '1';
+}
+
+async function handleTelegramAuth(user) {
+  setAuthMessage('Telegram tekshirilmoqda...');
+  try {
+    const res = await fetch('/api/telegram-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      setAuthMessage(data.error || 'Telegram kirish xatosi', true);
+      return;
+    }
+    await sb.auth.setSession(data.session);
+    currentProfile = data.user;
+    await enterApp();
+  } catch (e) {
+    setAuthMessage('Telegram API ulanmadi. Vercel deploy va SUPABASE_SERVICE_ROLE_KEY ni tekshiring.', true);
+  }
+}
+
+function showAuth() {
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-wrap').classList.add('hidden');
+}
+
+function roleLabel(role) {
+  return { admin: 'Admin', director: 'Direktor', executor: 'Ijrochi' }[role] || role;
+}
+function roleBadge(role) {
+  const cls = { admin: 'role-admin', director: 'role-director', executor: 'role-executor' }[role] || '';
+  return `<span class="role-badge ${cls}">${roleLabel(role)}</span>`;
+}
+function isAdmin() { return currentProfile?.role === 'admin'; }
+function isDirector() { return currentProfile?.role === 'director'; }
+function isExecutor() { return currentProfile?.role === 'executor'; }
+function canCreateTasks() { return isAdmin() || isDirector(); }
+function canApproveTasks() { return isAdmin() || isDirector(); }
+function canManageUsers() { return isAdmin(); }
+function getExecutors() {
+  return state.appUsers.filter(u => u.role === 'executor' || u.role === 'admin');
+}
+function getDirectors() {
+  return state.appUsers.filter(u => u.role === 'director' || u.role === 'admin');
+}
+function userById(id) {
+  return state.appUsers.find(u => u.id === id);
+}
+function visibleTasks() {
+  if (canCreateTasks()) return state.tasks;
+  return state.tasks.filter(t => t.assignee_user_id === currentProfile?.id);
+}
+
+function showApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-wrap').classList.remove('hidden');
+  const chip = document.getElementById('user-chip');
+  if (chip && currentProfile) {
+    chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role);
+  }
+  document.getElementById('admin-panel').classList.toggle('hidden', !canManageUsers());
+  document.getElementById('settings-panel').classList.toggle('hidden', !canManageUsers());
+  document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
+  document.getElementById('exec-section-title').classList.toggle('hidden', false);
+  document.getElementById('exec-grid').classList.toggle('hidden', false);
+  document.getElementById('review-section-title').classList.toggle('hidden', !canApproveTasks());
+  document.getElementById('review-list').classList.toggle('hidden', !canApproveTasks());
+  if (canManageUsers()) renderUsersTable();
+  renderExecutorSelect();
+}
+
+async function enterApp() {
+  state.settings = await fetchSettings();
+  state.appUsers = await fetchTeamUsers();
+  state.tasks = await fetchTasks();
+  showApp();
+  document.getElementById('tg-token').value = state.settings.telegram_token || '';
+  document.getElementById('tg-chat').value = state.settings.telegram_chat_id || '';
+  document.getElementById('tg-bot-user').value = state.settings.telegram_bot_username || TELEGRAM_BOT_USERNAME || '';
+  renderAll();
+  subscribeRealtime();
+}
+
+async function signOut() {
+  if (!usingLocalFallback && sb) await sb.auth.signOut();
+  currentProfile = null;
+  pendingOtp = { method: '', contact: '' };
+  showAuth();
+  setAuthMessage('');
+}
+
+function subscribeRealtime() {
+  if (usingLocalFallback || !sb) return;
+  sb.channel('tasks-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => { refreshFromDB(); })
+    .subscribe();
+}
+
+/* =========================================================
+   ADMIN — FOYDALANUVCHILAR
+========================================================= */
+async function fetchAppUsers() {
+  if (usingLocalFallback) return [];
+  const { data, error } = await sb.from('app_users').select('*').eq('is_active', true).order('created_at', { ascending: true });
+  if (error) { toast('Foydalanuvchilar: ' + error.message); return []; }
+  return data;
+}
+
+async function fetchTeamUsers() {
+  if (usingLocalFallback) return [];
+  const { data, error } = await sb.from('app_users').select('*').eq('is_active', true).order('display_name', { ascending: true });
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function renderUsersTable() {
+  const users = await fetchAppUsers();
+  const tbody = document.getElementById('users-tbody');
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>${escapeHtml(u.display_name)}</td>
+      <td>${escapeHtml(u.email || '—')}</td>
+      <td>${escapeHtml(u.phone || '—')}</td>
+      <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
+      <td>${roleLabel(u.role)}</td>
+      <td>${u.id !== currentProfile?.id ? `<button class="btn-red-tint" onclick="deactivateUser('${u.id}')">O'chirish</button>` : '—'}</td>
+    </tr>`).join('');
+}
+
+function renderExecutorSelect() {
+  const sel = document.getElementById('new-executor');
+  if (!sel) return;
+  const cur = sel.value;
+  const executors = getExecutors();
+  sel.innerHTML = '<option value="">Ijrochini tanlang…</option>' +
+    executors.map(u => `<option value="${u.id}">${escapeHtml(u.display_name)}${u.role === 'admin' ? ' (Admin)' : ''}</option>`).join('');
+  sel.value = cur;
+}
+
+async function addAppUser() {
+  const display_name = document.getElementById('u-name').value.trim();
+  const email = document.getElementById('u-email').value.trim().toLowerCase() || null;
+  const phone = document.getElementById('u-phone').value.trim() ? normalizePhone(document.getElementById('u-phone').value) : null;
+  const telegram_id = document.getElementById('u-telegram').value.trim() || null;
+  const role = document.getElementById('u-role').value;
+  if (!display_name) { toast('Ism kiriting'); return; }
+  if (!email && !phone && !telegram_id) { toast('Kamida bitta: email, telefon yoki Telegram ID'); return; }
+  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, is_active: true }]);
+  if (error) { toast('Xatolik: ' + error.message); return; }
+  document.getElementById('u-name').value = '';
+  document.getElementById('u-email').value = '';
+  document.getElementById('u-phone').value = '';
+  document.getElementById('u-telegram').value = '';
+  document.getElementById('u-role').value = 'executor';
+  state.appUsers = await fetchTeamUsers();
+  renderExecutorSelect();
+  await renderUsersTable();
+  toast('Foydalanuvchi qo\'shildi');
+}
+
+async function deactivateUser(id) {
+  if (!confirm('Foydalanuvchini o\'chirmoqchimisiz?')) return;
+  const { error } = await sb.from('app_users').update({ is_active: false }).eq('id', id);
+  if (error) { toast('Xatolik: ' + error.message); return; }
+  await renderUsersTable();
+  state.appUsers = await fetchTeamUsers();
+  renderExecutorSelect();
+  toast('O\'chirildi');
+}
+
+/* =========================================================
+   STATE
+========================================================= */
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'' };
+
+function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
+function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function initials(name){ return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase(); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function priorityClass(p){
+  const map = { 'Shoshilinch':'p-shoshilinch', 'Yuqori':'p-yuqori', "O'rta":'p-orta', 'Past':'p-past' };
+  return map[p] || 'p-';
+}
+
+/* =========================================================
+   DATA LAYER (Supabase yoki lokal fallback)
+========================================================= */
+async function fetchTasks() {
+  if (usingLocalFallback) {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+  }
+  const { data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: true });
+  if (error) { console.error(error); toast('Ma\'lumot olishda xatolik: ' + error.message); return []; }
+  return data;
+}
+async function fetchSettings() {
+  if (usingLocalFallback) {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || '{"telegram_token":"","telegram_chat_id":"","notifications_enabled":false}');
+  }
+  const { data, error } = await sb.from('settings').select('*').eq('id', 1).single();
+  if (error) { console.error(error); return { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }; }
+  return data;
+}
+async function insertTask(task) {
+  if (usingLocalFallback) {
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+    list.push(Object.assign({ id: uid(), created_at: new Date().toISOString() }, task));
+    localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
+    return;
+  }
+  const { error } = await sb.from('tasks').insert([task]);
+  if (error) toast('Xatolik: ' + error.message);
+}
+async function updateTask(id, patch) {
+  if (usingLocalFallback) {
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+    const idx = list.findIndex(t => t.id === id);
+    if (idx > -1) list[idx] = Object.assign({}, list[idx], patch);
+    localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
+    return;
+  }
+  const { error } = await sb.from('tasks').update(patch).eq('id', id);
+  if (error) toast('Xatolik: ' + error.message);
+}
+async function deleteTaskRow(id) {
+  if (usingLocalFallback) {
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]').filter(t => t.id !== id);
+    localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
+    return;
+  }
+  const { error } = await sb.from('tasks').delete().eq('id', id);
+  if (error) toast('Xatolik: ' + error.message);
+}
+async function saveSettings(patch) {
+  state.settings = Object.assign({}, state.settings, patch);
+  if (usingLocalFallback) {
+    localStorage.setItem(LOCAL_KEY_SETTINGS, JSON.stringify(state.settings));
+    return;
+  }
+  const { error } = await sb.from('settings').update(patch).eq('id', 1);
+  if (error) toast('Xatolik: ' + error.message);
+  if (patch.telegram_bot_username) {
+    const c = document.getElementById('telegram-login-container');
+    if (c) { delete c.dataset.loaded; c.innerHTML = ''; }
+  }
+}
+
+/* =========================================================
+   DERIVED
+========================================================= */
+function effectiveStatus(t) {
+  if (t.status === 'bajarildi') return 'bajarildi';
+  if (t.status === 'tekshiruvda') return 'tekshiruvda';
+  const today = new Date(todayISO());
+  const dl = t.deadline ? new Date(t.deadline) : null;
+  if (dl && dl < today) return 'muddati_otgan';
+  return 'jarayonda';
+}
+function statusLabel(eff) {
+  return {
+    jarayonda: 'Jarayonda',
+    tekshiruvda: 'Tekshiruvda',
+    bajarildi: 'Bajarildi',
+    muddati_otgan: "Muddati o'tgan"
+  }[eff] || eff;
+}
+function deadlineInfo(t) {
+  if (t.status === 'bajarildi') return { text: 'Bajarildi', cls: '' };
+  if (t.status === 'tekshiruvda') return { text: 'Tekshiruvda', cls: 'today' };
+  if (!t.deadline) return { text: '—', cls: '' };
+  const today = new Date(todayISO());
+  const dl = new Date(t.deadline);
+  const diff = Math.round((dl - today) / 86400000);
+  if (diff === 0) return { text: 'Bugun', cls: 'today' };
+  if (diff > 0) return { text: diff + ' kun qoldi', cls: '' };
+  return { text: Math.abs(diff) + ' kun o\'tdi', cls: 'overdue' };
+}
+function matchesFilters(t) {
+  if (state.filterPriority && t.priority !== state.filterPriority) return false;
+  if (state.filterAssignee && t.assignee !== state.filterAssignee) return false;
+  if (state.search) {
+    const s = state.search.toLowerCase();
+    const creator = userById(t.created_by_user_id);
+    const hay = [t.title, t.assignee, creator?.display_name].filter(Boolean).join(' ').toLowerCase();
+    if (!hay.includes(s)) return false;
+  }
+  return true;
+}
+function distinctAssignees() {
+  return Array.from(new Set(visibleTasks().map(t => t.assignee).filter(Boolean))).sort();
+}
+function taskRowHtml(t, mode) {
+  const eff = effectiveStatus(t);
+  const dl = deadlineInfo(t);
+  const creator = userById(t.created_by_user_id);
+  const isMine = t.assignee_user_id === currentProfile?.id;
+  let actions = '';
+  if (mode === 'review' && canApproveTasks() && t.status === 'tekshiruvda') {
+    actions = `<button class="btn-green" onclick="approveTask('${t.id}')">✓ Bajarildi</button>`;
+  } else {
+    const parts = [];
+    if (canCreateTasks()) parts.push(`<button class="icon-btn" onclick="openEditModal('${t.id}')">✎</button>`);
+    if (isMine && (eff === 'jarayonda' || eff === 'muddati_otgan')) {
+      parts.push(`<button class="btn-amber" onclick="submitForReview('${t.id}')">Tekshiruvga</button>`);
+    }
+    if (canApproveTasks() && t.status === 'tekshiruvda') {
+      parts.push(`<button class="btn-green" onclick="approveTask('${t.id}')">Bajarildi</button>`);
+    }
+    if (canCreateTasks()) parts.push(`<button class="icon-btn" onclick="removeTask('${t.id}')">🗑</button>`);
+    actions = parts.join('');
+  }
+  return `
+    <div class="task-row">
+      <div class="t-main">
+        <div class="t-title">${escapeHtml(t.title)}</div>
+        <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${t.comment ? ' · 💬 ' + escapeHtml(t.comment) : ''}</div>
+      </div>
+      ${t.priority ? `<span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
+      <span class="pill s-${eff}">${statusLabel(eff)}</span>
+      <span class="deadline-tag ${dl.cls}">${dl.text}</span>
+      <div class="task-actions">${actions}</div>
+    </div>`;
+}
+
+/* =========================================================
+   RENDER
+========================================================= */
+function renderKpis() {
+  const tasks = visibleTasks();
+  const total = tasks.length;
+  const done = tasks.filter(t => effectiveStatus(t) === 'bajarildi').length;
+  const review = tasks.filter(t => effectiveStatus(t) === 'tekshiruvda').length;
+  const overdue = tasks.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
+  const progress = tasks.filter(t => effectiveStatus(t) === 'jarayonda').length;
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-progress').textContent = progress;
+  document.getElementById('kpi-review').textContent = review;
+  document.getElementById('kpi-done').textContent = done;
+  document.getElementById('kpi-overdue').textContent = overdue;
+}
+function renderAssigneeOptions() {
+  const names = distinctAssignees();
+  const filterSel = document.getElementById('filter-assignee');
+  const cur = filterSel.value;
+  filterSel.innerHTML = '<option value="">Barcha ijrochilar</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  filterSel.value = cur;
+}
+function renderExecCards() {
+  const names = Array.from(new Set(state.tasks.map(t => t.assignee).filter(Boolean))).sort();
+  const grid = document.getElementById('exec-grid');
+  if (!names.length) { grid.innerHTML = '<div class="empty-msg">Hali topshiriq yo\'q</div>'; return; }
+  grid.innerHTML = names.map(name => {
+    const own = state.tasks.filter(t => t.assignee === name);
+    const total = own.length;
+    const done = own.filter(t => effectiveStatus(t) === 'bajarildi').length;
+    const review = own.filter(t => effectiveStatus(t) === 'tekshiruvda').length;
+    const overdue = own.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
+    const progress = own.filter(t => effectiveStatus(t) === 'jarayonda').length;
+    const pct = total ? Math.round((done/total)*100) : 0;
+    return `
+      <div class="exec-card" onclick="filterByAssignee('${escapeHtml(name).replace(/'/g,"\\'")}')">
+        <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}</div>
+        <div class="exec-stats"><span>Jami: ${total}</span><span style="color:var(--blue)">Jarayonda: ${progress}</span></div>
+        <div class="exec-stats"><span style="color:var(--amber)">Tekshiruv: ${review}</span><span style="color:var(--green)">Bajarildi: ${done}</span></div>
+        <div class="exec-bar"><div class="exec-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  }).join('');
+}
+function renderReviewList() {
+  const list = document.getElementById('review-list');
+  if (!canApproveTasks()) return;
+  const reviewTasks = visibleTasks().filter(t => t.status === 'tekshiruvda');
+  if (!reviewTasks.length) {
+    list.innerHTML = '<div class="empty-msg">Tekshiruvdagi topshiriq yo\'q</div>';
+    return;
+  }
+  list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
+}
+function renderTaskList() {
+  const list = document.getElementById('task-list');
+  const filtered = visibleTasks().filter(matchesFilters).filter(t => t.status !== 'tekshiruvda' || !canApproveTasks())
+    .slice().sort((x,y) => new Date(x.deadline||'2999-01-01') - new Date(y.deadline||'2999-01-01'));
+  if (!filtered.length) { list.innerHTML = '<div class="empty-msg">Topshiriq topilmadi</div>'; return; }
+  list.innerHTML = filtered.map(t => taskRowHtml(t, 'main')).join('');
+}
+function renderAll() {
+  renderKpis();
+  renderAssigneeOptions();
+  renderExecutorSelect();
+  renderExecCards();
+  renderReviewList();
+  renderTaskList();
+}
+function filterByAssignee(name) {
+  state.filterAssignee = name;
+  document.getElementById('filter-assignee').value = name;
+  renderTaskList();
+  document.getElementById('task-list').scrollIntoView({ behavior:'smooth' });
+}
+function onSearch(v){ state.search = v; renderTaskList(); }
+function onFilterAssignee(v){ state.filterAssignee = v; renderTaskList(); }
+function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); }
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+async function refreshFromDB() {
+  state.tasks = await fetchTasks();
+  state.appUsers = await fetchTeamUsers();
+  renderAll();
+  toast("Ma'lumotlar yangilandi");
+}
+async function addTask() {
+  const executorId = document.getElementById('new-executor').value;
+  const title = document.getElementById('new-title').value.trim();
+  const priority = document.getElementById('new-priority').value;
+  const deadline = document.getElementById('new-deadline').value || null;
+  const executor = userById(executorId);
+  if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  await insertTask({
+    assignee_user_id: executorId,
+    assignee: executor.display_name,
+    created_by_user_id: currentProfile.id,
+    title, priority, deadline,
+    status: 'jarayonda',
+    start_date: todayISO(),
+    comment: ''
+  });
+  document.getElementById('new-executor').value = '';
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-priority').value = '';
+  document.getElementById('new-deadline').value = '';
+  await refreshFromDB();
+  await notifyExecutorNewTask(executor, title, deadline);
+  toast('Topshiriq yaratildi va ijrochiga yuborildi');
+}
+async function submitForReview(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || task.assignee_user_id !== currentProfile.id) return;
+  if (!confirm('Topshiriqni tekshiruvga yuborasizmi?')) return;
+  await updateTask(id, { status: 'tekshiruvda' });
+  await refreshFromDB();
+  await notifyDirectorsReview(task);
+  toast('Tekshiruvga yuborildi — direktor xabar oladi');
+}
+async function approveTask(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || !canApproveTasks()) return;
+  if (!confirm('Topshiriq bajarilgan deb yopilsinmi?')) return;
+  await updateTask(id, { status: 'bajarildi' });
+  await refreshFromDB();
+  const executor = userById(task.assignee_user_id);
+  if (executor) await notifyUser(executor, `✅ <b>Topshiriq tasdiqlandi</b>\n\n${task.title}\n\nDirektor topshiriqni yopdi.`);
+  toast('Topshiriq bajarildi deb yopildi');
+}
+async function removeTask(id) {
+  if (!confirm("Topshiriqni o'chirmoqchimisiz?")) return;
+  await deleteTaskRow(id);
+  await refreshFromDB();
+  toast("O'chirildi");
+}
+function openEditModal(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t || !canCreateTasks()) return;
+  const executorOptions = getExecutors().map(u =>
+    `<option value="${u.id}" ${u.id===t.assignee_user_id?'selected':''}>${escapeHtml(u.display_name)}</option>`
+  ).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Topshiriqni tahrirlash</h3>
+        <div class="field"><label>Ijrochi</label><select id="e-executor">${executorOptions}</select></div>
+        <div class="field"><label>Topshiriq matni</label><input type="text" id="e-title" value="${escapeHtml(t.title)}"></div>
+        <div class="field"><label>Muddat</label><input type="date" id="e-deadline" value="${t.deadline || ''}"></div>
+        <div class="field"><label>Holat</label>
+          <select id="e-status">
+            <option value="jarayonda" ${t.status==='jarayonda'?'selected':''}>Jarayonda</option>
+            <option value="tekshiruvda" ${t.status==='tekshiruvda'?'selected':''}>Tekshiruvda</option>
+            <option value="bajarildi" ${t.status==='bajarildi'?'selected':''}>Bajarildi</option>
+          </select>
+        </div>
+        <div class="field"><label>Izoh</label><textarea id="e-comment" rows="3">${escapeHtml(t.comment||'')}</textarea></div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-blue" onclick="saveEdit('${id}')">Saqlash</button>
+        </div>
+      </div>
+    </div>`;
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+async function saveEdit(id) {
+  const executorId = document.getElementById('e-executor').value;
+  const executor = userById(executorId);
+  const patch = {
+    assignee_user_id: executorId,
+    assignee: executor ? executor.display_name : '',
+    title: document.getElementById('e-title').value.trim(),
+    deadline: document.getElementById('e-deadline').value || null,
+    status: document.getElementById('e-status').value,
+    comment: document.getElementById('e-comment').value.trim()
+  };
+  await updateTask(id, patch);
+  closeModal();
+  await refreshFromDB();
+  toast('Saqlandi');
+}
+
+/* =========================================================
+   NOTIFICATIONS
+========================================================= */
+function toggleDesktopNotif() {
+  if (!('Notification' in window)) { toast("Brauzeringiz bildirishnomani qo'llamaydi"); return; }
+  Notification.requestPermission().then(perm => {
+    const chip = document.getElementById('desktop-status');
+    if (perm === 'granted') {
+      chip.innerHTML = 'Holat: <b>✅ yoqilgan</b>';
+      chip.classList.remove('off');
+      new Notification('Topshiriqlar monitoringi', { body: 'Bildirishnomalar yoqildi ✅' });
+    } else {
+      chip.innerHTML = "Holat: <b>o'chiq</b>";
+      chip.classList.add('off');
+    }
+  });
+}
+async function sendTelegramTo(chat_id, text) {
+  const token = state.settings.telegram_token;
+  if (!token || !chat_id) return false;
+  try {
+    const res = await fetch('/api/send-telegram', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, chat_id, text })
+    });
+    const data = await res.json();
+    return !!(data && data.ok);
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}
+async function sendTelegram(text) {
+  const chat_id = state.settings.telegram_chat_id;
+  if (!state.settings.telegram_token || !chat_id) { toast('Avval Telegram token va Chat ID kiriting'); return false; }
+  const ok = await sendTelegramTo(chat_id, text);
+  if (!ok) toast('Telegramga yuborishda xatolik');
+  return ok;
+}
+async function notifyUser(user, text) {
+  if (!user?.telegram_id) return false;
+  return sendTelegramTo(user.telegram_id, text);
+}
+async function notifyExecutorNewTask(executor, title, deadline) {
+  const creator = currentProfile?.display_name || 'Direktor';
+  const dl = deadline ? `\nMuddat: <b>${deadline}</b>` : '';
+  const ok = await notifyUser(executor, `📋 <b>Yangi topshiriq</b>\n\n${title}${dl}\n\nYaratuvchi: ${creator}`);
+  if (!ok && !executor.telegram_id) toast('Ijrochining Telegram ID kiritilmagan — xabar yuborilmadi');
+}
+async function notifyDirectorsReview(task) {
+  const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}`;
+  let sent = 0;
+  for (const d of getDirectors()) {
+    if (await notifyUser(d, lines)) sent++;
+  }
+  if (!sent) toast('Direktorlarning Telegram ID si yo\'q — xabar yuborilmadi');
+}
+async function saveAndTestTelegram() {
+  const token = document.getElementById('tg-token').value.trim();
+  const chat_id = document.getElementById('tg-chat').value.trim();
+  const telegram_bot_username = document.getElementById('tg-bot-user').value.trim().replace('@', '');
+  await saveSettings({ telegram_token: token, telegram_chat_id: chat_id, telegram_bot_username });
+  const ok = await sendTelegram("✅ Topshiriqlar monitoringi botga ulandi!");
+  if (ok) toast('Telegram ulandi va test xabar yuborildi');
+}
+async function checkDeadlinesNow() {
+  const active = visibleTasks().filter(t => t.status !== 'bajarildi' && t.status !== 'tekshiruvda');
+  const today = active.filter(t => deadlineInfo(t).cls === 'today');
+  const overdue = active.filter(t => effectiveStatus(t) === 'muddati_otgan');
+  if (!today.length && !overdue.length) { toast("Bugun muddati o'tgan yoki tugaydigan topshiriq yo'q"); return; }
+  let lines = [];
+  if (overdue.length) lines.push('⚠️ <b>Muddati o\'tgan (' + overdue.length + '):</b>', ...overdue.map(t => '• ' + t.assignee + ' — ' + t.title));
+  if (today.length) lines.push('', '⏰ <b>Bugun tugaydi (' + today.length + '):</b>', ...today.map(t => '• ' + t.assignee + ' — ' + t.title));
+  await sendTelegram(lines.join('\n'));
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Muddat eslatmasi', { body: (overdue.length + today.length) + " ta topshiriqqa e'tibor bering" });
+  }
+  toast('Tekshirildi va yuborildi');
+}
+
+/* =========================================================
+   TOAST
+========================================================= */
+function toast(msg) {
+  const root = document.getElementById('toast-root');
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+/* =========================================================
+   INIT
+========================================================= */
+async function init() {
+  initSupabase();
+
+  if (usingLocalFallback) {
+    currentProfile = JSON.parse(localStorage.getItem(LOCAL_KEY_PROFILE) || '{"display_name":"Lokal foydalanuvchi","role":"admin"}');
+    await enterApp();
+    return;
+  }
+
+  const { data: sessionData } = await sb.auth.getSession();
+  if (sessionData?.session && await loadProfile()) {
+    await enterApp();
+  } else {
+    if (sessionData?.session) await sb.auth.signOut();
+    showAuth();
+  }
+
+  sb.auth.onAuthStateChange(async (event) => {
+    if (event === 'SIGNED_OUT') showAuth();
+  });
+}
+init();
+</script>
+</body>
+</html>
