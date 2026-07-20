@@ -170,6 +170,12 @@
   .user-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .user-form .full{grid-column:1/-1;}
   @media(max-width:600px){.user-form{grid-template-columns:1fr;}}
+  .app-nav{display:flex;gap:6px;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:5px;}
+  .app-nav-btn{flex:1;background:transparent;color:var(--text-soft);padding:10px 12px;font-size:13px;border-radius:9px;}
+  .app-nav-btn.active{background:var(--blue);color:#fff;}
+  .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
+  .view-pane{display:none;}
+  .view-pane.active{display:block;}
 </style>
 </head>
 <body>
@@ -206,7 +212,6 @@
     </div>
     <div class="user-bar">
       <span class="user-chip" id="user-chip"></span>
-      <button class="btn-ghost" onclick="toggleProfilePanel()" style="padding:7px 12px;font-size:12px;">Profil</button>
       <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
     </div>
     <div class="kpi-row">
@@ -218,6 +223,14 @@
     </div>
   </header>
 
+  <div class="app-nav" id="app-nav">
+    <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')">Monitoring</button>
+    <button type="button" class="app-nav-btn" data-view="profile" onclick="switchAppView('profile')">Profil</button>
+    <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')">Boshqaruv</button>
+  </div>
+
+  <!-- MONITORING -->
+  <div id="view-monitoring" class="view-pane active">
   <div class="toolbar">
     <input type="text" id="search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
     <select id="filter-assignee" onchange="onFilterAssignee(this.value)"><option value="">Barcha mas'ul shaxslar</option></select>
@@ -231,7 +244,37 @@
     <button class="btn-blue" onclick="refreshFromDB()">🔄 Yangilash</button>
   </div>
 
-  <div class="panel hidden" id="profile-panel">
+  <div class="panel hidden" id="create-task-panel">
+    <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
+    <div class="add-row">
+      <select id="new-executor"><option value="">Ijrochini tanlang…</option></select>
+      <input type="text" id="new-title" placeholder="Topshiriq matni">
+      <select id="new-priority">
+        <option value="">Ustuvorlik yo'q</option>
+        <option value="Shoshilinch">Shoshilinch</option>
+        <option value="Yuqori">Yuqori</option>
+        <option value="O'rta">O'rta</option>
+        <option value="Past">Past</option>
+      </select>
+      <input type="date" id="new-deadline">
+      <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
+    </div>
+    <p class="help-text" style="margin:8px 0 0;">Ijrochi Telegram orqali xabar oladi (Telegram ID kiritilgan bo'lsa).</p>
+  </div>
+
+  <div class="section-title hidden" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Tekshiruvdagi topshiriqlar</div>
+  <div class="task-list hidden" id="review-list"></div>
+
+  <div class="section-title hidden" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
+  <div class="exec-grid hidden" id="exec-grid"></div>
+
+  <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
+  <div class="task-list" id="task-list"></div>
+  </div>
+
+  <!-- PROFIL -->
+  <div id="view-profile" class="view-pane">
+  <div class="panel" id="profile-panel">
     <h2><span class="dot" style="background:var(--blue)"></span> Shaxsiy profil — parolni o'zgartirish</h2>
     <p class="help-text" style="margin-top:0;" id="profile-info"></p>
     <div class="user-form">
@@ -241,8 +284,11 @@
       <div class="full"><button class="btn-blue" onclick="changeMyPassword()">Parolni saqlash</button></div>
     </div>
   </div>
+  </div>
 
-  <div class="panel hidden" id="admin-panel">
+  <!-- BOSHQARUV (admin) -->
+  <div id="view-admin" class="view-pane">
+  <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
     <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Telegram ID — bildirishnomalar uchun. Rollar: Ijrochi / Direktor / Admin.</p>
     <div class="user-form">
@@ -282,33 +328,7 @@
     </div>
     <button class="btn-ghost" onclick="checkDeadlinesNow()">⏰ Hozir muddatlarni tekshirish</button>
   </div>
-
-  <div class="panel hidden" id="create-task-panel">
-    <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
-    <div class="add-row">
-      <select id="new-executor"><option value="">Ijrochini tanlang…</option></select>
-      <input type="text" id="new-title" placeholder="Topshiriq matni">
-      <select id="new-priority">
-        <option value="">Ustuvorlik yo'q</option>
-        <option value="Shoshilinch">Shoshilinch</option>
-        <option value="Yuqori">Yuqori</option>
-        <option value="O'rta">O'rta</option>
-        <option value="Past">Past</option>
-      </select>
-      <input type="date" id="new-deadline">
-      <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
-    </div>
-    <p class="help-text" style="margin:8px 0 0;">Ijrochi Telegram orqali xabar oladi (Telegram ID kiritilgan bo'lsa).</p>
   </div>
-
-  <div class="section-title hidden" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Tekshiruvdagi topshiriqlar</div>
-  <div class="task-list hidden" id="review-list"></div>
-
-  <div class="section-title hidden" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
-  <div class="exec-grid hidden" id="exec-grid"></div>
-
-  <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
-  <div class="task-list" id="task-list"></div>
 
 </div>
 </div>
@@ -546,9 +566,7 @@ function showApp() {
       (currentProfile.email ? ' · ' + escapeHtml(currentProfile.email) : '') +
       ' · Rol: ' + roleLabel(currentProfile.role);
   }
-  document.getElementById('profile-panel').classList.add('hidden');
-  document.getElementById('admin-panel').classList.toggle('hidden', !canManageUsers());
-  document.getElementById('settings-panel').classList.toggle('hidden', !canManageUsers());
+  document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
@@ -556,14 +574,20 @@ function showApp() {
   document.getElementById('review-list').classList.toggle('hidden', !canApproveTasks());
   if (canManageUsers()) renderUsersTable();
   renderExecutorSelect();
+  switchAppView('monitoring');
 }
 
-function toggleProfilePanel() {
-  const panel = document.getElementById('profile-panel');
-  panel.classList.toggle('hidden');
-  if (!panel.classList.contains('hidden')) {
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+function switchAppView(view) {
+  const allowed = ['monitoring', 'profile', 'admin'];
+  if (!allowed.includes(view)) view = 'monitoring';
+  if (view === 'admin' && !canManageUsers()) view = 'monitoring';
+  document.querySelectorAll('.view-pane').forEach(el => {
+    el.classList.toggle('active', el.id === 'view-' + view);
+  });
+  document.querySelectorAll('.app-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+  if (view === 'admin' && canManageUsers()) renderUsersTable();
 }
 
 async function changeMyPassword() {
