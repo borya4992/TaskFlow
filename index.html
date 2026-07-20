@@ -51,12 +51,15 @@
   header h1{margin:0;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
   header p{margin:4px 0 0;color:#E39BA6;font-size:12.5px;}
   .kpi-row{display:flex;gap:10px;}
-  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;cursor:pointer;transition:border-color .12s, background .12s;user-select:none;}
+  .kpi:hover{border-color:var(--blue);}
+  .kpi.active{border-color:var(--blue);background:var(--panel-2);}
   .kpi b{display:block;font-size:20px;line-height:1.1;}
   .kpi span{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
   .kpi.k-progress b{color:var(--blue);}
   .kpi.k-done b{color:var(--green);}
   .kpi.k-overdue b{color:var(--pink);}
+  .kpi.k-review b{color:var(--amber);}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
   .toolbar input[type=text]{flex:1;min-width:180px;}
@@ -215,11 +218,11 @@
       <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
     </div>
     <div class="kpi-row">
-      <div class="kpi"><b id="kpi-total">0</b><span>Jami</span></div>
-      <div class="kpi k-progress"><b id="kpi-progress">0</b><span>Jarayonda</span></div>
-      <div class="kpi" style="--kpi-color:var(--amber)"><b id="kpi-review" style="color:var(--amber)">0</b><span>Tekshiruvda</span></div>
-      <div class="kpi k-done"><b id="kpi-done">0</b><span>Bajarildi</span></div>
-      <div class="kpi k-overdue"><b id="kpi-overdue">0</b><span>Kechikkan</span></div>
+      <div class="kpi active" data-status="" onclick="filterByStatus('')" title="Barcha topshiriqlar"><b id="kpi-total">0</b><span>Jami</span></div>
+      <div class="kpi k-progress" data-status="jarayonda" onclick="filterByStatus('jarayonda')" title="Jarayondagi topshiriqlar"><b id="kpi-progress">0</b><span>Jarayonda</span></div>
+      <div class="kpi k-review" data-status="tekshiruvda" onclick="filterByStatus('tekshiruvda')" title="Tekshiruvdagi topshiriqlar"><b id="kpi-review">0</b><span>Tekshiruvda</span></div>
+      <div class="kpi k-done" data-status="bajarildi" onclick="filterByStatus('bajarildi')" title="Bajarilgan topshiriqlar"><b id="kpi-done">0</b><span>Bajarildi</span></div>
+      <div class="kpi k-overdue" data-status="muddati_otgan" onclick="filterByStatus('muddati_otgan')" title="Muddati o'tgan topshiriqlar"><b id="kpi-overdue">0</b><span>Kechikkan</span></div>
     </div>
   </header>
 
@@ -740,7 +743,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'' };
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -847,6 +850,7 @@ function deadlineInfo(t) {
 function matchesFilters(t) {
   if (state.filterPriority && t.priority !== state.filterPriority) return false;
   if (state.filterAssignee && t.assignee !== state.filterAssignee) return false;
+  if (state.filterStatus && effectiveStatus(t) !== state.filterStatus) return false;
   if (state.search) {
     const s = state.search.toLowerCase();
     const creator = userById(t.created_by_user_id);
@@ -906,6 +910,10 @@ function renderKpis() {
   document.getElementById('kpi-review').textContent = review;
   document.getElementById('kpi-done').textContent = done;
   document.getElementById('kpi-overdue').textContent = overdue;
+  document.querySelectorAll('.kpi-row .kpi').forEach(el => {
+    const st = el.getAttribute('data-status') || '';
+    el.classList.toggle('active', st === (state.filterStatus || ''));
+  });
 }
 function renderAssigneeOptions() {
   const names = distinctAssignees();
@@ -937,8 +945,17 @@ function renderExecCards() {
 }
 function renderReviewList() {
   const list = document.getElementById('review-list');
+  const title = document.getElementById('review-section-title');
   if (!canApproveTasks()) return;
-  const reviewTasks = visibleTasks().filter(t => t.status === 'tekshiruvda');
+  // Status filter boshqa bo'lsa, alohida tekshiruv blokini yashiramiz
+  if (state.filterStatus && state.filterStatus !== 'tekshiruvda') {
+    list.classList.add('hidden');
+    title.classList.add('hidden');
+    return;
+  }
+  title.classList.remove('hidden');
+  list.classList.remove('hidden');
+  const reviewTasks = visibleTasks().filter(t => t.status === 'tekshiruvda').filter(matchesFilters);
   if (!reviewTasks.length) {
     list.innerHTML = '<div class="empty-msg">Tekshiruvdagi topshiriq yo\'q</div>';
     return;
@@ -947,8 +964,12 @@ function renderReviewList() {
 }
 function renderTaskList() {
   const list = document.getElementById('task-list');
-  const filtered = visibleTasks().filter(matchesFilters).filter(t => t.status !== 'tekshiruvda' || !canApproveTasks())
-    .slice().sort((x,y) => new Date(x.deadline||'2999-01-01') - new Date(y.deadline||'2999-01-01'));
+  let filtered = visibleTasks().filter(matchesFilters);
+  // Oddiy rejimda tekshiruvdagilar alohida blokda — asosiy ro'yxatdan chiqaramiz
+  if (!state.filterStatus && canApproveTasks()) {
+    filtered = filtered.filter(t => t.status !== 'tekshiruvda');
+  }
+  filtered = filtered.slice().sort((x,y) => new Date(x.deadline||'2999-01-01') - new Date(y.deadline||'2999-01-01'));
   if (!filtered.length) { list.innerHTML = '<div class="empty-msg">Topshiriq topilmadi</div>'; return; }
   list.innerHTML = filtered.map(t => taskRowHtml(t, 'main')).join('');
 }
@@ -960,15 +981,25 @@ function renderAll() {
   renderReviewList();
   renderTaskList();
 }
+function filterByStatus(status) {
+  state.filterStatus = status || '';
+  switchAppView('monitoring');
+  renderKpis();
+  renderReviewList();
+  renderTaskList();
+  const target = document.getElementById(state.filterStatus === 'tekshiruvda' && canApproveTasks() ? 'review-list' : 'task-list');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 function filterByAssignee(name) {
   state.filterAssignee = name;
   document.getElementById('filter-assignee').value = name;
   renderTaskList();
+  renderReviewList();
   document.getElementById('task-list').scrollIntoView({ behavior:'smooth' });
 }
-function onSearch(v){ state.search = v; renderTaskList(); }
-function onFilterAssignee(v){ state.filterAssignee = v; renderTaskList(); }
-function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); }
+function onSearch(v){ state.search = v; renderTaskList(); renderReviewList(); }
+function onFilterAssignee(v){ state.filterAssignee = v; renderTaskList(); renderReviewList(); }
+function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); renderReviewList(); }
 
 /* =========================================================
    ACTIONS
