@@ -309,7 +309,7 @@
   #toast-root{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;}
   .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);}
 
-  .modal-backdrop{position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:center;justify-content:center;z-index:150;padding:16px;}
+  .modal-backdrop{position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:center;justify-content:center;z-index:400;padding:16px;}
   .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:20px 22px;box-shadow:var(--shadow);}
   .modal h3{margin:0 0 14px;font-size:15px;}
   .modal .field{margin-bottom:12px;}
@@ -427,7 +427,56 @@
   .chart-wrap{position:relative;height:280px;}
   @media(max-width:900px){.smart-charts{grid-template-columns:1fr;}}
   .add-row input[type=datetime-local]{min-width:190px;}
+
+  /* 3D Ofis */
+  .office3d-overlay{
+    position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
+    background:var(--bg);
+  }
+  .office3d-overlay.open{display:flex;}
+  .office3d-topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;
+  }
+  .office3d-topbar h2{margin:0;font-size:15px;display:flex;align-items:center;gap:8px;}
+  .office3d-canvas-wrap{flex:1;position:relative;min-height:0;overflow:hidden;}
+  .office3d-canvas-wrap canvas{display:block;width:100%;height:100%;}
+  .office3d-label{
+    pointer-events:none;text-align:center;transform:translate(-50%,-100%);
+    background:color-mix(in srgb, var(--panel) 92%, transparent);
+    border:1px solid var(--border);border-radius:8px;padding:4px 8px;min-width:72px;
+    box-shadow:var(--shadow);backdrop-filter:blur(4px);
+  }
+  .office3d-label .name{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;}
+  .office3d-label .role{font-size:9px;color:var(--accent2);margin-top:1px;}
+  .office3d-label .status{font-size:10px;margin-top:2px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .office3d-label .status-busy{color:var(--accent);}
+  .office3d-label .status-overdue{color:var(--danger);font-weight:700;}
+  .office3d-label .status-free{color:var(--success);}
+  .office3d-room-label{
+    pointer-events:none;transform:translate(-50%,-50%);
+    font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--text);background:color-mix(in srgb, var(--panel) 85%, transparent);
+    border:1px solid var(--border);padding:4px 10px;border-radius:8px;
+  }
+  .office3d-tooltip{
+    position:absolute;z-index:5;pointer-events:none;max-width:240px;
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;font-size:11.5px;color:var(--text-soft);line-height:1.45;box-shadow:var(--shadow);
+  }
+  .office3d-tooltip.hidden{display:none;}
+  .office3d-tooltip b{color:var(--text);}
+  .office3d-tooltip i{color:var(--accent);font-style:normal;font-size:10.5px;}
+  .office3d-hint{font-size:11.5px;color:var(--text-faint);}
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -487,6 +536,7 @@
   <div class="app-nav" id="app-nav">
     <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')">Monitoring</button>
     <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')">SMART</button>
+    <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D()">🧑‍💼 3D Ofis</button>
     <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')">Boshqaruv</button>
   </div>
 
@@ -589,6 +639,14 @@
       <div class="auth-field"><label>Bo'lim</label>
         <input type="text" id="u-department" list="department-suggestions" placeholder="Masalan: IT, HR, Moliya">
       </div>
+      <div class="auth-field"><label>Lavozim darajasi</label>
+        <select id="u-position-level">
+          <option value="xodim">Xodim</option>
+          <option value="bolim_boshligi">Bo'lim boshlig'i</option>
+          <option value="orinbosar">Direktor o'rinbosari</option>
+          <option value="direktor">Direktor</option>
+        </select>
+      </div>
       <div class="auth-field"><label>Email *</label><input type="email" id="u-email" placeholder="email@example.com"></div>
       <div class="auth-field"><label>Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
       <div class="auth-field"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
@@ -625,6 +683,15 @@
 
 <div id="modal-root"></div>
 <div id="toast-root"></div>
+
+<!-- 3D OFIS (faqat admin) -->
+<div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
+  <div class="office3d-topbar">
+    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Figuraga bosing — topshiriq yarating · Sichqoncha bilan aylantring</span></h2>
+    <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
+  </div>
+  <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
+</div>
 
 <script>
 /* =========================================================
@@ -702,6 +769,9 @@ function applyTheme(themeId, persist) {
     if (smartPane && smartPane.classList.contains('active') && typeof renderSmartAnalytics === 'function') {
       renderSmartAnalytics();
     }
+  } catch (e) {}
+  try {
+    if (window.Office3D && Office3D.isOpen()) Office3D.applyTheme();
   } catch (e) {}
 }
 
@@ -943,6 +1013,33 @@ function roleLabel(role) {
     executor: 'Ijrochi'
   }[role] || role;
 }
+function positionLevelLabel(level) {
+  return {
+    direktor: 'Direktor',
+    orinbosar: "Direktor o'rinbosari",
+    bolim_boshligi: "Bo'lim boshlig'i",
+    xodim: 'Xodim'
+  }[level] || level || 'Xodim';
+}
+function positionLevelFromRole(role) {
+  return {
+    director: 'direktor',
+    deputy_director: 'orinbosar',
+    dept_head: 'bolim_boshligi'
+  }[role] || 'xodim';
+}
+function positionLevelOf(u) {
+  const lv = u?.position_level;
+  if (lv && ['direktor', 'orinbosar', 'bolim_boshligi', 'xodim'].includes(lv)) return lv;
+  return positionLevelFromRole(u?.role);
+}
+function positionLevelOptionsHtml(selected) {
+  const levels = ['xodim', 'bolim_boshligi', 'orinbosar', 'direktor'];
+  const cur = selected || 'xodim';
+  return levels.map(l =>
+    `<option value="${l}" ${l === cur ? 'selected' : ''}>${positionLevelLabel(l)}</option>`
+  ).join('');
+}
 function roleBadge(role) {
   const cls = {
     admin: 'role-admin',
@@ -1037,6 +1134,7 @@ function showApp() {
     chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role) + dept;
   }
   document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
+  document.getElementById('nav-office-btn').classList.toggle('hidden', !canManageUsers());
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
@@ -1127,6 +1225,7 @@ async function enterApp() {
 }
 
 async function signOut() {
+  closeOffice3D();
   stopPresenceHeartbeat();
   if (!usingLocalFallback && sb) await sb.auth.signOut();
   currentProfile = null;
@@ -1139,10 +1238,11 @@ function subscribeRealtime() {
   if (usingLocalFallback || !sb) return;
   sb.channel('tasks-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => { refreshFromDB(); })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_users' }, async () => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' }, async () => {
       state.appUsers = await fetchTeamUsers();
       renderOnlineUsers();
       fillDepartmentSelects();
+      if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
     })
     .subscribe();
 }
@@ -1242,7 +1342,7 @@ async function renderUsersTable() {
       <td>${escapeHtml(u.email || '—')}</td>
       <td>${escapeHtml(u.phone || '—')}</td>
       <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
-      <td>${roleLabel(u.role)}</td>
+      <td>${roleLabel(u.role)}<div class="dept-tag">${positionLevelLabel(positionLevelOf(u))}</div></td>
       <td>${actions.join('')}</td>
     </tr>`;
   }).join('');
@@ -1268,6 +1368,7 @@ function openUserEditModal(id) {
         <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
         <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
         <div class="field"><label>Bo'lim</label><input type="text" id="edit-u-department" list="department-suggestions" value="${escapeHtml(u.department || '')}" placeholder="Masalan: IT, HR, Moliya"></div>
+        <div class="field"><label>Lavozim darajasi</label><select id="edit-u-position-level">${positionLevelOptionsHtml(positionLevelOf(u))}</select></div>
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
         <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
         <div class="field"><label>Telegram ID</label><input type="text" id="edit-u-telegram" value="${escapeHtml(u.telegram_id || '')}"></div>
@@ -1317,6 +1418,7 @@ async function saveUserEdit(id) {
   const display_name = document.getElementById('edit-u-name').value.trim();
   const role = document.getElementById('edit-u-role').value;
   const department = document.getElementById('edit-u-department').value.trim();
+  const position_level = document.getElementById('edit-u-position-level').value || 'xodim';
   const email = document.getElementById('edit-u-email').value.trim().toLowerCase() || null;
   const phoneRaw = document.getElementById('edit-u-phone').value.trim();
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
@@ -1324,7 +1426,7 @@ async function saveUserEdit(id) {
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy'); return; }
 
-  const patch = { display_name, role, department, email, phone, telegram_id };
+  const patch = { display_name, role, department, position_level, email, phone, telegram_id };
   const fileInput = document.getElementById('edit-avatar-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file) {
@@ -1357,6 +1459,7 @@ async function saveUserEdit(id) {
   }
   renderExecutorSelect();
   await renderUsersTable();
+  if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
   toast('Profil yangilandi');
 }
 
@@ -1377,9 +1480,10 @@ async function addAppUser() {
   const telegram_id = document.getElementById('u-telegram').value.trim() || null;
   const role = document.getElementById('u-role').value;
   const department = document.getElementById('u-department').value.trim();
+  const position_level = document.getElementById('u-position-level').value || positionLevelFromRole(role);
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy (parol orqali kirish uchun)'); return; }
-  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, is_active: true }]);
+  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, position_level, is_active: true }]);
   if (error) { toast('Xatolik: ' + error.message); return; }
   try {
     await adminManageAuthUser('create', email, display_name);
@@ -1393,11 +1497,13 @@ async function addAppUser() {
   document.getElementById('u-phone').value = '';
   document.getElementById('u-telegram').value = '';
   document.getElementById('u-department').value = '';
+  document.getElementById('u-position-level').value = 'xodim';
   document.getElementById('u-role').value = 'executor';
   state.appUsers = await fetchTeamUsers();
   renderExecutorSelect();
   fillDepartmentSelects();
   await renderUsersTable();
+  if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
   toast('Foydalanuvchi qo\'shildi. Standart parol: ' + DEFAULT_USER_PASSWORD);
 }
 
@@ -1795,6 +1901,9 @@ async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
   renderAll();
+  if (window.Office3D && Office3D.isOpen()) {
+    Office3D.update(state.appUsers, state.tasks);
+  }
   toast("Ma'lumotlar yangilandi");
 }
 async function addTask() {
@@ -1821,6 +1930,113 @@ async function addTask() {
   await notifyExecutorNewTask(executor, title, deadline);
   toast('Topshiriq yaratildi va ijrochiga yuborildi');
 }
+
+/** 3D Ofisdan: bajaruvchi oldindan tanlangan holda yangi topshiriq formasi */
+function openCreateTaskForUser(userId) {
+  if (!canManageUsers() && !canCreateTasks()) return;
+  const executor = userById(userId);
+  if (!executor) { toast('Foydalanuvchi topilmadi'); return; }
+  const executorOptions = getExecutors().map(u =>
+    `<option value="${u.id}" ${u.id === userId ? 'selected' : ''}>${assigneeOptionLabel(u)}</option>`
+  ).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Yangi topshiriq</h3>
+        <p class="hint">Bajaruvchi: <b>${escapeHtml(executor.display_name)}</b>${executor.department ? ' · ' + escapeHtml(executor.department) : ''}</p>
+        <div class="field"><label>Bajaruvchi</label><select id="m-executor">${executorOptions}</select></div>
+        <div class="field"><label>Topshiriq matni</label><input type="text" id="m-title" placeholder="Nima qilish kerak?" autofocus></div>
+        <div class="field"><label>Ustuvorlik</label>
+          <select id="m-priority">
+            <option value="">Ustuvorlik yo'q</option>
+            <option value="Shoshilinch">Shoshilinch</option>
+            <option value="Yuqori">Yuqori</option>
+            <option value="O'rta">O'rta</option>
+            <option value="Past">Past</option>
+          </select>
+        </div>
+        <div class="field"><label>Muddat</label><input type="datetime-local" id="m-deadline"></div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-blue" onclick="saveCreateTaskModal()">Yaratish va yuborish</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveCreateTaskModal() {
+  const executorId = document.getElementById('m-executor').value;
+  const title = document.getElementById('m-title').value.trim();
+  const priority = document.getElementById('m-priority').value;
+  const deadline = fromDatetimeLocal(document.getElementById('m-deadline').value);
+  const executor = userById(executorId);
+  if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  await insertTask({
+    assignee_user_id: executorId,
+    assignee: executor.display_name,
+    created_by_user_id: currentProfile.id,
+    title, priority, deadline,
+    status: 'jarayonda',
+    start_date: todayISO(),
+    comment: ''
+  });
+  closeModal();
+  await refreshFromDB();
+  await notifyExecutorNewTask(executor, title, deadline);
+  toast('Topshiriq yaratildi va ijrochiga yuborildi');
+}
+
+/* =========================================================
+   3D OFIS (admin)
+========================================================= */
+function getOfficeThemeColors() {
+  return {
+    bg: cssVar('--bg'),
+    panel: cssVar('--panel'),
+    border: cssVar('--border'),
+    accent: cssVar('--accent'),
+    accent2: cssVar('--accent2'),
+    success: cssVar('--success'),
+    danger: cssVar('--danger'),
+    warning: cssVar('--warning'),
+    text: cssVar('--text'),
+  };
+}
+
+async function openOffice3D() {
+  if (!canManageUsers()) { toast('3D Ofis faqat admin uchun'); return; }
+  if (!window.Office3D) {
+    toast('3D modul yuklanmoqda… biroz kuting');
+    return;
+  }
+  const overlay = document.getElementById('office3d-overlay');
+  const canvas = document.getElementById('office3d-canvas');
+  if (!overlay || !canvas) return;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  // users without admin-only filter — show all active team in office
+  Office3D.open(canvas, {
+    users: state.appUsers.filter(u => u.is_active !== false),
+    tasks: state.tasks,
+    getThemeColors: getOfficeThemeColors,
+    onSelectUser: (userId) => openCreateTaskForUser(userId),
+  });
+}
+
+function closeOffice3D() {
+  if (window.Office3D) Office3D.close();
+  const overlay = document.getElementById('office3d-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('office3d-overlay');
+    if (overlay && overlay.classList.contains('open')) closeOffice3D();
+  }
+});
 async function openSubmitReviewModal(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || task.assignee_user_id !== currentProfile.id) return;
@@ -2379,6 +2595,10 @@ async function init() {
   });
 }
 init();
+</script>
+<script type="module">
+  import { Office3D } from './office3d.js';
+  window.Office3D = Office3D;
 </script>
 </body>
 </html>

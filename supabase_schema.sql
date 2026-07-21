@@ -15,6 +15,9 @@ create table if not exists app_users (
   telegram_username text,
   avatar_url text default '',
   department text default '',
+  position_level text default 'xodim' check (position_level in (
+    'direktor', 'orinbosar', 'bolim_boshligi', 'xodim'
+  )),
   last_seen timestamptz,
   role text not null default 'executor' check (role in (
     'admin', 'director', 'deputy_director', 'dept_head', 'executor'
@@ -31,6 +34,22 @@ create table if not exists app_users (
 alter table app_users add column if not exists avatar_url text default '';
 alter table app_users add column if not exists department text default '';
 alter table app_users add column if not exists last_seen timestamptz;
+alter table app_users add column if not exists position_level text default 'xodim';
+
+-- Lavozim darajasi constraint
+alter table app_users drop constraint if exists app_users_position_level_check;
+update app_users set position_level = case
+  when role = 'director' then 'direktor'
+  when role = 'deputy_director' then 'orinbosar'
+  when role = 'dept_head' then 'bolim_boshligi'
+  else coalesce(nullif(position_level, ''), 'xodim')
+end
+where position_level is null
+   or position_level = ''
+   or position_level not in ('direktor', 'orinbosar', 'bolim_boshligi', 'xodim');
+alter table app_users add constraint app_users_position_level_check
+  check (position_level in ('direktor', 'orinbosar', 'bolim_boshligi', 'xodim'));
+
 alter table app_users drop constraint if exists app_users_role_check;
 update app_users set role = 'executor' where role = 'member';
 alter table app_users add constraint app_users_role_check
