@@ -320,13 +320,29 @@
   #toast-root{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;}
   .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);}
 
-  .modal-backdrop{position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:center;justify-content:center;z-index:400;padding:16px;}
-  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:20px 22px;box-shadow:var(--shadow);}
+  .modal-backdrop{
+    position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:flex-start;justify-content:center;z-index:400;
+    padding:max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  }
+  .modal{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;
+    padding:20px 22px;box-shadow:var(--shadow);margin:auto 0;
+    max-height:calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
   .modal h3{margin:0 0 14px;font-size:15px;}
   .modal .field{margin-bottom:12px;}
   .modal label{display:block;font-size:11.5px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
   .modal input,.modal select,.modal textarea{width:100%;}
   .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+  .modal-head{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+    margin:0 0 14px;position:sticky;top:0;z-index:2;
+    background:var(--panel);padding-bottom:4px;
+  }
+  .modal-head h3{margin:0;font-size:15px;flex:1;min-width:0;line-height:1.35;}
+  .modal-head .btn-ghost{flex-shrink:0;min-height:40px;padding:8px 12px;}
 
   /* Theme picker */
   .theme-wrap{position:relative;}
@@ -447,13 +463,26 @@
   .office3d-overlay{
     position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
     background:var(--bg);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
   }
   .office3d-overlay.open{display:flex;}
   .office3d-topbar{
     display:flex;align-items:center;justify-content:space-between;gap:12px;
-    padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;
+    padding:10px 16px;padding-top:max(10px, env(safe-area-inset-top, 0px));
+    padding-left:max(12px, env(safe-area-inset-left, 0px));
+    padding-right:max(12px, env(safe-area-inset-right, 0px));
+    border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;z-index:2;
   }
-  .office3d-topbar h2{margin:0;font-size:15px;display:flex;align-items:center;gap:8px;}
+  .office3d-topbar h2{margin:0;font-size:15px;display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
+  .office3d-close{
+    flex-shrink:0;min-height:44px;min-width:44px;padding:10px 14px;
+  }
+  .office3d-bottombar{
+    display:none;flex-shrink:0;padding:10px 16px;
+    padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--border);background:var(--panel);
+  }
+  .office3d-bottombar .btn-ghost{width:100%;min-height:48px;font-size:15px;}
   .office3d-canvas-wrap{flex:1;position:relative;min-height:0;overflow:hidden;}
   .office3d-canvas-wrap canvas{display:block;width:100%;height:100%;}
   .office3d-label{
@@ -484,6 +513,13 @@
   .office3d-tooltip i{color:var(--accent);font-style:normal;font-size:10.5px;}
   .office3d-hint{font-size:11.5px;color:var(--text-faint);}
   .office3d-legend{font-size:11px;color:var(--text-soft);margin-left:auto;margin-right:12px;}
+  @media(max-width:720px){
+    .office3d-hint,.office3d-legend{display:none;}
+    .office3d-topbar h2{font-size:14px;}
+    .office3d-bottombar{display:block;}
+    .modal.wide{max-width:100%;}
+    .modal-actions{position:sticky;bottom:0;background:var(--panel);padding-top:10px;padding-bottom:2px;z-index:2;}
+  }
 </style>
 <script type="importmap">
 {
@@ -731,9 +767,12 @@
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
   <div class="office3d-topbar">
     <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)</span></h2>
-    <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
+    <button type="button" class="btn-ghost office3d-close" onclick="closeOffice3D()">✕ Yopish</button>
   </div>
   <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
+  <div class="office3d-bottombar">
+    <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
+  </div>
 </div>
 
 <script>
@@ -1926,7 +1965,10 @@ function openAssigneeTasksModal(name) {
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal wide" style="max-width:1100px;">
-        <h3>${escapeHtml(name)} — barcha topshiriqlar</h3>
+        <div class="modal-head">
+          <h3>${escapeHtml(name)} — barcha topshiriqlar</h3>
+          <button type="button" class="btn-ghost" onclick="closeModal()">✕ Yopish</button>
+        </div>
         <div class="assignee-board">
           ${assigneeColumnHtml('Jarayonda', 'jarayonda', by.jarayonda)}
           ${assigneeColumnHtml('Tekshiruvda', 'tekshiruvda', by.tekshiruvda)}
