@@ -260,17 +260,41 @@ as $$
 $$;
 
 -- ============================================================
--- 5) BIRINCHI ADMIN (timekeeper.1120@gmail.com)
+-- 5) BIRINCHI ADMIN (timekeeper.1120@gmail.com) — dublikatsiz
 -- ============================================================
-insert into app_users (display_name, email, role, is_active)
-select 'Admin', 'timekeeper.1120@gmail.com', 'admin', true
+insert into app_users (display_name, email, role, is_active, department)
+select 'Admin', 'timekeeper.1120@gmail.com', 'admin', true, ''
 where not exists (
   select 1 from app_users where lower(email) = lower('timekeeper.1120@gmail.com')
 );
 
 update app_users
-set role = 'admin', is_active = true, display_name = coalesce(nullif(display_name, ''), 'Admin')
+set role = 'admin',
+    is_active = true,
+    department = '',
+    display_name = coalesce(nullif(display_name, ''), 'Admin')
 where lower(email) = lower('timekeeper.1120@gmail.com');
+
+-- Admin hech qachon ofis bo'limi bo'lmasin
+update app_users
+set department = ''
+where role = 'admin'
+   or lower(trim(coalesce(department, ''))) in ('admin', 'админ');
+
+-- Bir xil email bo'yicha dublikatlarni o'chirish (faqat keyingilarini nofaol qilish)
+with ranked as (
+  select id,
+         row_number() over (
+           partition by lower(email)
+           order by (role = 'admin') desc, created_at asc nulls last, id asc
+         ) as rn
+  from app_users
+  where email is not null and trim(email) <> ''
+)
+update app_users u
+set is_active = false
+from ranked r
+where u.id = r.id and r.rn > 1 and u.is_active = true;
 
 -- ============================================================
 -- 6) ROW LEVEL SECURITY

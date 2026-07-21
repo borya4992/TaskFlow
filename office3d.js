@@ -58,18 +58,26 @@ function genderOf(u) {
 
 function normalizeOfficeDepartment(raw) {
   const s = String(raw || '').trim().toLowerCase();
-  if (!s) return 'Xodimlar';
+  if (!s || s === 'admin' || s === 'админ' || s === 'boshqa' || s === "boshqa") return 'Xodimlar';
   for (const d of OFFICE_WORK_DEPARTMENTS) {
     if (d.toLowerCase() === s) return d;
   }
   if (s.includes('qabul') || s.includes('hr') || s.includes('recruit')) return 'Ishga qabul qilish';
   if (s.includes('kompens') || s.includes('payroll') || s.includes('moliya')) return 'Kompensatsiya';
   if (s.includes('xodim') || s.includes('staff') || s.includes('personnel')) return 'Xodimlar';
+  if (s.includes('boshqaruv') || s.includes('management')) return 'Xodimlar';
   return 'Xodimlar';
 }
 
 function officeUsers(users) {
-  return (users || []).filter((u) => u && u.is_active !== false && u.role !== 'admin');
+  return (users || []).filter((u) => {
+    if (!u || u.is_active === false) return false;
+    const role = String(u.role || '').toLowerCase();
+    if (role === 'admin') return false;
+    const dept = String(u.department || '').trim().toLowerCase();
+    if (dept === 'admin' || dept === 'админ') return false;
+    return true;
+  });
 }
 
 function hexToInt(hex, fallback = 0x4c8dff) {
@@ -583,6 +591,9 @@ export const Office3D = {
     this._bindEvents();
     this._resize();
     this._loop();
+    try {
+      console.info('[Office3D] build 20260722b — fixed rooms + low-poly + Dam olish');
+    } catch (_) {}
   },
 
   update(users, tasks) {

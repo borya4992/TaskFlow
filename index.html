@@ -647,11 +647,7 @@
         </select>
       </div>
       <div class="auth-field"><label>Bo'lim</label>
-        <select id="u-department">
-          <option value="Xodimlar">Xodimlar</option>
-          <option value="Ishga qabul qilish">Ishga qabul qilish</option>
-          <option value="Kompensatsiya">Kompensatsiya</option>
-        </select>
+        <input type="text" id="u-department" list="department-suggestions" placeholder="Masalan: Xodimlar, Ishga qabul qilish…" autocomplete="off">
       </div>
       <div class="auth-field"><label>Jins</label>
         <select id="u-gender">
@@ -707,7 +703,7 @@
 <!-- 3D OFIS (faqat admin) -->
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
   <div class="office3d-topbar">
-    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Figuraga bosing — topshiriq yarating · Bo'sh → Dam olish · Band → bo'lim</span></h2>
+    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Boshqaruv · Xodimlar · Ishga qabul · Kompensatsiya · Dam olish · Low-poly figuralar</span></h2>
     <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
   </div>
   <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
@@ -1074,7 +1070,8 @@ function genderOptionsHtml(selected) {
   ).join('');
 }
 function officeDepartmentOptionsHtml(selected) {
-  const cur = OFFICE_DEPARTMENTS.includes(selected) ? selected : 'Xodimlar';
+  // Eski select uchun saqlangan; hozir input+datalist ishlatiladi
+  const cur = selected || '';
   return OFFICE_DEPARTMENTS.map(d =>
     `<option value="${escapeHtml(d)}" ${d === cur ? 'selected' : ''}>${escapeHtml(d)}</option>`
   ).join('');
@@ -1142,13 +1139,19 @@ function distinctDepartments() {
   return Array.from(new Set([
     ...OFFICE_DEPARTMENTS,
     ...state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
-  ])).sort((a, b) => a.localeCompare(b, 'uz'));
+  ]))
+    .filter(d => !/^admin$/i.test(d))
+    .sort((a, b) => a.localeCompare(b, 'uz'));
 }
 
 function refreshDepartmentSuggestions() {
   const list = document.getElementById('department-suggestions');
   if (!list) return;
-  list.innerHTML = distinctDepartments().map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
+  const deps = Array.from(new Set([
+    ...OFFICE_DEPARTMENTS,
+    ...state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
+  ])).filter(d => !/^admin$/i.test(d)).sort((a, b) => a.localeCompare(b, 'uz'));
+  list.innerHTML = deps.map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
 }
 
 function fillDepartmentSelects() {
@@ -1407,7 +1410,7 @@ function openUserEditModal(id) {
         </div>
         <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
         <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
-        <div class="field"><label>Bo'lim</label><select id="edit-u-department">${officeDepartmentOptionsHtml(u.department || 'Xodimlar')}</select></div>
+        <div class="field"><label>Bo'lim</label><input type="text" id="edit-u-department" list="department-suggestions" value="${escapeHtml(u.department || '')}" placeholder="Masalan: Xodimlar, Ishga qabul qilish…" autocomplete="off"></div>
         <div class="field"><label>Jins</label><select id="edit-u-gender">${genderOptionsHtml(genderOf(u))}</select></div>
         <div class="field"><label>Lavozim darajasi</label><select id="edit-u-position-level">${positionLevelOptionsHtml(positionLevelOf(u))}</select></div>
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
@@ -1539,7 +1542,7 @@ async function addAppUser() {
   document.getElementById('u-email').value = '';
   document.getElementById('u-phone').value = '';
   document.getElementById('u-telegram').value = '';
-  document.getElementById('u-department').value = 'Xodimlar';
+  document.getElementById('u-department').value = '';
   document.getElementById('u-gender').value = 'erkak';
   document.getElementById('u-position-level').value = 'xodim';
   document.getElementById('u-role').value = 'executor';
@@ -2058,9 +2061,15 @@ async function openOffice3D() {
   if (!overlay || !canvas) return;
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  // Admin 3D ofisda ko'rinmaydi; filtr office3d.js ichida ham bor
+  // Admin va Admin bo'limi 3D ofisda ko'rinmaydi
   Office3D.open(canvas, {
-    users: state.appUsers.filter(u => u.is_active !== false && u.role !== 'admin'),
+    users: state.appUsers.filter(u => {
+      if (u.is_active === false) return false;
+      if (String(u.role || '').toLowerCase() === 'admin') return false;
+      const d = String(u.department || '').trim().toLowerCase();
+      if (d === 'admin') return false;
+      return true;
+    }),
     tasks: state.tasks,
     getThemeColors: getOfficeThemeColors,
     onSelectUser: (userId) => openCreateTaskForUser(userId),
@@ -2641,8 +2650,9 @@ async function init() {
 init();
 </script>
 <script type="module">
-  import { Office3D } from './office3d.js';
+  import { Office3D } from './office3d.js?v=20260722b';
   window.Office3D = Office3D;
+  window.OFFICE3D_BUILD = '20260722b';
 </script>
 </body>
 </html>
