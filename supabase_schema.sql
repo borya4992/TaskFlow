@@ -14,6 +14,8 @@ create table if not exists app_users (
   telegram_id text,
   telegram_username text,
   avatar_url text default '',
+  department text default '',
+  last_seen timestamptz,
   role text not null default 'executor' check (role in (
     'admin', 'director', 'deputy_director', 'dept_head', 'executor'
   )),
@@ -27,6 +29,8 @@ create table if not exists app_users (
 
 -- Mavjud bazada rollarni yangilash
 alter table app_users add column if not exists avatar_url text default '';
+alter table app_users add column if not exists department text default '';
+alter table app_users add column if not exists last_seen timestamptz;
 alter table app_users drop constraint if exists app_users_role_check;
 update app_users set role = 'executor' where role = 'member';
 alter table app_users add constraint app_users_role_check
@@ -257,6 +261,12 @@ create policy "app_users_admin_write" on app_users
   for all using (public.is_admin())
   with check (public.is_admin());
 
+-- Har bir user o'z last_seen (online) holatini yangilashi mumkin
+drop policy if exists "app_users_update_own_presence" on app_users;
+create policy "app_users_update_own_presence" on app_users
+  for update using (auth_user_id = auth.uid())
+  with check (auth_user_id = auth.uid());
+
 drop policy if exists "tasks_all_access" on tasks;
 drop policy if exists "tasks_authenticated" on tasks;
 drop policy if exists "tasks_select" on tasks;
@@ -321,6 +331,13 @@ grant execute on function public.my_user_id() to authenticated;
 do $$
 begin
   alter publication supabase_realtime add table tasks;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table app_users;
 exception
   when duplicate_object then null;
 end $$;

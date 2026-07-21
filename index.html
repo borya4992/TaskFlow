@@ -399,8 +399,15 @@
   .auth-hint{font-size:11.5px;color:var(--text-faint);margin-top:14px;line-height:1.5;text-align:center;}
   .auth-telegram-wrap{display:flex;justify-content:center;min-height:48px;align-items:center;}
   .user-bar{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;}
-  .user-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-soft);}
+  .user-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-soft);cursor:pointer;transition:border-color .12s,color .12s;}
+  .user-chip:hover{border-color:var(--accent);color:var(--text);}
   .user-chip b{color:var(--text);}
+  .online-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:8px 12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;}
+  .online-bar .online-label{font-size:11.5px;color:var(--text-faint);white-space:nowrap;}
+  .online-chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--border);border-radius:16px;padding:3px 9px;font-size:11.5px;color:var(--text-soft);}
+  .online-dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 2px color-mix(in srgb, var(--success) 25%, transparent);flex-shrink:0;}
+  .online-empty{font-size:11.5px;color:var(--text-faint);}
+  .dept-tag{font-size:10px;color:var(--text-faint);margin-left:4px;}
   .admin-badge{background:var(--accent2);color:var(--on-accent);font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
   .users-table{width:100%;border-collapse:collapse;font-size:12.5px;}
   .users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;color:var(--text);}
@@ -455,7 +462,7 @@
       <h1>📋 Topshiriqlar monitoringi</h1>
     </div>
     <div class="user-bar">
-      <span class="user-chip" id="user-chip"></span>
+      <span class="user-chip" id="user-chip" title="Profilni ochish" onclick="openMyProfileModal()"></span>
       <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;">Ilovani o'rnatish</button>
       <div class="theme-wrap">
         <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 Tema</button>
@@ -472,10 +479,14 @@
     </div>
   </header>
 
+  <div class="online-bar" id="online-bar">
+    <span class="online-label">🟢 Onlayn:</span>
+    <span id="online-list" class="online-empty">—</span>
+  </div>
+
   <div class="app-nav" id="app-nav">
     <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')">Monitoring</button>
     <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')">SMART</button>
-    <button type="button" class="app-nav-btn" data-view="profile" onclick="switchAppView('profile')">Profil</button>
     <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')">Boshqaruv</button>
   </div>
 
@@ -483,6 +494,7 @@
   <div id="view-monitoring" class="view-pane active">
   <div class="toolbar">
     <input type="text" id="search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
+    <select id="filter-department" onchange="onFilterDepartment(this.value)"><option value="">Barcha bo'limlar</option></select>
     <select id="filter-assignee" onchange="onFilterAssignee(this.value)"><option value="">Barcha mas'ul shaxslar</option></select>
     <select id="filter-priority" onchange="onFilterPriority(this.value)">
       <option value="">Barcha ustuvorliklar</option>
@@ -527,6 +539,9 @@
     <div class="panel">
       <h2><span class="dot" style="background:var(--green)"></span> SMART Task Monitoring</h2>
       <p class="help-text" style="margin-top:0;">Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.</p>
+      <div class="toolbar" style="margin-bottom:12px;">
+        <select id="smart-filter-department" onchange="onSmartFilterDepartment(this.value)"><option value="">Barcha bo'limlar</option></select>
+      </div>
       <div class="smart-stats" id="smart-stats"></div>
     </div>
     <div class="smart-charts">
@@ -555,25 +570,11 @@
     </div>
   </div>
 
-  <!-- PROFIL -->
-  <div id="view-profile" class="view-pane">
-  <div class="panel" id="profile-panel">
-    <h2><span class="dot" style="background:var(--blue)"></span> Shaxsiy profil — parolni o'zgartirish</h2>
-    <p class="help-text" style="margin-top:0;" id="profile-info"></p>
-    <div class="user-form">
-      <div class="auth-field"><label>Joriy parol</label><input type="password" id="pwd-current" autocomplete="current-password"></div>
-      <div class="auth-field"><label>Yangi parol</label><input type="password" id="pwd-new" autocomplete="new-password"></div>
-      <div class="auth-field full"><label>Yangi parolni tasdiqlang</label><input type="password" id="pwd-confirm" autocomplete="new-password"></div>
-      <div class="full"><button class="btn-blue" onclick="changeMyPassword()">Parolni saqlash</button></div>
-    </div>
-  </div>
-  </div>
-
   <!-- BOSHQARUV (admin) -->
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Ro'yxatdagi foydalanuvchini bosing — profilni tahrirlash oynasi ochiladi.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Ro'yxatdagi foydalanuvchini bosing — profilni tahrirlash oynasi ochiladi. Bo'limga biriktirish monitoring filtrida ishlaydi.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
@@ -585,13 +586,17 @@
           <option value="admin">Admin</option>
         </select>
       </div>
+      <div class="auth-field"><label>Bo'lim</label>
+        <input type="text" id="u-department" list="department-suggestions" placeholder="Masalan: IT, HR, Moliya">
+      </div>
       <div class="auth-field"><label>Email *</label><input type="email" id="u-email" placeholder="email@example.com"></div>
       <div class="auth-field"><label>Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
-      <div class="auth-field full"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
+      <div class="auth-field"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
       <div class="full"><button class="btn-blue" onclick="addAppUser()">Foydalanuvchi qo'shish</button></div>
     </div>
+    <datalist id="department-suggestions"></datalist>
     <table class="users-table">
-      <thead><tr><th>Ism</th><th>Email</th><th>Telefon</th><th>Telegram</th><th>Rol</th><th></th></tr></thead>
+      <thead><tr><th>Ism</th><th>Bo'lim</th><th>Email</th><th>Telefon</th><th>Telegram</th><th>Rol</th><th></th></tr></thead>
       <tbody id="users-tbody"></tbody>
     </table>
   </div>
@@ -987,7 +992,40 @@ function userAvatarHtml(u, cls) {
   return `<span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-soft);">${initials(name)}</span>`;
 }
 function visibleTasks() {
-  return state.tasks;
+  let tasks = state.tasks;
+  if (state.filterDepartment) {
+    const deptUsers = state.appUsers.filter(u => (u.department || '') === state.filterDepartment);
+    const ids = new Set(deptUsers.map(u => u.id));
+    const names = new Set(deptUsers.map(u => u.display_name));
+    tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
+  }
+  return tasks;
+}
+
+function distinctDepartments() {
+  return Array.from(new Set(
+    state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'uz'));
+}
+
+function refreshDepartmentSuggestions() {
+  const list = document.getElementById('department-suggestions');
+  if (!list) return;
+  list.innerHTML = distinctDepartments().map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
+}
+
+function fillDepartmentSelects() {
+  const deps = distinctDepartments();
+  const options = '<option value="">Barcha bo\'limlar</option>' +
+    deps.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  ['filter-department', 'smart-filter-department'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = options;
+    el.value = deps.includes(cur) ? cur : '';
+  });
+  refreshDepartmentSuggestions();
 }
 
 function showApp() {
@@ -995,13 +1033,8 @@ function showApp() {
   document.getElementById('app-wrap').classList.remove('hidden');
   const chip = document.getElementById('user-chip');
   if (chip && currentProfile) {
-    chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role);
-  }
-  const profileInfo = document.getElementById('profile-info');
-  if (profileInfo && currentProfile) {
-    profileInfo.innerHTML = 'Foydalanuvchi: <b>' + escapeHtml(currentProfile.display_name) + '</b>' +
-      (currentProfile.email ? ' · ' + escapeHtml(currentProfile.email) : '') +
-      ' · Rol: ' + roleLabel(currentProfile.role);
+    const dept = currentProfile.department ? ` <span class="dept-tag">· ${escapeHtml(currentProfile.department)}</span>` : '';
+    chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role) + dept;
   }
   document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
@@ -1011,11 +1044,13 @@ function showApp() {
   document.getElementById('review-list').classList.toggle('hidden', false);
   if (canManageUsers()) renderUsersTable();
   renderExecutorSelect();
+  fillDepartmentSelects();
+  renderOnlineUsers();
   switchAppView('monitoring');
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'smart', 'profile', 'admin'];
+  const allowed = ['monitoring', 'smart', 'admin'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   document.querySelectorAll('.view-pane').forEach(el => {
@@ -1025,7 +1060,37 @@ function switchAppView(view) {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
   if (view === 'admin' && canManageUsers()) renderUsersTable();
-  if (view === 'smart') renderSmartAnalytics();
+  if (view === 'smart') {
+    fillDepartmentSelects();
+    const smartSel = document.getElementById('smart-filter-department');
+    if (smartSel) smartSel.value = state.smartFilterDepartment || '';
+    renderSmartAnalytics();
+  }
+}
+
+function openMyProfileModal() {
+  if (!currentProfile) return;
+  const u = currentProfile;
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal wide">
+        <h3>Shaxsiy profil</h3>
+        <p class="hint" id="profile-info">
+          <b>${escapeHtml(u.display_name)}</b>
+          ${u.email ? ' · ' + escapeHtml(u.email) : ''}
+          · Rol: ${roleLabel(u.role)}
+          ${u.department ? ' · Bo\'lim: ' + escapeHtml(u.department) : ''}
+        </p>
+        <h3 style="font-size:13px;margin-top:4px;">Parolni o'zgartirish</h3>
+        <div class="field"><label>Joriy parol</label><input type="password" id="pwd-current" autocomplete="current-password"></div>
+        <div class="field"><label>Yangi parol</label><input type="password" id="pwd-new" autocomplete="new-password"></div>
+        <div class="field"><label>Yangi parolni tasdiqlang</label><input type="password" id="pwd-confirm" autocomplete="new-password"></div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Yopish</button>
+          <button class="btn-blue" onclick="changeMyPassword()">Parolni saqlash</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 async function changeMyPassword() {
@@ -1045,6 +1110,7 @@ async function changeMyPassword() {
   document.getElementById('pwd-new').value = '';
   document.getElementById('pwd-confirm').value = '';
   toast('Parol yangilandi');
+  closeModal();
 }
 
 async function enterApp() {
@@ -1057,9 +1123,11 @@ async function enterApp() {
   document.getElementById('tg-bot-user').value = state.settings.telegram_bot_username || TELEGRAM_BOT_USERNAME || '';
   renderAll();
   subscribeRealtime();
+  startPresenceHeartbeat();
 }
 
 async function signOut() {
+  stopPresenceHeartbeat();
   if (!usingLocalFallback && sb) await sb.auth.signOut();
   currentProfile = null;
   pendingOtp = { method: '', contact: '' };
@@ -1071,7 +1139,68 @@ function subscribeRealtime() {
   if (usingLocalFallback || !sb) return;
   sb.channel('tasks-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => { refreshFromDB(); })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_users' }, async () => {
+      state.appUsers = await fetchTeamUsers();
+      renderOnlineUsers();
+      fillDepartmentSelects();
+    })
     .subscribe();
+}
+
+/* =========================================================
+   ONLINE PRESENCE
+========================================================= */
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 daqiqa
+let presenceTimer = null;
+
+function isUserOnline(u) {
+  if (!u?.last_seen) return false;
+  const t = new Date(u.last_seen).getTime();
+  if (isNaN(t)) return false;
+  return (Date.now() - t) <= ONLINE_THRESHOLD_MS;
+}
+
+function renderOnlineUsers() {
+  const el = document.getElementById('online-list');
+  if (!el) return;
+  const online = (state.appUsers || []).filter(isUserOnline)
+    .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
+  if (!online.length) {
+    el.className = 'online-empty';
+    el.textContent = 'Hozir hech kim onlayn emas';
+    return;
+  }
+  el.className = '';
+  el.innerHTML = online.map(u =>
+    `<span class="online-chip"><span class="online-dot"></span>${escapeHtml(u.display_name)}${u.department ? ' · ' + escapeHtml(u.department) : ''}</span>`
+  ).join('');
+}
+
+async function bumpMyPresence() {
+  if (usingLocalFallback || !sb || !currentProfile?.id) return;
+  try {
+    await sb.from('app_users').update({ last_seen: new Date().toISOString() }).eq('id', currentProfile.id);
+    const me = state.appUsers.find(u => u.id === currentProfile.id);
+    if (me) me.last_seen = new Date().toISOString();
+    renderOnlineUsers();
+  } catch (e) { console.warn('presence:', e); }
+}
+
+function startPresenceHeartbeat() {
+  stopPresenceHeartbeat();
+  bumpMyPresence();
+  presenceTimer = setInterval(async () => {
+    await bumpMyPresence();
+    // boshqalarning holatini yangilash
+    if (!usingLocalFallback && sb) {
+      state.appUsers = await fetchTeamUsers();
+      renderOnlineUsers();
+    }
+  }, 30000);
+}
+
+function stopPresenceHeartbeat() {
+  if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
 }
 
 /* =========================================================
@@ -1094,8 +1223,9 @@ async function fetchTeamUsers() {
 async function renderUsersTable() {
   const users = await fetchAppUsers();
   state.appUsers = users;
+  fillDepartmentSelects();
   const tbody = document.getElementById('users-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
   tbody.innerHTML = users.map(u => {
     const actions = [];
     if (u.email) {
@@ -1108,6 +1238,7 @@ async function renderUsersTable() {
     return `
     <tr class="user-row" onclick="openUserEditModal('${u.id}')">
       <td>${userAvatarHtml(u, 'user-avatar-sm')}${escapeHtml(u.display_name)}</td>
+      <td>${escapeHtml(u.department || '—')}</td>
       <td>${escapeHtml(u.email || '—')}</td>
       <td>${escapeHtml(u.phone || '—')}</td>
       <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
@@ -1121,6 +1252,7 @@ function openUserEditModal(id) {
   if (!canManageUsers()) return;
   const u = state.appUsers.find(x => x.id === id);
   if (!u) { toast('Foydalanuvchi topilmadi'); return; }
+  refreshDepartmentSuggestions();
   const avatarSrc = u.avatar_url || '';
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
@@ -1135,6 +1267,7 @@ function openUserEditModal(id) {
         </div>
         <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
         <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
+        <div class="field"><label>Bo'lim</label><input type="text" id="edit-u-department" list="department-suggestions" value="${escapeHtml(u.department || '')}" placeholder="Masalan: IT, HR, Moliya"></div>
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
         <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
         <div class="field"><label>Telegram ID</label><input type="text" id="edit-u-telegram" value="${escapeHtml(u.telegram_id || '')}"></div>
@@ -1183,6 +1316,7 @@ async function uploadUserAvatar(userId, file) {
 async function saveUserEdit(id) {
   const display_name = document.getElementById('edit-u-name').value.trim();
   const role = document.getElementById('edit-u-role').value;
+  const department = document.getElementById('edit-u-department').value.trim();
   const email = document.getElementById('edit-u-email').value.trim().toLowerCase() || null;
   const phoneRaw = document.getElementById('edit-u-phone').value.trim();
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
@@ -1190,7 +1324,7 @@ async function saveUserEdit(id) {
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy'); return; }
 
-  const patch = { display_name, role, email, phone, telegram_id };
+  const patch = { display_name, role, department, email, phone, telegram_id };
   const fileInput = document.getElementById('edit-avatar-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file) {
@@ -1242,9 +1376,10 @@ async function addAppUser() {
   const phone = document.getElementById('u-phone').value.trim() ? normalizePhone(document.getElementById('u-phone').value) : null;
   const telegram_id = document.getElementById('u-telegram').value.trim() || null;
   const role = document.getElementById('u-role').value;
+  const department = document.getElementById('u-department').value.trim();
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy (parol orqali kirish uchun)'); return; }
-  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, is_active: true }]);
+  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, is_active: true }]);
   if (error) { toast('Xatolik: ' + error.message); return; }
   try {
     await adminManageAuthUser('create', email, display_name);
@@ -1257,9 +1392,11 @@ async function addAppUser() {
   document.getElementById('u-email').value = '';
   document.getElementById('u-phone').value = '';
   document.getElementById('u-telegram').value = '';
+  document.getElementById('u-department').value = '';
   document.getElementById('u-role').value = 'executor';
   state.appUsers = await fetchTeamUsers();
   renderExecutorSelect();
+  fillDepartmentSelects();
   await renderUsersTable();
   toast('Foydalanuvchi qo\'shildi. Standart parol: ' + DEFAULT_USER_PASSWORD);
 }
@@ -1289,7 +1426,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'' };
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -1508,21 +1645,24 @@ function renderAssigneeOptions() {
   filterSel.value = cur;
 }
 function renderExecCards() {
-  const names = Array.from(new Set(state.tasks.map(t => t.assignee).filter(Boolean))).sort();
+  const tasks = visibleTasks();
+  const names = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean))).sort();
   const grid = document.getElementById('exec-grid');
   if (!names.length) { grid.innerHTML = '<div class="empty-msg">Hali topshiriq yo\'q</div>'; return; }
   grid.innerHTML = names.map(name => {
-    const own = state.tasks.filter(t => t.assignee === name);
+    const own = tasks.filter(t => t.assignee === name);
     const total = own.length;
     const done = own.filter(t => effectiveStatus(t) === 'bajarildi').length;
     const review = own.filter(t => effectiveStatus(t) === 'tekshiruvda').length;
     const overdue = own.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
     const progress = own.filter(t => effectiveStatus(t) === 'jarayonda').length;
     const pct = total ? Math.round((done/total)*100) : 0;
+    const user = state.appUsers.find(u => u.display_name === name);
+    const dept = user?.department ? `<span class="dept-tag">${escapeHtml(user.department)}</span>` : '';
     const safeName = escapeHtml(name).replace(/'/g,"\\'");
     return `
       <div class="exec-card" onclick="openAssigneeTasksModal('${safeName}')">
-        <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}</div>
+        <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}${dept}</div>
         <div class="exec-stats"><span>Jami: ${total}</span><span style="color:var(--blue)">Jarayonda: ${progress}</span></div>
         <div class="exec-stats"><span style="color:var(--amber)">Tekshiruv: ${review}</span><span style="color:var(--green)">Bajarildi: ${done}</span></div>
         <div class="exec-bar"><div class="exec-bar-fill" style="width:${pct}%"></div></div>
@@ -1605,12 +1745,14 @@ function renderTaskList() {
   list.innerHTML = filtered.map(t => taskRowHtml(t, 'main')).join('');
 }
 function renderAll() {
+  fillDepartmentSelects();
   renderKpis();
   renderAssigneeOptions();
   renderExecutorSelect();
   renderExecCards();
   renderReviewList();
   renderTaskList();
+  renderOnlineUsers();
   const smartPane = document.getElementById('view-smart');
   if (smartPane && smartPane.classList.contains('active')) renderSmartAnalytics();
 }
@@ -1633,6 +1775,18 @@ function filterByAssignee(name) {
 function onSearch(v){ state.search = v; renderTaskList(); renderReviewList(); }
 function onFilterAssignee(v){ state.filterAssignee = v; renderTaskList(); renderReviewList(); }
 function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); renderReviewList(); }
+function onFilterDepartment(v){
+  state.filterDepartment = v || '';
+  renderKpis();
+  renderAssigneeOptions();
+  renderExecCards();
+  renderTaskList();
+  renderReviewList();
+}
+function onSmartFilterDepartment(v){
+  state.smartFilterDepartment = v || '';
+  renderSmartAnalytics();
+}
 
 /* =========================================================
    ACTIONS
@@ -1941,7 +2095,14 @@ function smartRiskForAssignee(own) {
 }
 
 function renderSmartAnalytics() {
-  const tasks = visibleTasks();
+  // SMART o'z bo'lim filtriga ega (monitoring filtridan mustaqil)
+  let tasks = state.tasks;
+  if (state.smartFilterDepartment) {
+    const deptUsers = state.appUsers.filter(u => (u.department || '') === state.smartFilterDepartment);
+    const ids = new Set(deptUsers.map(u => u.id));
+    const names = new Set(deptUsers.map(u => u.display_name));
+    tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
+  }
   const m = computeSmartMetrics(tasks);
   const stats = document.getElementById('smart-stats');
   if (stats) {
