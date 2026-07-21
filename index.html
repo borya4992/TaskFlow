@@ -1683,10 +1683,10 @@ async function fetchDeletedTasks() {
 }
 async function fetchSettings() {
   if (usingLocalFallback) {
-    return JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || '{"telegram_token":"","telegram_chat_id":"","notifications_enabled":false}');
+    return JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || '{"telegram_token":"","telegram_chat_id":"","notifications_enabled":false,"office3d_public":false}');
   }
   const { data, error } = await sb.from('settings').select('*').eq('id', 1).single();
-  if (error) { console.error(error); return { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }; }
+  if (error) { console.error(error); return { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }; }
   return data;
 }
 async function insertTask(task) {
@@ -2021,10 +2021,12 @@ function onSmartFilterDepartment(v){
 async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
+  fillDepartmentSelects();
   renderAll();
   if (window.Office3D && Office3D.isOpen()) {
     Office3D.update(state.appUsers, state.tasks);
   }
+  if (canManageUsers()) renderDeletedTasksPanel();
   toast("Ma'lumotlar yangilandi");
 }
 async function addTask() {
