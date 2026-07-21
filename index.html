@@ -531,13 +531,17 @@
     </div>
     <div class="smart-charts">
       <div class="panel">
-        <h2><span class="dot"></span> SMART kriteriy ballari</h2>
+        <h2><span class="dot" style="background:var(--accent)"></span> Eng faol ijrochilar (bajarilgan topshiriqlar)</h2>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
         <h2><span class="dot" style="background:var(--amber)"></span> Holat taqsimoti</h2>
         <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
       </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot" style="background:var(--success)"></span> Kunlik topshiriqlar trendi (so'nggi 30 kun)</h2>
+      <div class="chart-wrap" style="height:220px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel">
       <h2><span class="dot" style="background:var(--purple)"></span> Ijrochi kesimida monitoring</h2>
@@ -1887,11 +1891,12 @@ async function checkDeadlinesNow() {
 /* =========================================================
    SMART ANALYTICS (dashboard)
 ========================================================= */
-let smartCharts = { smart: null, status: null };
+let smartCharts = { smart: null, status: null, trend: null };
 
 function destroySmartCharts() {
   if (smartCharts.smart) { smartCharts.smart.destroy(); smartCharts.smart = null; }
   if (smartCharts.status) { smartCharts.status.destroy(); smartCharts.status = null; }
+  if (smartCharts.trend) { smartCharts.trend.destroy(); smartCharts.trend = null; }
 }
 
 function computeSmartMetrics(tasks) {
@@ -1986,31 +1991,60 @@ function renderSmartAnalytics() {
   const danger = cssVar('--danger') || '#F2635C';
   const tick = cssVar('--text-soft') || '#93A0B4';
   const grid = cssVar('--border') || '#232C3D';
+  const panel2 = cssVar('--panel-2') || '#171F2E';
+
+  // --- Chart 1: Eng faol ijrochilar (bajarilgan topshiriqlar soni) ---
   const smartCtx = document.getElementById('chart-smart');
-  const statusCtx = document.getElementById('chart-status');
   if (smartCtx) {
-    smartCharts.smart = new Chart(smartCtx, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(m.scores),
-        datasets: [{
-          label: 'SMART score (%)',
-          data: Object.values(m.scores),
-          backgroundColor: [accent, success, warning, accent2, danger],
-          borderRadius: 6,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { beginAtZero: true, max: 100, ticks: { color: tick }, grid: { color: grid } },
-          x: { ticks: { color: tick }, grid: { display: false } }
+    const names = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean)));
+    const userDone = names
+      .map(name => ({
+        name,
+        done: tasks.filter(t => t.assignee === name && effectiveStatus(t) === 'bajarildi').length
+      }))
+      .filter(u => u.done > 0)
+      .sort((a, b) => b.done - a.done)
+      .slice(0, 10);
+
+    if (userDone.length) {
+      const palette = [accent, success, warning, accent2, danger, '#60A5FA', '#34D399', '#FBBF24', '#A78BFA', '#F472B6'];
+      smartCharts.smart = new Chart(smartCtx, {
+        type: 'bar',
+        data: {
+          labels: userDone.map(u => u.name),
+          datasets: [{
+            label: 'Bajarilgan',
+            data: userDone.map(u => u.done),
+            backgroundColor: userDone.map((_, i) => palette[i % palette.length]),
+            borderRadius: 6,
+          }]
         },
-        plugins: { legend: { display: false } }
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { beginAtZero: true, ticks: { color: tick, stepSize: 1 }, grid: { color: grid } },
+            y: { ticks: { color: tick }, grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    } else {
+      // hali bajarilgan topshiriq yo'q
+      const ctx2d = smartCtx.getContext('2d');
+      if (ctx2d) {
+        ctx2d.clearRect(0, 0, smartCtx.width, smartCtx.height);
+        ctx2d.fillStyle = tick;
+        ctx2d.font = '13px sans-serif';
+        ctx2d.textAlign = 'center';
+        ctx2d.fillText("Hali bajarilgan topshiriq yo'q", smartCtx.width / 2, 60);
       }
-    });
+    }
   }
+
+  // --- Chart 2: Holat taqsimoti (donut) ---
+  const statusCtx = document.getElementById('chart-status');
   if (statusCtx) {
     const jar = tasks.filter(t => effectiveStatus(t)==='jarayonda').length;
     const tek = tasks.filter(t => effectiveStatus(t)==='tekshiruvda').length;
@@ -2031,6 +2065,80 @@ function renderSmartAnalytics() {
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } }
+        }
+      }
+    });
+  }
+
+  // --- Chart 3: Kunlik trend (so'nggi 30 kun) ---
+  const trendCtx = document.getElementById('chart-trend');
+  if (trendCtx) {
+    // So'nggi 30 kunni sanab chiqamiz
+    const days = 30;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const labels = [];
+    const createdCounts = [];
+    const doneCounts = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().slice(0, 10);
+      labels.push(pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1));
+
+      createdCounts.push(
+        tasks.filter(t => (t.created_at || '').slice(0, 10) === dayStr).length
+      );
+      doneCounts.push(
+        tasks.filter(t => t.status === 'bajarildi' && (t.created_at || '').slice(0, 10) === dayStr).length
+      );
+    }
+
+    smartCharts.trend = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Yaratilgan",
+            data: createdCounts,
+            borderColor: accent,
+            backgroundColor: accent + '22',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          },
+          {
+            label: "Bajarildi",
+            data: doneCounts,
+            borderColor: success,
+            backgroundColor: success + '22',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: { color: tick, maxTicksLimit: 10 },
+            grid: { color: grid }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: tick, stepSize: 1 },
+            grid: { color: grid }
+          }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { color: tick, boxWidth: 12 } }
         }
       }
     });
