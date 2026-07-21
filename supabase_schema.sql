@@ -122,6 +122,31 @@ create table if not exists settings (
 );
 insert into settings (id) values (1) on conflict (id) do nothing;
 alter table settings add column if not exists telegram_bot_username text default '';
+alter table settings add column if not exists office3d_public boolean default false;
+
+-- Soft-delete topshiriqlar
+alter table tasks add column if not exists deleted_at timestamptz;
+
+-- Bo'lim nomlarini kanoniklashtirish (dublikatlarni yo'qotish)
+update app_users set department = case
+  when lower(coalesce(department, '')) ~ '(qabul|hr|recruit)' then 'Ishga qabul qilish bo''limi'
+  when lower(coalesce(department, '')) ~ '(kompens|payroll|moliya)' then 'Kompensatsiya bo''limi'
+  when lower(coalesce(department, '')) ~ '(xodim|staff|personnel)' then 'Xodimlar bo''limi'
+  when trim(coalesce(department, '')) = '' then 'Xodimlar bo''limi'
+  when lower(trim(department)) in (
+    'xodimlar', 'ishga qabul qilish', 'kompensatsiya',
+    'xodimlar bo''limi', 'ishga qabul qilish bo''limi', 'kompensatsiya bo''limi'
+  ) then case
+    when lower(trim(department)) like '%qabul%' then 'Ishga qabul qilish bo''limi'
+    when lower(trim(department)) like '%kompens%' then 'Kompensatsiya bo''limi'
+    else 'Xodimlar bo''limi'
+  end
+  else 'Xodimlar bo''limi'
+end
+where role <> 'admin' or department is distinct from '';
+
+update app_users set department = ''
+where role = 'admin';
 
 -- ============================================================
 -- 4) YORDAMCHI FUNKSIYALAR

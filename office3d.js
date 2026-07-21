@@ -9,8 +9,12 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 const MANAGEMENT_LEVELS = new Set(['direktor', 'orinbosar', 'bolim_boshligi']);
 const STAY_AT_DESK_LEVELS = new Set(['direktor', 'orinbosar']);
 
-/** 3D ofisdagi ish xonalari (Admin ko'rinmaydi) */
-export const OFFICE_WORK_DEPARTMENTS = ['Xodimlar', 'Ishga qabul qilish', 'Kompensatsiya'];
+/** 3D ofisdagi ish xonalari (Admin ko'rinmaydi) — yagona kanonik nomlar */
+export const OFFICE_WORK_DEPARTMENTS = [
+  "Xodimlar bo'limi",
+  "Ishga qabul qilish bo'limi",
+  "Kompensatsiya bo'limi",
+];
 
 /** Na'muna: low-poly humanoid ofis kiyimi (erkak oq + galstuk, ayol pink) */
 export const CHARACTER_PRESETS = {
@@ -66,15 +70,15 @@ function genderOf(u) {
 
 function normalizeOfficeDepartment(raw) {
   const s = String(raw || '').trim().toLowerCase();
-  if (!s || s === 'admin' || s === 'админ' || s === 'boshqa' || s === "boshqa") return 'Xodimlar';
+  if (!s || s === 'admin' || s === 'админ' || s === 'boshqa') return "Xodimlar bo'limi";
   for (const d of OFFICE_WORK_DEPARTMENTS) {
     if (d.toLowerCase() === s) return d;
   }
-  if (s.includes('qabul') || s.includes('hr') || s.includes('recruit')) return 'Ishga qabul qilish';
-  if (s.includes('kompens') || s.includes('payroll') || s.includes('moliya')) return 'Kompensatsiya';
-  if (s.includes('xodim') || s.includes('staff') || s.includes('personnel')) return 'Xodimlar';
-  if (s.includes('boshqaruv') || s.includes('management')) return 'Xodimlar';
-  return 'Xodimlar';
+  if (s.includes('qabul') || s.includes('hr') || s.includes('recruit')) return "Ishga qabul qilish bo'limi";
+  if (s.includes('kompens') || s.includes('payroll') || s.includes('moliya')) return "Kompensatsiya bo'limi";
+  if (s.includes('xodim') || s.includes('staff') || s.includes('personnel')) return "Xodimlar bo'limi";
+  if (s.includes('boshqaruv') || s.includes('management')) return "Xodimlar bo'limi";
+  return "Xodimlar bo'limi";
 }
 
 function officeUsers(users) {
@@ -548,37 +552,50 @@ function resetLimbPose(person) {
 
 function applySitPose(person, t) {
   const ud = person.userData;
-  // Root polga: bel stulda; qo'llar oldinga — klaviatura ustida
+  const restSit = ud.zone === 'rest' || ud.restSit || (ud.target && ud.target.restSit);
+
   if (ud.hip) {
     ud.hip.position.y = ud.hipSitY ?? CHAIR_SEAT_Y - 0.02;
     ud.hip.rotation.x = 0.04;
   }
   if (ud.torso) {
     ud.torso.position.y = ud.torsoSitY ?? 0.55;
-    ud.torso.rotation.x = 0.12;
+    ud.torso.rotation.x = restSit ? 0.06 : 0.12;
   }
   if (ud.head) {
     ud.head.position.y = ud.headSitY ?? 0.98;
-    ud.head.rotation.set(-0.08, 0, 0);
+    ud.head.rotation.set(restSit ? 0 : -0.08, 0, 0);
   }
 
   const armY = ud.armSitY ?? 0.78;
-  const armZ = ud.armSitZ ?? -0.06;
+  const armZ = restSit ? 0.08 : (ud.armSitZ ?? -0.06);
   const sx = ud.armShoulderX ?? 0.2;
   const tap = Math.sin(t * 12) * 0.05;
 
-  // Yelka past, qo'l oldinga (local -Z) klaviatura tomon
-  if (ud.armL) {
-    ud.armL.position.set(-sx, armY, armZ);
-    ud.armL.rotation.set(-Math.PI / 2 - 0.25, 0.12, 0.18);
+  if (restSit) {
+    // Dam olish: qo'llar stol ustida, tinch
+    if (ud.armL) {
+      ud.armL.position.set(-sx, armY, armZ);
+      ud.armL.rotation.set(-Math.PI / 2 - 0.1, 0.1, 0.25);
+    }
+    if (ud.armR) {
+      ud.armR.position.set(sx, armY, armZ);
+      ud.armR.rotation.set(-Math.PI / 2 - 0.1, -0.1, -0.25);
+    }
+    if (ud.forearmL) ud.forearmL.rotation.set(0.1, 0.05, 0);
+    if (ud.forearmR) ud.forearmR.rotation.set(0.1, -0.05, 0);
+  } else {
+    if (ud.armL) {
+      ud.armL.position.set(-sx, armY, armZ);
+      ud.armL.rotation.set(-Math.PI / 2 - 0.25, 0.12, 0.18);
+    }
+    if (ud.armR) {
+      ud.armR.position.set(sx, armY, armZ);
+      ud.armR.rotation.set(-Math.PI / 2 - 0.25, -0.12, -0.18);
+    }
+    if (ud.forearmL) ud.forearmL.rotation.set(0.05 + tap, 0.08, 0);
+    if (ud.forearmR) ud.forearmR.rotation.set(0.05 - tap, -0.08, 0);
   }
-  if (ud.armR) {
-    ud.armR.position.set(sx, armY, armZ);
-    ud.armR.rotation.set(-Math.PI / 2 - 0.25, -0.12, -0.18);
-  }
-  // Bilak stol/klaviatura tekisligida
-  if (ud.forearmL) ud.forearmL.rotation.set(0.05 + tap, 0.08, 0);
-  if (ud.forearmR) ud.forearmR.rotation.set(0.05 - tap, -0.08, 0);
 
   if (ud.legL) ud.legL.rotation.set(-Math.PI / 2 + 0.1, 0.06, 0);
   if (ud.legR) ud.legR.rotation.set(-Math.PI / 2 + 0.1, -0.06, 0);
@@ -696,7 +713,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722e — hands on keyboard + Bobur sunglasses');
+      console.info('[Office3D] build 20260722f — depts bo\'limi, rest table, public toggle');
     } catch (_) {}
   },
 
@@ -890,8 +907,10 @@ export const Office3D = {
         if (idx >= st.restSlots.length) idx = Math.max(0, st.restSlots.length - 1);
         st.restAssign.set(user.id, idx);
       }
-      const slot = st.restSlots[idx] || { x: 0, y: 0, z: 10, rotY: 0 };
-      return { ...slot, seated: false, zone: 'rest' };
+      const slot = st.restSlots[idx] || {
+        x: 0, y: 0.04, z: 10, rotY: 0, seated: true, restSit: true,
+      };
+      return { ...slot, seated: true, restSit: true, zone: 'rest' };
     }
 
     st.restAssign.delete(user.id);
@@ -949,39 +968,51 @@ export const Office3D = {
     const roomW = 9;
     const roomD = 8;
     const workRooms = [
-      { name: 'Xodimlar', cx: -10, cz: 2.5, floor: 0x1a2233 },
-      { name: 'Ishga qabul qilish', cx: 0, cz: 2.5, floor: 0x162030 },
-      { name: 'Kompensatsiya', cx: 10, cz: 2.5, floor: 0x1a2233 },
+      { name: "Xodimlar bo'limi", cx: -10, cz: 2.5, floor: 0x1a2233 },
+      { name: "Ishga qabul qilish bo'limi", cx: 0, cz: 2.5, floor: 0x162030 },
+      { name: "Kompensatsiya bo'limi", cx: 10, cz: 2.5, floor: 0x1a2233 },
     ];
     workRooms.forEach((r) => {
       this._makeRoom(r.cx, r.cz, roomW, roomD, r.name, r.floor);
     });
 
-    // —— Dam olish ——
+    // —— Dam olish: bitta stol atrofida o'tirish ——
     const restW = 16;
     const restD = 6.5;
     const restCx = 0;
     const restCz = 12;
     this._makeRoom(restCx, restCz, restW, restD, 'Dam olish', 0x1e2838);
-    const sofa = new THREE.Mesh(
-      new THREE.BoxGeometry(7, 0.4, 1.3),
-      new THREE.MeshStandardMaterial({ color: 0x3d5a80, roughness: 0.8 })
+
+    // Katta dumaloq stol
+    const tableTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.6, 1.6, 0.08, 24),
+      new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.65 })
     );
-    sofa.position.set(restCx, 0.28, restCz + 1.4);
-    sofa.userData.isOfficeProp = true;
-    st.scene.add(sofa);
+    tableTop.position.set(restCx, 0.72, restCz);
+    tableTop.userData.isOfficeProp = true;
+    st.scene.add(tableTop);
+    const tableLeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.22, 0.68, 12),
+      new THREE.MeshStandardMaterial({ color: 0x3a3f48, roughness: 0.55, metalness: 0.2 })
+    );
+    tableLeg.position.set(restCx, 0.34, restCz);
+    tableLeg.userData.isOfficeProp = true;
+    st.scene.add(tableLeg);
 
     st.restSlots = [];
-    for (let i = 0; i < 24; i++) {
-      const col = i % 8;
-      const row = Math.floor(i / 8);
+    const seatCount = 12;
+    const seatR = 2.35;
+    for (let i = 0; i < seatCount; i++) {
+      const a = (i / seatCount) * Math.PI * 2 + Math.PI / seatCount;
+      // Markazga qarab o'tirish
       st.restSlots.push({
-        x: restCx - restW / 2 + 1.3 + col * 1.7,
+        x: restCx + Math.cos(a) * seatR,
         y: 0.04,
-        z: restCz - restD / 2 + 1.4 + row * 1.55,
-        rotY: Math.PI,
-        seated: false,
+        z: restCz + Math.sin(a) * seatR,
+        rotY: a + Math.PI,
+        seated: true,
         zone: 'rest',
+        restSit: true,
       });
     }
 
@@ -1067,8 +1098,16 @@ export const Office3D = {
     person.userData.gender = g;
     person.userData.lastStatus = status;
     person.userData.zone = pose.zone;
+    person.userData.restSit = !!pose.restSit;
     person.userData.seated = !!pose.seated;
-    person.userData.target = { x: pose.x, y: pose.y ?? 0, z: pose.z, rotY: pose.rotY || 0, seated: !!pose.seated };
+    person.userData.target = {
+      x: pose.x,
+      y: pose.y ?? 0,
+      z: pose.z,
+      rotY: pose.rotY || 0,
+      seated: !!pose.seated,
+      restSit: !!pose.restSit,
+    };
     person.userData.walking = false;
     person.castShadow = true;
 
@@ -1097,8 +1136,10 @@ export const Office3D = {
       z: tz,
       rotY: pose.rotY || 0,
       seated: !!pose.seated,
+      restSit: !!pose.restSit,
     };
     person.userData.zone = pose.zone;
+    person.userData.restSit = !!pose.restSit;
     if (dist > 0.12) {
       person.userData.walking = true;
       person.userData.seated = false;

@@ -642,7 +642,7 @@
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar</b>, <b>Ishga qabul qilish</b>, <b>Kompensatsiya</b>. 3D ofisda Admin ko'rinmaydi; bo'sh xodimlar <b>Dam olish</b>da, topshiriq berilganda o'z bo'limiga o'tadi.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
@@ -655,7 +655,11 @@
         </select>
       </div>
       <div class="auth-field"><label>Bo'lim</label>
-        <input type="text" id="u-department" list="department-suggestions" placeholder="Masalan: Xodimlar, Ishga qabul qilish…" autocomplete="off">
+        <select id="u-department">
+          <option value="Xodimlar bo'limi">Xodimlar bo'limi</option>
+          <option value="Ishga qabul qilish bo'limi">Ishga qabul qilish bo'limi</option>
+          <option value="Kompensatsiya bo'limi">Kompensatsiya bo'limi</option>
+        </select>
       </div>
       <div class="auth-field"><label>Jins</label>
         <select id="u-gender">
@@ -699,6 +703,21 @@
       Telegram ulanmagan. Bot yaratish: <b>@BotFather</b> → token oling; keyin botga <b>/start</b> yozing va Chat ID'ni <b>@userinfobot</b> orqali toping.
     </div>
     <button class="btn-ghost" onclick="checkDeadlinesNow()">⏰ Hozir muddatlarni tekshirish</button>
+    <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent2)"></span> 3D Ofis</h2>
+    <div class="notif-row">
+      <button class="btn-ghost" id="btn-office3d-public" onclick="toggleOffice3DPublic()">🌐 3D Ofisni barchaga ko'rsatish</button>
+      <span class="status-chip" id="office3d-public-status">Holat: <b>faqat admin</b></span>
+    </div>
+    <p class="help-text" style="margin-top:8px;">Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.</p>
+  </div>
+
+  <div class="panel hidden" id="deleted-tasks-panel">
+    <h2><span class="dot" style="background:var(--danger)"></span> O'chirilgan topshiriqlar</h2>
+    <p class="help-text" style="margin-top:0;">Soft-delete: tiklash mumkin.</p>
+    <table class="users-table">
+      <thead><tr><th>Topshiriq</th><th>Bajaruvchi</th><th>O'chirilgan</th><th>Holat</th><th></th></tr></thead>
+      <tbody id="deleted-tasks-tbody"></tbody>
+    </table>
   </div>
   </div>
 
@@ -711,7 +730,7 @@
 <!-- 3D OFIS (faqat admin) -->
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
   <div class="office3d-topbar">
-    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Boshqaruv · Xodimlar · Ishga qabul · Kompensatsiya · Dam olish · Low-poly figuralar</span></h2>
+    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)</span></h2>
     <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
   </div>
   <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
@@ -1064,7 +1083,21 @@ function positionLevelOptionsHtml(selected) {
     `<option value="${l}" ${l === cur ? 'selected' : ''}>${positionLevelLabel(l)}</option>`
   ).join('');
 }
-const OFFICE_DEPARTMENTS = ['Xodimlar', 'Ishga qabul qilish', 'Kompensatsiya'];
+const OFFICE_DEPARTMENTS = [
+  "Xodimlar bo'limi",
+  "Ishga qabul qilish bo'limi",
+  "Kompensatsiya bo'limi",
+];
+function normalizeDepartment(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s || s === 'admin') return "Xodimlar bo'limi";
+  for (const d of OFFICE_DEPARTMENTS) {
+    if (d.toLowerCase() === s) return d;
+  }
+  if (s.includes('qabul') || s.includes('hr') || s.includes('recruit')) return "Ishga qabul qilish bo'limi";
+  if (s.includes('kompens') || s.includes('payroll') || s.includes('moliya')) return "Kompensatsiya bo'limi";
+  return "Xodimlar bo'limi";
+}
 function genderOf(u) {
   return u?.gender === 'ayol' ? 'ayol' : 'erkak';
 }
@@ -1078,8 +1111,7 @@ function genderOptionsHtml(selected) {
   ).join('');
 }
 function officeDepartmentOptionsHtml(selected) {
-  // Eski select uchun saqlangan; hozir input+datalist ishlatiladi
-  const cur = selected || '';
+  const cur = normalizeDepartment(selected);
   return OFFICE_DEPARTMENTS.map(d =>
     `<option value="${escapeHtml(d)}" ${d === cur ? 'selected' : ''}>${escapeHtml(d)}</option>`
   ).join('');
@@ -1105,6 +1137,9 @@ function isDirector() { return currentProfile?.role === 'director'; }
 function isExecutor() { return currentProfile?.role === 'executor'; }
 function canCreateTasks() { return !!currentProfile; }
 function canManageUsers() { return isAdmin(); }
+function canViewOffice3D() {
+  return isAdmin() || !!state.settings?.office3d_public;
+}
 function isTaskCreator(t) { return !!t && t.created_by_user_id === currentProfile?.id; }
 function canReviewTask(t) { return isAdmin() || isTaskCreator(t); }
 function canEditTask(t) { return isAdmin() || isTaskCreator(t); }
@@ -1133,9 +1168,9 @@ function userAvatarHtml(u, cls) {
   return `<span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-soft);">${initials(name)}</span>`;
 }
 function visibleTasks() {
-  let tasks = state.tasks;
+  let tasks = state.tasks.filter(t => !t.deleted_at);
   if (state.filterDepartment) {
-    const deptUsers = state.appUsers.filter(u => (u.department || '') === state.filterDepartment);
+    const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.filterDepartment);
     const ids = new Set(deptUsers.map(u => u.id));
     const names = new Set(deptUsers.map(u => u.display_name));
     tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
@@ -1144,34 +1179,26 @@ function visibleTasks() {
 }
 
 function distinctDepartments() {
-  return Array.from(new Set([
-    ...OFFICE_DEPARTMENTS,
-    ...state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
-  ]))
-    .filter(d => !/^admin$/i.test(d))
-    .sort((a, b) => a.localeCompare(b, 'uz'));
+  return OFFICE_DEPARTMENTS.slice();
 }
 
 function refreshDepartmentSuggestions() {
   const list = document.getElementById('department-suggestions');
   if (!list) return;
-  const deps = Array.from(new Set([
-    ...OFFICE_DEPARTMENTS,
-    ...state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
-  ])).filter(d => !/^admin$/i.test(d)).sort((a, b) => a.localeCompare(b, 'uz'));
-  list.innerHTML = deps.map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
+  list.innerHTML = OFFICE_DEPARTMENTS.map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
 }
 
 function fillDepartmentSelects() {
-  const deps = distinctDepartments();
+  const deps = OFFICE_DEPARTMENTS;
   const options = '<option value="">Barcha bo\'limlar</option>' +
     deps.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
   ['filter-department', 'smart-filter-department'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    const cur = el.value;
+    const cur = normalizeDepartment(el.value) === el.value ? el.value : '';
+    const prev = el.value;
     el.innerHTML = options;
-    el.value = deps.includes(cur) ? cur : '';
+    el.value = deps.includes(prev) ? prev : (deps.includes(normalizeDepartment(prev)) ? normalizeDepartment(prev) : '');
   });
   refreshDepartmentSuggestions();
 }
@@ -1185,16 +1212,20 @@ function showApp() {
     chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role) + dept;
   }
   document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
-  document.getElementById('nav-office-btn').classList.toggle('hidden', !canManageUsers());
+  document.getElementById('nav-office-btn').classList.toggle('hidden', !canViewOffice3D());
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
   document.getElementById('review-section-title').classList.toggle('hidden', false);
   document.getElementById('review-list').classList.toggle('hidden', false);
-  if (canManageUsers()) renderUsersTable();
+  if (canManageUsers()) {
+    renderUsersTable();
+    renderDeletedTasksPanel();
+  }
   renderExecutorSelect();
   fillDepartmentSelects();
   renderOnlineUsers();
+  updateOffice3DPublicUI();
   switchAppView('monitoring');
 }
 
@@ -1208,7 +1239,11 @@ function switchAppView(view) {
   document.querySelectorAll('.app-nav-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
-  if (view === 'admin' && canManageUsers()) renderUsersTable();
+  if (view === 'admin' && canManageUsers()) {
+    renderUsersTable();
+    renderDeletedTasksPanel();
+    updateOffice3DPublicUI();
+  }
   if (view === 'smart') {
     fillDepartmentSelects();
     const smartSel = document.getElementById('smart-filter-department');
@@ -1418,7 +1453,7 @@ function openUserEditModal(id) {
         </div>
         <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
         <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
-        <div class="field"><label>Bo'lim</label><input type="text" id="edit-u-department" list="department-suggestions" value="${escapeHtml(u.department || '')}" placeholder="Masalan: Xodimlar, Ishga qabul qilish…" autocomplete="off"></div>
+        <div class="field"><label>Bo'lim</label><select id="edit-u-department">${officeDepartmentOptionsHtml(u.department)}</select></div>
         <div class="field"><label>Jins</label><select id="edit-u-gender">${genderOptionsHtml(genderOf(u))}</select></div>
         <div class="field"><label>Lavozim darajasi</label><select id="edit-u-position-level">${positionLevelOptionsHtml(positionLevelOf(u))}</select></div>
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
@@ -1469,7 +1504,7 @@ async function uploadUserAvatar(userId, file) {
 async function saveUserEdit(id) {
   const display_name = document.getElementById('edit-u-name').value.trim();
   const role = document.getElementById('edit-u-role').value;
-  const department = document.getElementById('edit-u-department').value.trim();
+  const department = normalizeDepartment(document.getElementById('edit-u-department').value);
   const gender = document.getElementById('edit-u-gender').value === 'ayol' ? 'ayol' : 'erkak';
   const position_level = document.getElementById('edit-u-position-level').value || 'xodim';
   const email = document.getElementById('edit-u-email').value.trim().toLowerCase() || null;
@@ -1532,7 +1567,7 @@ async function addAppUser() {
   const phone = document.getElementById('u-phone').value.trim() ? normalizePhone(document.getElementById('u-phone').value) : null;
   const telegram_id = document.getElementById('u-telegram').value.trim() || null;
   const role = document.getElementById('u-role').value;
-  const department = document.getElementById('u-department').value.trim() || 'Xodimlar';
+  const department = normalizeDepartment(document.getElementById('u-department').value);
   const gender = document.getElementById('u-gender').value === 'ayol' ? 'ayol' : 'erkak';
   const position_level = document.getElementById('u-position-level').value || positionLevelFromRole(role);
   if (!display_name) { toast('Ism kiriting'); return; }
@@ -1550,7 +1585,7 @@ async function addAppUser() {
   document.getElementById('u-email').value = '';
   document.getElementById('u-phone').value = '';
   document.getElementById('u-telegram').value = '';
-  document.getElementById('u-department').value = '';
+  document.getElementById('u-department').value = "Xodimlar bo'limi";
   document.getElementById('u-gender').value = 'erkak';
   document.getElementById('u-position-level').value = 'xodim';
   document.getElementById('u-role').value = 'executor';
@@ -1587,7 +1622,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'' };
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -1628,11 +1663,23 @@ function priorityClass(p){
 ========================================================= */
 async function fetchTasks() {
   if (usingLocalFallback) {
-    return JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+    return JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]').filter(t => !t.deleted_at);
   }
-  const { data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: true });
+  let { data, error } = await sb.from('tasks').select('*').is('deleted_at', null).order('created_at', { ascending: true });
+  if (error && /deleted_at/i.test(error.message || '')) {
+    ({ data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: true }));
+  }
   if (error) { console.error(error); toast('Ma\'lumot olishda xatolik: ' + error.message); return []; }
-  return data;
+  return (data || []).filter(t => !t.deleted_at);
+}
+async function fetchDeletedTasks() {
+  if (!canManageUsers()) return [];
+  if (usingLocalFallback) {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]').filter(t => !!t.deleted_at);
+  }
+  const { data, error } = await sb.from('tasks').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data || [];
 }
 async function fetchSettings() {
   if (usingLocalFallback) {
@@ -1664,12 +1711,31 @@ async function updateTask(id, patch) {
   if (error) toast('Xatolik: ' + error.message);
 }
 async function deleteTaskRow(id) {
+  const deleted_at = new Date().toISOString();
   if (usingLocalFallback) {
-    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]').filter(t => t.id !== id);
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+    const idx = list.findIndex(t => t.id === id);
+    if (idx > -1) list[idx] = Object.assign({}, list[idx], { deleted_at });
     localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
     return;
   }
-  const { error } = await sb.from('tasks').delete().eq('id', id);
+  const { error } = await sb.from('tasks').update({ deleted_at }).eq('id', id);
+  if (error) toast('Xatolik: ' + error.message);
+}
+async function restoreTaskRow(id) {
+  if (!canManageUsers()) return;
+  if (usingLocalFallback) {
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
+    const idx = list.findIndex(t => t.id === id);
+    if (idx > -1) {
+      const row = Object.assign({}, list[idx]);
+      delete row.deleted_at;
+      list[idx] = row;
+    }
+    localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
+    return;
+  }
+  const { error } = await sb.from('tasks').update({ deleted_at: null }).eq('id', id);
   if (error) toast('Xatolik: ' + error.message);
 }
 async function saveSettings(patch) {
@@ -2058,8 +2124,24 @@ function getOfficeThemeColors() {
   };
 }
 
+function updateOffice3DPublicUI() {
+  const on = !!state.settings?.office3d_public;
+  const chip = document.getElementById('office3d-public-status');
+  const btn = document.getElementById('btn-office3d-public');
+  if (chip) chip.innerHTML = on ? 'Holat: <b>✅ barchaga ochiq</b>' : 'Holat: <b>faqat admin</b>';
+  if (btn) btn.textContent = on ? '🔒 3D Ofisni faqat adminga qoldirish' : '🌐 3D Ofisni barchaga ko\'rsatish';
+  const nav = document.getElementById('nav-office-btn');
+  if (nav) nav.classList.toggle('hidden', !canViewOffice3D());
+}
+async function toggleOffice3DPublic() {
+  if (!canManageUsers()) return;
+  const next = !state.settings?.office3d_public;
+  await saveSettings({ office3d_public: next });
+  updateOffice3DPublicUI();
+  toast(next ? '3D Ofis barcha foydalanuvchilarga ochildi' : '3D Ofis faqat admin uchun');
+}
 async function openOffice3D() {
-  if (!canManageUsers()) { toast('3D Ofis faqat admin uchun'); return; }
+  if (!canViewOffice3D()) { toast('3D Ofis hozircha yopiq'); return; }
   if (!window.Office3D) {
     toast('3D modul yuklanmoqda… biroz kuting');
     return;
@@ -2069,7 +2151,6 @@ async function openOffice3D() {
   if (!overlay || !canvas) return;
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  // Admin va Admin bo'limi 3D ofisda ko'rinmaydi
   Office3D.open(canvas, {
     users: state.appUsers.filter(u => {
       if (u.is_active === false) return false;
@@ -2078,9 +2159,11 @@ async function openOffice3D() {
       if (d === 'admin') return false;
       return true;
     }),
-    tasks: state.tasks,
+    tasks: state.tasks.filter(t => !t.deleted_at),
     getThemeColors: getOfficeThemeColors,
-    onSelectUser: (userId) => openCreateTaskForUser(userId),
+    onSelectUser: canManageUsers() || canCreateTasks()
+      ? (userId) => openCreateTaskForUser(userId)
+      : () => toast('Topshiriq yaratish huquqi yo\'q'),
   });
 }
 
@@ -2185,10 +2268,37 @@ async function returnForRework(id) {
 async function removeTask(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || !canDeleteTask(task)) return;
-  if (!confirm("Topshiriqni o'chirmoqchimisiz?")) return;
+  if (!confirm("Topshiriqni o'chirmoqchimisiz? (Admin keyin tiklashi mumkin)")) return;
   await deleteTaskRow(id);
   await refreshFromDB();
-  toast("O'chirildi");
+  if (canManageUsers()) renderDeletedTasksPanel();
+  toast("O'chirildi (tiklash mumkin)");
+}
+async function restoreTask(id) {
+  if (!canManageUsers()) return;
+  await restoreTaskRow(id);
+  await refreshFromDB();
+  await renderDeletedTasksPanel();
+  toast('Topshiriq tiklandi');
+}
+async function renderDeletedTasksPanel() {
+  const wrap = document.getElementById('deleted-tasks-panel');
+  const tbody = document.getElementById('deleted-tasks-tbody');
+  if (!wrap || !tbody || !canManageUsers()) return;
+  const rows = await fetchDeletedTasks();
+  wrap.classList.toggle('hidden', false);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">O\'chirilgan topshiriq yo\'q</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(t => `
+    <tr>
+      <td>${escapeHtml(t.title || '—')}</td>
+      <td>${escapeHtml(t.assignee || '—')}</td>
+      <td>${t.deleted_at ? escapeHtml(formatDeadlineDisplay(t.deleted_at)) : '—'}</td>
+      <td>${escapeHtml(t.status || '—')}</td>
+      <td><button class="btn-blue" style="padding:6px 10px;font-size:11px;" onclick="restoreTask('${t.id}')">↩ Tiklash</button></td>
+    </tr>`).join('');
 }
 function openEditModal(id) {
   const t = state.tasks.find(x => x.id === id);
@@ -2375,7 +2485,7 @@ function renderSmartAnalytics() {
   // SMART o'z bo'lim filtriga ega (monitoring filtridan mustaqil)
   let tasks = state.tasks;
   if (state.smartFilterDepartment) {
-    const deptUsers = state.appUsers.filter(u => (u.department || '') === state.smartFilterDepartment);
+    const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.smartFilterDepartment);
     const ids = new Set(deptUsers.map(u => u.id));
     const names = new Set(deptUsers.map(u => u.display_name));
     tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
@@ -2658,9 +2768,9 @@ async function init() {
 init();
 </script>
 <script type="module">
-  import { Office3D } from './office3d.js?v=20260722e';
+  import { Office3D } from './office3d.js?v=20260722f';
   window.Office3D = Office3D;
-  window.OFFICE3D_BUILD = '20260722e';
+  window.OFFICE3D_BUILD = '20260722f';
 </script>
 </body>
 </html>
