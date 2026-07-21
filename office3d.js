@@ -339,16 +339,60 @@ function createPersonMesh(level, gender) {
     torsoRestY: TORSO_STAND,
     armRestY: ARM_STAND,
     headRestY: HEAD_STAND,
-    // O'tirish: bel stulda, qo'l stol ustida
-    hipSitY: CHAIR_SEAT_Y,
-    torsoSitY: 0.62,
-    armSitY: 0.86,
-    headSitY: 1.05,
+    // O'tirish: bel stulda, yelka stol ustiga yaqin, qo'l klaviaturada
+    hipSitY: CHAIR_SEAT_Y - 0.02,
+    torsoSitY: 0.55,
+    armSitY: 0.78,
+    headSitY: 0.98,
+    armSitZ: -0.06,
+    armShoulderX: p.shoulder,
     baseScale: 1,
     gender: g,
     standY: 0,
   };
   return root;
+}
+
+function wantsSunglasses(user) {
+  const n = String(user?.display_name || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  return n.includes('bobur') && n.includes('babajanov');
+}
+
+/** Qora ko'zoynak (Bobur Babajanov) */
+function addSunglasses(headGroup) {
+  const shades = new THREE.Group();
+  const dark = mat(0x0d0d0d, { roughness: 0.35, metalness: 0.45 });
+  const lens = mat(0x111111, { roughness: 0.2, metalness: 0.55, transparent: true, opacity: 0.92 });
+
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.038, 0.022), lens);
+  left.position.set(-0.055, 0.012, 0.115);
+  shades.add(left);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.038, 0.022), lens);
+  right.position.set(0.055, 0.012, 0.115);
+  shades.add(right);
+
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.014, 0.018), dark);
+  bridge.position.set(0, 0.014, 0.112);
+  shades.add(bridge);
+
+  const frameTop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.012, 0.016), dark);
+  frameTop.position.set(0, 0.032, 0.11);
+  shades.add(frameTop);
+
+  const templeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.012), dark);
+  templeL.position.set(-0.11, 0.014, 0.04);
+  templeL.rotation.y = 0.35;
+  shades.add(templeL);
+  const templeR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.012), dark);
+  templeR.position.set(0.11, 0.014, 0.04);
+  templeR.rotation.y = -0.35;
+  shades.add(templeR);
+
+  headGroup.add(shades);
+  return shades;
 }
 
 /** Ish stoli: monitor, klaviatura, sichqoncha, stul, o'simlik, krujka */
@@ -482,13 +526,14 @@ function resetLimbPose(person) {
   if (ud.hip && ud.hipRestY != null) ud.hip.position.y = ud.hipRestY;
   if (ud.torso && ud.torsoRestY != null) ud.torso.position.y = ud.torsoRestY;
   if (ud.head && ud.headRestY != null) ud.head.position.y = ud.headRestY;
+  const sx = ud.armShoulderX ?? 0.2;
   if (ud.armL) {
+    ud.armL.position.set(-sx, ud.armRestY ?? 1.28, 0);
     ud.armL.rotation.set(0, 0, 0.12);
-    if (ud.armRestY != null) ud.armL.position.y = ud.armRestY;
   }
   if (ud.armR) {
+    ud.armR.position.set(sx, ud.armRestY ?? 1.28, 0);
     ud.armR.rotation.set(0, 0, -0.12);
-    if (ud.armRestY != null) ud.armR.position.y = ud.armRestY;
   }
   if (ud.forearmL) ud.forearmL.rotation.set(0, 0, 0);
   if (ud.forearmR) ud.forearmR.rotation.set(0, 0, 0);
@@ -503,33 +548,42 @@ function resetLimbPose(person) {
 
 function applySitPose(person, t) {
   const ud = person.userData;
-  // Root polga: bel stulda, qo'l klaviatura balandligida
+  // Root polga: bel stulda; qo'llar oldinga — klaviatura ustida
   if (ud.hip) {
-    ud.hip.position.y = ud.hipSitY ?? CHAIR_SEAT_Y;
-    ud.hip.rotation.x = 0.02;
+    ud.hip.position.y = ud.hipSitY ?? CHAIR_SEAT_Y - 0.02;
+    ud.hip.rotation.x = 0.04;
   }
   if (ud.torso) {
-    ud.torso.position.y = ud.torsoSitY ?? 0.62;
-    ud.torso.rotation.x = 0.08;
+    ud.torso.position.y = ud.torsoSitY ?? 0.55;
+    ud.torso.rotation.x = 0.12;
   }
   if (ud.head) {
-    ud.head.position.y = ud.headSitY ?? 1.05;
-    ud.head.rotation.set(-0.05, 0, 0);
+    ud.head.position.y = ud.headSitY ?? 0.98;
+    ud.head.rotation.set(-0.08, 0, 0);
   }
+
+  const armY = ud.armSitY ?? 0.78;
+  const armZ = ud.armSitZ ?? -0.06;
+  const sx = ud.armShoulderX ?? 0.2;
+  const tap = Math.sin(t * 12) * 0.05;
+
+  // Yelka past, qo'l oldinga (local -Z) klaviatura tomon
   if (ud.armL) {
-    ud.armL.position.y = ud.armSitY ?? 0.86;
-    ud.armL.rotation.set(-1.35, 0.2, 0.75);
+    ud.armL.position.set(-sx, armY, armZ);
+    ud.armL.rotation.set(-Math.PI / 2 - 0.25, 0.12, 0.18);
   }
   if (ud.armR) {
-    ud.armR.position.y = ud.armSitY ?? 0.86;
-    ud.armR.rotation.set(-1.35, -0.2, -0.75);
+    ud.armR.position.set(sx, armY, armZ);
+    ud.armR.rotation.set(-Math.PI / 2 - 0.25, -0.12, -0.18);
   }
-  if (ud.forearmL) ud.forearmL.rotation.set(-0.95 + Math.sin(t * 11) * 0.14, 0.1, 0.05);
-  if (ud.forearmR) ud.forearmR.rotation.set(-0.95 + Math.sin(t * 11 + 1.2) * 0.14, -0.1, -0.05);
-  if (ud.legL) ud.legL.rotation.set(-Math.PI / 2 + 0.12, 0.06, 0);
-  if (ud.legR) ud.legR.rotation.set(-Math.PI / 2 + 0.12, -0.06, 0);
-  if (ud.shinL) ud.shinL.rotation.x = Math.PI / 2 - 0.08;
-  if (ud.shinR) ud.shinR.rotation.x = Math.PI / 2 - 0.08;
+  // Bilak stol/klaviatura tekisligida
+  if (ud.forearmL) ud.forearmL.rotation.set(0.05 + tap, 0.08, 0);
+  if (ud.forearmR) ud.forearmR.rotation.set(0.05 - tap, -0.08, 0);
+
+  if (ud.legL) ud.legL.rotation.set(-Math.PI / 2 + 0.1, 0.06, 0);
+  if (ud.legR) ud.legR.rotation.set(-Math.PI / 2 + 0.1, -0.06, 0);
+  if (ud.shinL) ud.shinL.rotation.x = Math.PI / 2 - 0.06;
+  if (ud.shinR) ud.shinR.rotation.x = Math.PI / 2 - 0.06;
 }
 
 function applyIdlePose(person, t) {
@@ -642,7 +696,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722d — sit on floor root, hands at desk, feet grounded');
+      console.info('[Office3D] build 20260722e — hands on keyboard + Bobur sunglasses');
     } catch (_) {}
   },
 
@@ -1001,6 +1055,9 @@ export const Office3D = {
     const g = genderOf(user);
     const status = userWorkStatus(user, tasks);
     const person = createPersonMesh(level, g);
+    if (wantsSunglasses(user) && person.userData.head) {
+      addSunglasses(person.userData.head);
+    }
     person.position.set(pose.x, pose.y ?? 0, pose.z);
     person.rotation.y = pose.rotY || 0;
     person.userData.baseY = pose.y ?? 0;
