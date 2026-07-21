@@ -507,9 +507,84 @@ function createRestChair(rotY = 0) {
   });
 
   g.userData.isOfficeProp = true;
-  g.userData.sitLocal = new THREE.Vector3(0, 0, 0.04);
+  g.userData.sitLocal = new THREE.Vector3(0, 0, 0.18); // stolga yaqinroq
   g.userData.faceYaw = rotY;
   return g;
+}
+
+function addRestTableSnacks(g) {
+  const y = DESK_TOP_Y + 0.045;
+  const plateMat = mat(0xf2f0ea, { roughness: 0.55 });
+  const foodWarm = mat(0xd4a05a, { roughness: 0.8 });
+  const foodRed = mat(0xc45c48, { roughness: 0.75 });
+  const foodGreen = mat(0x5a9a4a, { roughness: 0.8 });
+  const drinkCola = mat(0x6b2a1a, { roughness: 0.35, metalness: 0.15 });
+  const drinkTea = mat(0xc4a060, { roughness: 0.4 });
+  const glass = mat(0xd8e8f0, { roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.7 });
+
+  // Markazda meva/salat idishi
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.08, 16), plateMat);
+  bowl.position.set(0, y, 0);
+  g.add(bowl);
+  [[0, 0.06], [0.1, -0.04], [-0.08, -0.05], [0.05, 0.1], [-0.1, 0.06]].forEach(([x, z], i) => {
+    const fruit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05 + (i % 3) * 0.01, 8, 8),
+      i % 2 === 0 ? foodRed : foodGreen
+    );
+    fruit.position.set(x, y + 0.07, z);
+    g.add(fruit);
+  });
+
+  // Non / sendvich
+  const bread = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 0.18), foodWarm);
+  bread.position.set(-0.7, y + 0.02, 0.15);
+  bread.rotation.y = 0.35;
+  g.add(bread);
+  const filling = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.02, 0.15), foodGreen);
+  filling.position.set(-0.7, y + 0.05, 0.15);
+  filling.rotation.y = 0.35;
+  g.add(filling);
+  const bread2 = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.035, 0.18), foodWarm);
+  bread2.position.set(-0.7, y + 0.08, 0.15);
+  bread2.rotation.y = 0.35;
+  g.add(bread2);
+
+  // Pizza / pishiriq
+  const pizza = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 16), foodWarm);
+  pizza.position.set(0.65, y + 0.015, -0.1);
+  g.add(pizza);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), foodRed);
+    top.position.set(0.65 + Math.cos(a) * 0.12, y + 0.04, -0.1 + Math.sin(a) * 0.12);
+    g.add(top);
+  }
+
+  // Ichimliklar
+  const drinks = [
+    { x: -0.35, z: -0.45, color: drinkCola, h: 0.22, r: 0.045 },
+    { x: 0.25, z: -0.5, color: drinkTea, h: 0.16, r: 0.05 },
+    { x: 0.55, z: 0.35, color: glass, h: 0.14, r: 0.04 },
+    { x: -0.55, z: 0.4, color: drinkCola, h: 0.2, r: 0.04 },
+    { x: 0.1, z: 0.5, color: drinkTea, h: 0.15, r: 0.048 },
+  ];
+  drinks.forEach((d) => {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(d.r, d.r * 0.9, d.h, 10), d.color);
+    cup.position.set(d.x, y + d.h / 2, d.z);
+    g.add(cup);
+    if (d.color === drinkCola) {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(d.r * 0.7, d.r * 0.7, 0.03, 8), mat(0x222222));
+      cap.position.set(d.x, y + d.h + 0.01, d.z);
+      g.add(cap);
+    }
+  });
+
+  // Kichik likopchalar (atrofda)
+  [[-1.0, 0], [1.0, 0.05], [0, -0.75], [0.2, 0.7]].forEach(([x, z]) => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.02, 12), plateMat);
+    p.position.set(x, y, z);
+    g.add(p);
+  });
 }
 
 function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4) {
@@ -534,6 +609,8 @@ function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4) {
     leg.position.set(ux * rx, (DESK_TOP_Y - 0.04) / 2, uz * rz);
     g.add(leg);
   });
+
+  addRestTableSnacks(g);
 
   g.userData.isOfficeProp = true;
   g.userData.rx = rx;
@@ -619,34 +696,34 @@ function applySitPose(person, t) {
 
   if (ud.hip) {
     ud.hip.position.y = ud.hipSitY ?? CHAIR_SEAT_Y - 0.02;
-    ud.hip.rotation.x = 0.04;
+    ud.hip.rotation.x = restSit ? 0.08 : 0.04;
   }
   if (ud.torso) {
     ud.torso.position.y = ud.torsoSitY ?? 0.55;
-    ud.torso.rotation.x = restSit ? 0.06 : 0.12;
+    ud.torso.rotation.x = restSit ? 0.14 : 0.12;
   }
   if (ud.head) {
     ud.head.position.y = ud.headSitY ?? 0.98;
-    ud.head.rotation.set(restSit ? 0 : -0.08, 0, 0);
+    ud.head.rotation.set(restSit ? 0.05 : -0.08, 0, 0);
   }
 
-  const armY = ud.armSitY ?? 0.78;
-  const armZ = restSit ? 0.08 : (ud.armSitZ ?? -0.06);
+  const armY = restSit ? 0.74 : (ud.armSitY ?? 0.78);
+  const armZ = restSit ? 0.28 : (ud.armSitZ ?? -0.06);
   const sx = ud.armShoulderX ?? 0.2;
   const tap = Math.sin(t * 12) * 0.05;
 
   if (restSit) {
-    // Dam olish: qo'llar stol ustida, tinch
+    // Dam olish: qo'llar stol ustida
     if (ud.armL) {
-      ud.armL.position.set(-sx, armY, armZ);
-      ud.armL.rotation.set(-Math.PI / 2 - 0.1, 0.1, 0.25);
+      ud.armL.position.set(-sx * 0.9, armY, armZ);
+      ud.armL.rotation.set(-Math.PI / 2 + 0.05, 0.08, 0.2);
     }
     if (ud.armR) {
-      ud.armR.position.set(sx, armY, armZ);
-      ud.armR.rotation.set(-Math.PI / 2 - 0.1, -0.1, -0.25);
+      ud.armR.position.set(sx * 0.9, armY, armZ);
+      ud.armR.rotation.set(-Math.PI / 2 + 0.05, -0.08, -0.2);
     }
-    if (ud.forearmL) ud.forearmL.rotation.set(0.1, 0.05, 0);
-    if (ud.forearmR) ud.forearmR.rotation.set(0.1, -0.05, 0);
+    if (ud.forearmL) ud.forearmL.rotation.set(0.35, 0.04, 0);
+    if (ud.forearmR) ud.forearmR.rotation.set(0.35, -0.04, 0);
   } else {
     if (ud.armL) {
       ud.armL.position.set(-sx, armY, armZ);
@@ -776,7 +853,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722g — elliptic rest table + chairs facing inward');
+      console.info('[Office3D] build 20260722h — closer rest seats, snacks, managers always sit');
     } catch (_) {}
   },
 
@@ -947,7 +1024,7 @@ export const Office3D = {
     const level = positionLevelOf(user);
     const isWorking = status.kind === 'busy' || status.kind === 'overdue';
 
-    // Direktor / o'rinbosar — bo'sh bo'lsa ham Boshqaruvda qoladi
+    // Direktor / o'rinbosar — har doim Boshqaruvda o'tiradi
     if (STAY_AT_DESK_LEVELS.has(level)) {
       const desk = st.deskSlots.boshqaruv || {};
       const seats = desk.seats || [];
@@ -955,7 +1032,7 @@ export const Office3D = {
       const seat = seats[i] || seats[0] || { x: 0, y: 0.42, z: -8, rotY: 0, standY: 0.35, zone: 'work' };
       return {
         ...seat,
-        seated: isWorking,
+        seated: true,
         zone: 'work',
         labelFree: true,
       };
@@ -1007,7 +1084,6 @@ export const Office3D = {
     const platformY = 0.35;
     this._floor(14, 5, platformY, colors.border, 0, -8);
     this._roomLabel('Boshqaruv', 0, -8);
-    const mgrFloorY = platformY + 0.04;
 
     const managers = team
       .filter((u) => {
@@ -1020,10 +1096,7 @@ export const Office3D = {
     managers.forEach((u, i) => {
       const n = managers.length;
       const x = (i - (n - 1) / 2) * 3.2;
-      const seat = this._addWorkstationAt(x, -8.15, 0, platformY);
-      // Bo'sh: platforma polida tik turish (oyoqlar tegadi)
-      seat.standPos = { x: seat.x, y: mgrFloorY, z: seat.z + 0.2 };
-      mgrSeats.push(seat);
+      mgrSeats.push(this._addWorkstationAt(x, -8.15, 0, platformY));
     });
     st.deskSlots.boshqaruv = { managers: managers.map((u) => u.id), seats: mgrSeats };
 
@@ -1053,9 +1126,9 @@ export const Office3D = {
 
     st.restSlots = [];
     const seatCount = 12;
-    // Stullar ellipse bo'ylab, stol chetidan biroz tashqarida
-    const seatRx = tableRx + 1.05;
-    const seatRz = tableRz + 1.0;
+    // Stullar stol chetiga yaqin — qo'llar stolga tegadi
+    const seatRx = tableRx + 0.48;
+    const seatRz = tableRz + 0.42;
     for (let i = 0; i < seatCount; i++) {
       const a = (i / seatCount) * Math.PI * 2 + Math.PI / seatCount;
       const sx = restCx + Math.cos(a) * seatRx;
@@ -1124,23 +1197,7 @@ export const Office3D = {
   },
 
   _resolvePose(user, status) {
-    const pose = this._targetPose(user, status);
-    const level = positionLevelOf(user);
-    // Menejerlar bo'sh: tik turish
-    if (STAY_AT_DESK_LEVELS.has(level) && !pose.seated && pose.standPos) {
-      return {
-        x: pose.standPos.x,
-        y: pose.standPos.y,
-        z: pose.standPos.z,
-        rotY: pose.rotY,
-        seated: false,
-        zone: 'work',
-      };
-    }
-    if (STAY_AT_DESK_LEVELS.has(level) && !pose.seated) {
-      return { ...pose, y: pose.standY ?? pose.standPos?.y ?? 0.39, seated: false };
-    }
-    return pose;
+    return this._targetPose(user, status);
   },
 
   _placePerson(user, pose, tasks) {
