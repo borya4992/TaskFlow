@@ -478,6 +478,69 @@ function createWorkstation(rotY = 0) {
   return g;
 }
 
+/** Dam olish: elliptic stol + stolga qaragan stul */
+function createRestChair(rotY = 0) {
+  const g = new THREE.Group();
+  g.rotation.y = rotY;
+  const black = mat(0x2a3038, { roughness: 0.55, metalness: 0.15 });
+  const metal = mat(0x3a4048, { metalness: 0.45, roughness: 0.5 });
+  const fabric = mat(0x3d4a5c, { roughness: 0.85 });
+
+  // Stul: old tomoni +Z (stolga qaragan)
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.44), fabric);
+  seat.position.set(0, CHAIR_SEAT_Y, 0);
+  g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.52, 0.06), fabric);
+  back.position.set(0, CHAIR_SEAT_Y + 0.28, -0.2);
+  g.add(back);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.04, 10), metal);
+  base.position.set(0, 0.06, 0);
+  g.add(base);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, CHAIR_SEAT_Y - 0.08, 8), metal);
+  pole.position.set(0, CHAIR_SEAT_Y / 2, 0);
+  g.add(pole);
+  // Qo'ltiqlar
+  [-0.22, 0.22].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.32), black);
+    arm.position.set(x, CHAIR_SEAT_Y + 0.18, -0.02);
+    g.add(arm);
+  });
+
+  g.userData.isOfficeProp = true;
+  g.userData.sitLocal = new THREE.Vector3(0, 0, 0.04);
+  g.userData.faceYaw = rotY;
+  return g;
+}
+
+function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4) {
+  const g = new THREE.Group();
+  g.position.set(cx, 0, cz);
+  const wood = mat(0xc4a574, { roughness: 0.62 });
+  const edge = mat(0x8b6914, { roughness: 0.55, metalness: 0.08 });
+  const metal = mat(0x3a3f48, { roughness: 0.5, metalness: 0.25 });
+
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.09, 48), wood);
+  top.scale.set(rx, 1, rz);
+  top.position.y = DESK_TOP_Y;
+  g.add(top);
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 0.03, 48), edge);
+  rim.scale.set(rx, 1, rz);
+  rim.position.y = DESK_TOP_Y - 0.05;
+  g.add(rim);
+
+  // 4 ta oyoq — ellipse ichida
+  [[-0.55, -0.45], [0.55, -0.45], [-0.55, 0.45], [0.55, 0.45]].forEach(([ux, uz]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, DESK_TOP_Y - 0.04, 10), metal);
+    leg.position.set(ux * rx, (DESK_TOP_Y - 0.04) / 2, uz * rz);
+    g.add(leg);
+  });
+
+  g.userData.isOfficeProp = true;
+  g.userData.rx = rx;
+  g.userData.rz = rz;
+  return g;
+}
+
 function makeLabelEl(user, status, level) {
   const el = document.createElement('div');
   el.className = 'office3d-label';
@@ -713,7 +776,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722f — depts bo\'limi, rest table, public toggle');
+      console.info('[Office3D] build 20260722g — elliptic rest table + chairs facing inward');
     } catch (_) {}
   },
 
@@ -976,40 +1039,40 @@ export const Office3D = {
       this._makeRoom(r.cx, r.cz, roomW, roomD, r.name, r.floor);
     });
 
-    // —— Dam olish: bitta stol atrofida o'tirish ——
+    // —— Dam olish: elliptic stol + stullar (stolga qaragan) ——
     const restW = 16;
-    const restD = 6.5;
+    const restD = 7.2;
     const restCx = 0;
     const restCz = 12;
     this._makeRoom(restCx, restCz, restW, restD, 'Dam olish', 0x1e2838);
 
-    // Katta dumaloq stol
-    const tableTop = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 1.6, 0.08, 24),
-      new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.65 })
-    );
-    tableTop.position.set(restCx, 0.72, restCz);
-    tableTop.userData.isOfficeProp = true;
-    st.scene.add(tableTop);
-    const tableLeg = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.22, 0.68, 12),
-      new THREE.MeshStandardMaterial({ color: 0x3a3f48, roughness: 0.55, metalness: 0.2 })
-    );
-    tableLeg.position.set(restCx, 0.34, restCz);
-    tableLeg.userData.isOfficeProp = true;
-    st.scene.add(tableLeg);
+    const tableRx = 2.6;
+    const tableRz = 1.35;
+    const table = createEllipticRestTable(restCx, restCz, tableRx, tableRz);
+    st.scene.add(table);
 
     st.restSlots = [];
     const seatCount = 12;
-    const seatR = 2.35;
+    // Stullar ellipse bo'ylab, stol chetidan biroz tashqarida
+    const seatRx = tableRx + 1.05;
+    const seatRz = tableRz + 1.0;
     for (let i = 0; i < seatCount; i++) {
       const a = (i / seatCount) * Math.PI * 2 + Math.PI / seatCount;
-      // Markazga qarab o'tirish
+      const sx = restCx + Math.cos(a) * seatRx;
+      const sz = restCz + Math.sin(a) * seatRz;
+      // Stol markaziga qarash (person forward = +Z)
+      const faceYaw = Math.atan2(restCx - sx, restCz - sz);
+      const chair = createRestChair(faceYaw);
+      chair.position.set(sx, 0, sz);
+      st.scene.add(chair);
+
+      const sit = chair.userData.sitLocal.clone();
+      sit.applyAxisAngle(new THREE.Vector3(0, 1, 0), faceYaw);
       st.restSlots.push({
-        x: restCx + Math.cos(a) * seatR,
+        x: sx + sit.x,
         y: 0.04,
-        z: restCz + Math.sin(a) * seatR,
-        rotY: a + Math.PI,
+        z: sz + sit.z,
+        rotY: faceYaw,
         seated: true,
         zone: 'rest',
         restSit: true,
