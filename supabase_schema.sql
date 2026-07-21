@@ -13,7 +13,10 @@ create table if not exists app_users (
   phone text,
   telegram_id text,
   telegram_username text,
-  role text not null default 'executor' check (role in ('admin', 'director', 'executor')),
+  avatar_url text default '',
+  role text not null default 'executor' check (role in (
+    'admin', 'director', 'deputy_director', 'dept_head', 'executor'
+  )),
   auth_user_id uuid references auth.users(id) on delete set null,
   is_active boolean not null default true,
   created_at timestamptz default now(),
@@ -23,10 +26,11 @@ create table if not exists app_users (
 );
 
 -- Mavjud bazada rollarni yangilash
+alter table app_users add column if not exists avatar_url text default '';
 alter table app_users drop constraint if exists app_users_role_check;
 update app_users set role = 'executor' where role = 'member';
 alter table app_users add constraint app_users_role_check
-  check (role in ('admin', 'director', 'executor'));
+  check (role in ('admin', 'director', 'deputy_director', 'dept_head', 'executor'));
 
 create unique index if not exists app_users_email_unique
   on app_users (lower(email)) where email is not null;
@@ -263,19 +267,27 @@ drop policy if exists "tasks_delete" on tasks;
 create policy "tasks_select" on tasks
   for select using (auth.role() = 'authenticated');
 
+-- Har bir autentifikatsiyalangan user topshiriq yaratishi mumkin
 create policy "tasks_insert" on tasks
-  for insert with check (public.is_director_or_admin());
+  for insert with check (
+    auth.role() = 'authenticated'
+    and created_by_user_id = public.my_user_id()
+  );
 
+-- Ijrochi: jarayonda → tekshiruvda
+-- Yaratuvchi/admin: tekshiruvda → bajarildi yoki qayta ishlash (jarayonda + muddat)
 create policy "tasks_update" on tasks
   for update using (
-    public.is_director_or_admin()
+    public.is_admin()
+    or created_by_user_id = public.my_user_id()
     or (
       assignee_user_id = public.my_user_id()
       and status in ('jarayonda', 'muddati_otgan')
     )
   )
   with check (
-    public.is_director_or_admin()
+    public.is_admin()
+    or created_by_user_id = public.my_user_id()
     or (
       assignee_user_id = public.my_user_id()
       and status = 'tekshiruvda'
@@ -283,7 +295,10 @@ create policy "tasks_update" on tasks
   );
 
 create policy "tasks_delete" on tasks
-  for delete using (public.is_director_or_admin());
+  for delete using (
+    public.is_admin()
+    or created_by_user_id = public.my_user_id()
+  );
 
 drop policy if exists "settings_all_access" on settings;
 drop policy if exists "settings_read" on settings;
@@ -302,4 +317,33 @@ grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_director_or_admin() to authenticated;
 grant execute on function public.my_user_id() to authenticated;
 
-alter publication supabase_realtime add table tasks;
+-- Realtime (allaqachon qo'shilgan bo'lsa xato bermaydi)
+do $$
+begin
+  alter publication supabase_realtime add table tasks;
+exception
+  when duplicate_object then null;
+end $$;
+
+-- ============================================================
+-- 7) AVATAR STORAGE
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "avatars_public_read" on storage.objects;
+create policy "avatars_public_read" on storage.objects
+  for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars_admin_insert" on storage.objects;
+create policy "avatars_admin_insert" on storage.objects
+  for insert with check (bucket_id = 'avatars' and public.is_admin());
+
+drop policy if exists "avatars_admin_update" on storage.objects;
+create policy "avatars_admin_update" on storage.objects
+  for update using (bucket_id = 'avatars' and public.is_admin());
+
+drop policy if exists "avatars_admin_delete" on storage.objects;
+create policy "avatars_admin_delete" on storage.objects
+  for delete using (bucket_id = 'avatars' and public.is_admin());

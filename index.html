@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="uz" data-theme="midnight">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TaskFlow — Topshiriqlar monitoringi</title>
 <meta name="description" content="Jamoa topshiriqlarini monitoring qilish ilovasi">
-<meta name="theme-color" content="#0B0F17">
+<meta name="theme-color" content="#0B0F17" id="meta-theme-color">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,35 +14,187 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<script>
+/* Flash oldini olish — localStorage'dan temani darhol qo'llash */
+(function () {
+  try {
+    var t = localStorage.getItem('app_theme') || 'midnight';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-  :root{
-    --bg:#0B0F17;
-    --panel:#121826;
-    --panel-2:#171F2E;
-    --border:#232C3D;
-    --text:#E7ECF3;
-    --text-soft:#93A0B4;
-    --text-faint:#5C6B80;
-    --blue:#4C8DFF;
-    --blue-dark:#2F6FE0;
-    --purple:#9B6BEA;
-    --green:#35C77A;
-    --green-tint:#12301F;
-    --amber:#F2B84B;
-    --amber-tint:#332507;
-    --red:#F2635C;
-    --red-tint:#341418;
-    --pink:#F49CA0;
-    --radius:10px;
+  /* =========================================================
+     THEME TOKENS — yangi tema qo'shish: [data-theme="..."] bloki
+  ========================================================= */
+  :root,
+  [data-theme="midnight"] {
+    --bg: #0B0F17;
+    --panel: #121826;
+    --panel-2: #171F2E;
+    --border: #232C3D;
+    --text: #E7ECF3;
+    --text-soft: #93A0B4;
+    --text-faint: #5C6B80;
+    --accent: #4C8DFF;
+    --accent2: #9B6BEA;
+    --success: #35C77A;
+    --danger: #F2635C;
+    --warning: #F2B84B;
+    --accent-dark: #2F6FE0;
+    --accent-tint: #12253A;
+    --success-tint: #12301F;
+    --warning-tint: #332507;
+    --danger-tint: #341418;
+    --pink: #F49CA0;
+    --on-accent: #FFFFFF;
+    --on-success: #04150C;
+    --on-warning: #1A1200;
+    --subtitle: #E39BA6;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --modal-scrim: rgba(0, 0, 0, 0.55);
+    --radius: 10px;
+    color-scheme: dark;
   }
+
+  [data-theme="neon"] {
+    --bg: #0A0014;
+    --panel: #160826;
+    --panel-2: #1F0A35;
+    --border: #3A1858;
+    --text: #F1E9FF;
+    --text-soft: #C4B0E0;
+    --text-faint: #8A6FB0;
+    --accent: #FF2E92;
+    --accent2: #00E5FF;
+    --success: #00FFA3;
+    --danger: #FF3860;
+    --warning: #FFD400;
+    --accent-dark: #D91A78;
+    --accent-tint: #2A0A30;
+    --success-tint: #003D28;
+    --warning-tint: #3D3200;
+    --danger-tint: #3D0A18;
+    --pink: #FF7AB5;
+    --on-accent: #FFFFFF;
+    --on-success: #002218;
+    --on-warning: #1A1200;
+    --subtitle: #FF7AB5;
+    --shadow: 0 8px 28px rgba(255, 46, 146, 0.18);
+    --modal-scrim: rgba(5, 0, 12, 0.65);
+    --radius: 10px;
+    color-scheme: dark;
+  }
+
+  [data-theme="sunset"] {
+    --bg: #1A0E12;
+    --panel: #2B1620;
+    --panel-2: #351C28;
+    --border: #4A2530;
+    --text: #FDEEE8;
+    --text-soft: #D4A8A8;
+    --text-faint: #9A7078;
+    --accent: #FF6B4A;
+    --accent2: #FFA654;
+    --success: #4ADE80;
+    --danger: #FF4D6D;
+    --warning: #FFB020;
+    --accent-dark: #E05538;
+    --accent-tint: #3D1A18;
+    --success-tint: #0F2E1A;
+    --warning-tint: #3D2A08;
+    --danger-tint: #3D1018;
+    --pink: #FF9A8C;
+    --on-accent: #FFFFFF;
+    --on-success: #052010;
+    --on-warning: #1A1200;
+    --subtitle: #FF9A8C;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --modal-scrim: rgba(12, 4, 6, 0.6);
+    --radius: 10px;
+    color-scheme: dark;
+  }
+
+  [data-theme="forest"] {
+    --bg: #0A1712;
+    --panel: #122A20;
+    --panel-2: #183528;
+    --border: #1F4534;
+    --text: #E6F5EC;
+    --text-soft: #8FB8A4;
+    --text-faint: #5A8570;
+    --accent: #22C58B;
+    --accent2: #5EEAD4;
+    --success: #4ADE80;
+    --danger: #F87171;
+    --warning: #FBBF24;
+    --accent-dark: #1AA875;
+    --accent-tint: #0F2E24;
+    --success-tint: #0F2E1A;
+    --warning-tint: #3D2E08;
+    --danger-tint: #3D1818;
+    --pink: #FCA5A5;
+    --on-accent: #042016;
+    --on-success: #052010;
+    --on-warning: #1A1200;
+    --subtitle: #5EEAD4;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --modal-scrim: rgba(2, 10, 8, 0.6);
+    --radius: 10px;
+    color-scheme: dark;
+  }
+
+  [data-theme="aurora"] {
+    --bg: #F6F8FC;
+    --panel: #FFFFFF;
+    --panel-2: #F1F5F9;
+    --border: #E2E8F0;
+    --text: #1A2333;
+    --text-soft: #475569;
+    --text-faint: #64748B;
+    --accent: #3B6FF2;
+    --accent2: #8B5CF6;
+    --success: #16A34A;
+    --danger: #DC2626;
+    --warning: #D97706;
+    --accent-dark: #2B5AD9;
+    --accent-tint: #DBEAFE;
+    --success-tint: #DCFCE7;
+    --warning-tint: #FEF3C7;
+    --danger-tint: #FEE2E2;
+    --pink: #E11D48;
+    --on-accent: #FFFFFF;
+    --on-success: #FFFFFF;
+    --on-warning: #FFFFFF;
+    --subtitle: #BE185D;
+    --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --modal-scrim: rgba(15, 23, 42, 0.4);
+    --radius: 10px;
+    color-scheme: light;
+  }
+
+  /* Eski nomlar → yangi tokenlar (moslik) */
+  :root, [data-theme] {
+    --blue: var(--accent);
+    --blue-dark: var(--accent-dark);
+    --purple: var(--accent2);
+    --green: var(--success);
+    --amber: var(--warning);
+    --red: var(--danger);
+    --green-tint: var(--success-tint);
+    --amber-tint: var(--warning-tint);
+    --red-tint: var(--danger-tint);
+  }
+
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     font-size:14px;line-height:1.5;
+    transition: background-color .2s ease, color .15s ease;
   }
   .hidden{display:none !important;}
   button,input,select,textarea{font-family:inherit;font-size:13.5px;}
@@ -51,7 +203,8 @@
     padding:9px 12px;outline:none;
   }
   input::placeholder,textarea::placeholder{color:var(--text-faint);}
-  input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+  select option{background:var(--panel);color:var(--text);}
   button{cursor:pointer;border:none;border-radius:8px;font-weight:600;transition:filter .1s, transform .08s;}
   button:active{transform:scale(.97);}
   .wrap{max-width:1280px;margin:0 auto;padding:22px 26px 60px;}
@@ -60,39 +213,39 @@
   header{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:20px;}
   header .titles{flex:1;min-width:240px;}
   header h1{margin:0;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
-  header p{margin:4px 0 0;color:#E39BA6;font-size:12.5px;}
+  header p{margin:4px 0 0;color:var(--subtitle);font-size:12.5px;}
   .kpi-row{display:flex;gap:10px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;cursor:pointer;transition:border-color .12s, background .12s;user-select:none;}
-  .kpi:hover{border-color:var(--blue);}
-  .kpi.active{border-color:var(--blue);background:var(--panel-2);}
-  .kpi b{display:block;font-size:20px;line-height:1.1;}
+  .kpi:hover{border-color:var(--accent);}
+  .kpi.active{border-color:var(--accent);background:var(--panel-2);}
+  .kpi b{display:block;font-size:20px;line-height:1.1;color:var(--text);}
   .kpi span{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
-  .kpi.k-progress b{color:var(--blue);}
-  .kpi.k-done b{color:var(--green);}
+  .kpi.k-progress b{color:var(--accent);}
+  .kpi.k-done b{color:var(--success);}
   .kpi.k-overdue b{color:var(--pink);}
-  .kpi.k-review b{color:var(--amber);}
+  .kpi.k-review b{color:var(--warning);}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
   .toolbar input[type=text]{flex:1;min-width:180px;}
-  .btn-blue{background:var(--blue);color:#fff;padding:9px 16px;}
-  .btn-blue:hover{background:var(--blue-dark);}
+  .btn-blue{background:var(--accent);color:var(--on-accent);padding:9px 16px;}
+  .btn-blue:hover{background:var(--accent-dark);}
   .btn-ghost{background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:9px 14px;}
   .btn-ghost:hover{color:var(--text);}
-  .btn-green{background:var(--green);color:#04150C;padding:9px 14px;}
-  .btn-red-tint{background:var(--red-tint);color:var(--red);padding:8px 14px;font-size:12.5px;}
+  .btn-green{background:var(--success);color:var(--on-success);padding:9px 14px;}
+  .btn-red-tint{background:var(--danger-tint);color:var(--danger);padding:8px 14px;font-size:12.5px;}
 
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px;}
   .panel h2{margin:0 0 14px;font-size:14.5px;display:flex;align-items:center;gap:8px;}
-  .panel h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--purple);}
+  .panel h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);}
 
   .notif-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
   .status-chip{font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:6px;}
-  .status-chip b{color:var(--green);}
+  .status-chip b{color:var(--success);}
   .status-chip.off b{color:var(--text-faint);}
   .telegram-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
   .telegram-row input{flex:1;min-width:220px;}
   .help-text{font-size:11.5px;color:var(--text-faint);margin:6px 0 12px;}
-  .help-text a{color:var(--blue);text-decoration:none;}
+  .help-text a{color:var(--accent);text-decoration:none;}
 
   .add-row{display:flex;gap:10px;flex-wrap:wrap;}
   .add-row input[type=text]{flex:2;min-width:160px;}
@@ -100,16 +253,16 @@
   .add-row input[type=date]{min-width:150px;}
 
   .section-title{font-size:15px;font-weight:700;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
-  .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);}
+  .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
 
   .exec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
   .exec-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;transition:border-color .12s;}
-  .exec-card:hover{border-color:var(--blue);}
+  .exec-card:hover{border-color:var(--accent);}
   .exec-name{font-weight:700;font-size:13.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-  .exec-avatar{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .exec-avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .exec-stats{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-faint);margin-bottom:8px;}
   .exec-bar{height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;}
-  .exec-bar-fill{height:100%;background:var(--green);border-radius:20px;}
+  .exec-bar-fill{height:100%;background:var(--success);border-radius:20px;}
 
   .task-list{display:flex;flex-direction:column;gap:8px;}
   .task-row{
@@ -120,38 +273,68 @@
   .task-row .t-title{font-weight:650;font-size:13.5px;}
   .task-row .t-sub{font-size:11.5px;color:var(--text-faint);margin-top:3px;}
   .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
-  .p-shoshilinch{background:var(--red-tint);color:var(--red);}
-  .p-yuqori{background:var(--red-tint);color:var(--red);}
-  .p-orta{background:var(--amber-tint);color:var(--amber);}
+  .p-shoshilinch{background:var(--danger-tint);color:var(--danger);}
+  .p-yuqori{background:var(--danger-tint);color:var(--danger);}
+  .p-orta{background:var(--warning-tint);color:var(--warning);}
   .p-past{background:var(--panel-2);color:var(--text-faint);}
   .p-{background:var(--panel-2);color:var(--text-faint);}
-  .s-jarayonda{background:#12253A;color:var(--blue);}
-  .s-tekshiruvda{background:var(--amber-tint);color:var(--amber);}
-  .s-bajarildi{background:var(--green-tint);color:var(--green);}
-  .s-muddati_otgan{background:var(--red-tint);color:var(--red);}
+  .s-jarayonda{background:var(--accent-tint);color:var(--accent);}
+  .s-tekshiruvda{background:var(--warning-tint);color:var(--warning);}
+  .s-bajarildi{background:var(--success-tint);color:var(--success);}
+  .s-muddati_otgan{background:var(--danger-tint);color:var(--danger);}
   .role-badge{font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
-  .role-admin{background:var(--purple);color:#fff;}
-  .role-director{background:var(--amber);color:#1a1200;}
-  .role-executor{background:var(--blue);color:#fff;}
-  .btn-amber{background:var(--amber);color:#1a1200;padding:8px 12px;font-size:12px;}
+  .role-admin{background:var(--accent2);color:var(--on-accent);}
+  .role-director{background:var(--warning);color:var(--on-warning);}
+  .role-deputy_director{background:var(--accent);color:var(--on-accent);}
+  .role-dept_head{background:var(--success);color:var(--on-success);}
+  .role-executor{background:var(--accent);color:var(--on-accent);}
+  .btn-amber{background:var(--warning);color:var(--on-warning);padding:8px 12px;font-size:12px;}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-soft);padding:8px 12px;font-size:12px;}
+  .btn-outline:hover{color:var(--text);border-color:var(--text-faint);}
+  .user-avatar-sm{width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;background:var(--panel-2);}
+  .user-avatar-lg{width:88px;height:88px;border-radius:50%;object-fit:cover;background:var(--panel-2);display:block;margin:0 auto 10px;border:2px solid var(--border);}
+  .avatar-upload{text-align:center;margin-bottom:14px;}
+  .users-table tr.user-row{cursor:pointer;}
+  .users-table tr.user-row:hover{background:var(--panel-2);}
+  .modal.wide{max-width:520px;}
+  .modal .hint{font-size:11.5px;color:var(--text-faint);margin:-6px 0 12px;line-height:1.4;}
   .deadline-tag{font-size:11.5px;color:var(--text-faint);min-width:90px;text-align:right;}
-  .deadline-tag.overdue{color:var(--red);font-weight:700;}
-  .deadline-tag.today{color:var(--amber);font-weight:700;}
-  .task-actions{display:flex;gap:6px;}
+  .deadline-tag.overdue{color:var(--danger);font-weight:700;}
+  .deadline-tag.today{color:var(--warning);font-weight:700;}
+  .task-actions{display:flex;gap:6px;flex-wrap:wrap;}
   .icon-btn{background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:6px 9px;font-size:12px;}
   .icon-btn:hover{color:var(--text);}
   .empty-msg{color:var(--text-faint);text-align:center;padding:26px;font-size:13px;}
 
   #toast-root{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;}
-  .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);}
 
-  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:150;padding:16px;}
-  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:20px 22px;}
+  .modal-backdrop{position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:center;justify-content:center;z-index:150;padding:16px;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:440px;padding:20px 22px;box-shadow:var(--shadow);}
   .modal h3{margin:0 0 14px;font-size:15px;}
   .modal .field{margin-bottom:12px;}
   .modal label{display:block;font-size:11.5px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
   .modal input,.modal select,.modal textarea{width:100%;}
   .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+
+  /* Theme picker */
+  .theme-wrap{position:relative;}
+  .theme-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:7px 12px;font-size:12px;border-radius:8px;}
+  .theme-btn:hover{color:var(--text);}
+  .theme-menu{
+    display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:120;
+    min-width:220px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:6px;box-shadow:var(--shadow);
+  }
+  .theme-menu.open{display:block;}
+  .theme-option{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:transparent;color:var(--text);padding:9px 10px;border-radius:8px;font-size:12.5px;font-weight:600;
+  }
+  .theme-option:hover{background:var(--panel-2);}
+  .theme-option.active{background:var(--accent-tint);outline:1px solid var(--accent);}
+  .theme-swatches{display:flex;gap:4px;margin-left:auto;}
+  .theme-swatch{width:12px;height:12px;border-radius:50%;border:1px solid var(--border);flex-shrink:0;}
 
   @media(max-width:720px){
     .wrap{padding:16px;}
@@ -161,32 +344,32 @@
 
   /* auth */
   .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 26px;width:100%;max-width:420px;}
+  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 26px;width:100%;max-width:420px;box-shadow:var(--shadow);}
   .auth-card h1{margin:0 0 6px;font-size:22px;text-align:center;}
   .auth-sub{text-align:center;color:var(--text-faint);font-size:12.5px;margin:0 0 22px;}
   .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--panel-2);border-radius:10px;padding:4px;}
   .auth-tab{flex:1;background:transparent;color:var(--text-soft);padding:8px 4px;font-size:11px;border-radius:8px;}
-  .auth-tab.active{background:var(--blue);color:#fff;}
+  .auth-tab.active{background:var(--accent);color:var(--on-accent);}
   .auth-field{margin-bottom:12px;}
   .auth-field label{display:block;font-size:11px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
   .auth-field input{width:100%;}
-  .auth-btn{width:100%;background:var(--blue);color:#fff;padding:11px;margin-top:4px;}
-  .auth-btn:hover{background:var(--blue-dark);}
+  .auth-btn{width:100%;background:var(--accent);color:var(--on-accent);padding:11px;margin-top:4px;}
+  .auth-btn:hover{background:var(--accent-dark);}
   .auth-hint{font-size:11.5px;color:var(--text-faint);margin-top:14px;line-height:1.5;text-align:center;}
   .auth-telegram-wrap{display:flex;justify-content:center;min-height:48px;align-items:center;}
-  .user-bar{display:flex;align-items:center;gap:10px;margin-left:auto;}
+  .user-bar{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;}
   .user-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-soft);}
   .user-chip b{color:var(--text);}
-  .admin-badge{background:var(--purple);color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
+  .admin-badge{background:var(--accent2);color:var(--on-accent);font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;vertical-align:middle;}
   .users-table{width:100%;border-collapse:collapse;font-size:12.5px;}
-  .users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  .users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;color:var(--text);}
   .users-table th{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;}
   .user-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .user-form .full{grid-column:1/-1;}
   @media(max-width:600px){.user-form{grid-template-columns:1fr;}}
   .app-nav{display:flex;gap:6px;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:5px;}
   .app-nav-btn{flex:1;background:transparent;color:var(--text-soft);padding:10px 12px;font-size:13px;border-radius:9px;}
-  .app-nav-btn.active{background:var(--blue);color:#fff;}
+  .app-nav-btn.active{background:var(--accent);color:var(--on-accent);}
   .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
   .view-pane{display:none;}
   .view-pane.active{display:block;}
@@ -233,6 +416,10 @@
     <div class="user-bar">
       <span class="user-chip" id="user-chip"></span>
       <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;">Ilovani o'rnatish</button>
+      <div class="theme-wrap">
+        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 Tema</button>
+        <div class="theme-menu" id="theme-menu" role="menu"></div>
+      </div>
       <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
     </div>
     <div class="kpi-row">
@@ -281,14 +468,14 @@
       <input type="datetime-local" id="new-deadline" title="Muddat (sana va soat)">
       <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Bajaruvchi: Ijrochi, Direktor yoki Admin. Telegram ID bo'lsa xabar yuboriladi.</p>
+    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. Tekshiruv yaratuvchiga boradi. Telegram ID bo'lsa xabar yuboriladi.</p>
   </div>
 
-  <div class="section-title hidden" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Tekshiruvdagi topshiriqlar</div>
-  <div class="task-list hidden" id="review-list"></div>
+  <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
+  <div class="task-list" id="review-list"></div>
 
-  <div class="section-title hidden" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
-  <div class="exec-grid hidden" id="exec-grid"></div>
+  <div class="section-title" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
+  <div class="exec-grid" id="exec-grid"></div>
 
   <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
   <div class="task-list" id="task-list"></div>
@@ -341,12 +528,14 @@
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Telegram ID — bildirishnomalar uchun. Rollar: Ijrochi / Direktor / Admin.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Ro'yxatdagi foydalanuvchini bosing — profilni tahrirlash oynasi ochiladi.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
         <select id="u-role">
           <option value="executor">Ijrochi</option>
+          <option value="dept_head">Bo'lim boshlig'i</option>
+          <option value="deputy_director">Direktor o'rinbosari</option>
           <option value="director">Direktor</option>
           <option value="admin">Admin</option>
         </select>
@@ -405,6 +594,124 @@ let pendingOtp = { method: '', contact: '' };
 const LOCAL_KEY_TASKS = 'tm_local_tasks';
 const LOCAL_KEY_SETTINGS = 'tm_local_settings';
 const LOCAL_KEY_PROFILE = 'tm_local_profile';
+const THEME_STORAGE_KEY = 'app_theme';
+
+/** Yangi tema: shu yerga id + label + swatch ranglarni qo'shing va CSS da [data-theme="id"] yozing */
+const THEMES = [
+  {
+    id: 'midnight',
+    label: 'Midnight',
+    swatches: ['#0B0F17', '#4C8DFF', '#9B6BEA', '#35C77A']
+  },
+  {
+    id: 'neon',
+    label: 'Neon Cyber',
+    swatches: ['#0A0014', '#FF2E92', '#00E5FF', '#00FFA3']
+  },
+  {
+    id: 'sunset',
+    label: 'Sunset Coral',
+    swatches: ['#1A0E12', '#FF6B4A', '#FFA654', '#FFB020']
+  },
+  {
+    id: 'forest',
+    label: 'Forest Emerald',
+    swatches: ['#0A1712', '#22C58B', '#5EEAD4', '#FBBF24']
+  },
+  {
+    id: 'aurora',
+    label: 'Aurora Light',
+    swatches: ['#F6F8FC', '#3B6FF2', '#8B5CF6', '#16A34A']
+  }
+];
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function getSavedThemeId() {
+  try {
+    const id = localStorage.getItem(THEME_STORAGE_KEY);
+    if (id && THEMES.some(t => t.id === id)) return id;
+  } catch (e) {}
+  return 'midnight';
+}
+
+function applyTheme(themeId, persist) {
+  const id = THEMES.some(t => t.id === themeId) ? themeId : 'midnight';
+  document.documentElement.setAttribute('data-theme', id);
+  if (persist !== false) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, id); } catch (e) {}
+  }
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', cssVar('--bg') || '#0B0F17');
+  syncThemeMenuActive();
+  // SMART chartlar ochiq bo'lsa — temaga mos ranglar bilan qayta chizish
+  try {
+    const smartPane = document.getElementById('view-smart');
+    if (smartPane && smartPane.classList.contains('active') && typeof renderSmartAnalytics === 'function') {
+      renderSmartAnalytics();
+    }
+  } catch (e) {}
+}
+
+function renderThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  const current = getSavedThemeId();
+  menu.innerHTML = THEMES.map(t => `
+    <button type="button" class="theme-option${t.id === current ? ' active' : ''}" role="menuitem"
+      data-theme-id="${t.id}" onclick="selectTheme('${t.id}')">
+      <span>${escapeHtml(t.label)}</span>
+      <span class="theme-swatches">
+        ${t.swatches.map(c => `<span class="theme-swatch" style="background:${c}"></span>`).join('')}
+      </span>
+    </button>
+  `).join('');
+}
+
+function syncThemeMenuActive() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  const current = document.documentElement.getAttribute('data-theme') || 'midnight';
+  menu.querySelectorAll('.theme-option').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-theme-id') === current);
+  });
+}
+
+function toggleThemeMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('theme-menu');
+  const btn = document.getElementById('theme-btn');
+  if (!menu) return;
+  const open = !menu.classList.contains('open');
+  menu.classList.toggle('open', open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function closeThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  const btn = document.getElementById('theme-btn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function selectTheme(themeId) {
+  applyTheme(themeId, true);
+  closeThemeMenu();
+}
+
+function initThemeSystem() {
+  applyTheme(getSavedThemeId(), false);
+  renderThemeMenu();
+  document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.theme-wrap');
+    if (wrap && !wrap.contains(e.target)) closeThemeMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeThemeMenu();
+  });
+}
 
 function initSupabase() {
   if (SUPABASE_URL.startsWith('YOUR_') || SUPABASE_ANON_KEY.startsWith('YOUR_')) {
@@ -578,27 +885,48 @@ function showAuth() {
 }
 
 function roleLabel(role) {
-  return { admin: 'Admin', director: 'Direktor', executor: 'Ijrochi' }[role] || role;
+  return {
+    admin: 'Admin',
+    director: 'Direktor',
+    deputy_director: "Direktor o'rinbosari",
+    dept_head: "Bo'lim boshlig'i",
+    executor: 'Ijrochi'
+  }[role] || role;
 }
 function roleBadge(role) {
-  const cls = { admin: 'role-admin', director: 'role-director', executor: 'role-executor' }[role] || '';
+  const cls = {
+    admin: 'role-admin',
+    director: 'role-director',
+    deputy_director: 'role-deputy_director',
+    dept_head: 'role-dept_head',
+    executor: 'role-executor'
+  }[role] || '';
   return `<span class="role-badge ${cls}">${roleLabel(role)}</span>`;
+}
+function roleOptionsHtml(selected) {
+  const roles = ['executor', 'dept_head', 'deputy_director', 'director', 'admin'];
+  return roles.map(r =>
+    `<option value="${r}" ${r === selected ? 'selected' : ''}>${roleLabel(r)}</option>`
+  ).join('');
 }
 function isAdmin() { return currentProfile?.role === 'admin'; }
 function isDirector() { return currentProfile?.role === 'director'; }
 function isExecutor() { return currentProfile?.role === 'executor'; }
-function canCreateTasks() { return isAdmin() || isDirector(); }
-function canApproveTasks() { return isAdmin() || isDirector(); }
+function canCreateTasks() { return !!currentProfile; }
 function canManageUsers() { return isAdmin(); }
+function isTaskCreator(t) { return !!t && t.created_by_user_id === currentProfile?.id; }
+function canReviewTask(t) { return isAdmin() || isTaskCreator(t); }
+function canEditTask(t) { return isAdmin() || isTaskCreator(t); }
+function canDeleteTask(t) { return isAdmin() || isTaskCreator(t); }
 function getExecutors() {
-  // Admin va direktorlar ham bir-biriga / o'ziga topshiriq bera oladi
   return state.appUsers
-    .filter(u => u.role === 'executor' || u.role === 'admin' || u.role === 'director')
     .slice()
     .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
 }
 function getDirectors() {
-  return state.appUsers.filter(u => u.role === 'director' || u.role === 'admin');
+  return state.appUsers.filter(u =>
+    u.role === 'director' || u.role === 'deputy_director' || u.role === 'admin'
+  );
 }
 function assigneeOptionLabel(u) {
   return escapeHtml(u.display_name) + ' (' + roleLabel(u.role) + ')';
@@ -606,9 +934,15 @@ function assigneeOptionLabel(u) {
 function userById(id) {
   return state.appUsers.find(u => u.id === id);
 }
+function userAvatarHtml(u, cls) {
+  const name = u?.display_name || '?';
+  if (u?.avatar_url) {
+    return `<img class="${cls}" src="${escapeHtml(u.avatar_url)}" alt="">`;
+  }
+  return `<span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-soft);">${initials(name)}</span>`;
+}
 function visibleTasks() {
-  if (canCreateTasks()) return state.tasks;
-  return state.tasks.filter(t => t.assignee_user_id === currentProfile?.id);
+  return state.tasks;
 }
 
 function showApp() {
@@ -628,8 +962,8 @@ function showApp() {
   document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
-  document.getElementById('review-section-title').classList.toggle('hidden', !canApproveTasks());
-  document.getElementById('review-list').classList.toggle('hidden', !canApproveTasks());
+  document.getElementById('review-section-title').classList.toggle('hidden', false);
+  document.getElementById('review-list').classList.toggle('hidden', false);
   if (canManageUsers()) renderUsersTable();
   renderExecutorSelect();
   switchAppView('monitoring');
@@ -714,26 +1048,137 @@ async function fetchTeamUsers() {
 
 async function renderUsersTable() {
   const users = await fetchAppUsers();
+  state.appUsers = users;
   const tbody = document.getElementById('users-tbody');
   if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
   tbody.innerHTML = users.map(u => {
     const actions = [];
     if (u.email) {
-      actions.push(`<button class="btn-ghost" style="padding:6px 10px;font-size:11px;margin-right:4px;" onclick="resetUserPassword('${escapeHtml(u.email)}')">Parolni tiklash</button>`);
+      actions.push(`<button class="btn-ghost" style="padding:6px 10px;font-size:11px;margin-right:4px;" onclick="event.stopPropagation();resetUserPassword('${escapeHtml(u.email)}')">Parolni tiklash</button>`);
     }
+    actions.push(`<button class="btn-ghost" style="padding:6px 10px;font-size:11px;margin-right:4px;" onclick="event.stopPropagation();openUserEditModal('${u.id}')">Tahrirlash</button>`);
     if (u.id !== currentProfile?.id) {
-      actions.push(`<button class="btn-red-tint" onclick="deactivateUser('${u.id}')">O'chirish</button>`);
+      actions.push(`<button class="btn-red-tint" onclick="event.stopPropagation();deactivateUser('${u.id}')">O'chirish</button>`);
     }
     return `
-    <tr>
-      <td>${escapeHtml(u.display_name)}</td>
+    <tr class="user-row" onclick="openUserEditModal('${u.id}')">
+      <td>${userAvatarHtml(u, 'user-avatar-sm')}${escapeHtml(u.display_name)}</td>
       <td>${escapeHtml(u.email || '—')}</td>
       <td>${escapeHtml(u.phone || '—')}</td>
       <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
       <td>${roleLabel(u.role)}</td>
-      <td>${actions.length ? actions.join('') : '—'}</td>
+      <td>${actions.join('')}</td>
     </tr>`;
   }).join('');
+}
+
+function openUserEditModal(id) {
+  if (!canManageUsers()) return;
+  const u = state.appUsers.find(x => x.id === id);
+  if (!u) { toast('Foydalanuvchi topilmadi'); return; }
+  const avatarSrc = u.avatar_url || '';
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal wide">
+        <h3>Profilni tahrirlash</h3>
+        <div class="avatar-upload">
+          ${avatarSrc
+            ? `<img id="edit-avatar-preview" class="user-avatar-lg" src="${escapeHtml(avatarSrc)}" alt="">`
+            : `<div id="edit-avatar-preview" class="user-avatar-lg" style="display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--text-soft);">${initials(u.display_name)}</div>`}
+          <input type="file" id="edit-avatar-file" accept="image/*" style="font-size:12px;">
+          <p class="hint" style="margin-top:8px;">JPG/PNG, tavsiya: 512×512 px gacha</p>
+        </div>
+        <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
+        <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
+        <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
+        <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
+        <div class="field"><label>Telegram ID</label><input type="text" id="edit-u-telegram" value="${escapeHtml(u.telegram_id || '')}"></div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-blue" onclick="saveUserEdit('${u.id}')">Saqlash</button>
+        </div>
+      </div>
+    </div>`;
+  const fileInput = document.getElementById('edit-avatar-file');
+  if (fileInput) fileInput.addEventListener('change', () => previewAvatarFile(fileInput));
+}
+
+function previewAvatarFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('edit-avatar-preview');
+  if (!preview) return;
+  if (preview.tagName === 'IMG') {
+    preview.src = url;
+  } else {
+    const img = document.createElement('img');
+    img.id = 'edit-avatar-preview';
+    img.className = 'user-avatar-lg';
+    img.src = url;
+    img.alt = '';
+    preview.replaceWith(img);
+  }
+}
+
+async function uploadUserAvatar(userId, file) {
+  if (!file || !sb) return null;
+  if (file.size > 2 * 1024 * 1024) throw new Error('Rasm 2 MB dan katta bo\'lmasin');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('avatars').upload(path, file, {
+    upsert: true,
+    contentType: file.type || 'image/jpeg'
+  });
+  if (error) throw new Error(error.message);
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  return data?.publicUrl || null;
+}
+
+async function saveUserEdit(id) {
+  const display_name = document.getElementById('edit-u-name').value.trim();
+  const role = document.getElementById('edit-u-role').value;
+  const email = document.getElementById('edit-u-email').value.trim().toLowerCase() || null;
+  const phoneRaw = document.getElementById('edit-u-phone').value.trim();
+  const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
+  const telegram_id = document.getElementById('edit-u-telegram').value.trim() || null;
+  if (!display_name) { toast('Ism kiriting'); return; }
+  if (!email) { toast('Email majburiy'); return; }
+
+  const patch = { display_name, role, email, phone, telegram_id };
+  const fileInput = document.getElementById('edit-avatar-file');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (file) {
+    try {
+      const url = await uploadUserAvatar(id, file);
+      if (url) patch.avatar_url = url;
+    } catch (e) {
+      toast('Avatar yuklanmadi: ' + e.message);
+      return;
+    }
+  }
+
+  const { error } = await sb.from('app_users').update(patch).eq('id', id);
+  if (error) { toast('Xatolik: ' + error.message); return; }
+
+  const old = userById(id);
+  if (old?.email && email && old.email.toLowerCase() !== email) {
+    try {
+      await adminManageAuthUser('create', email, display_name);
+    } catch (e) {
+      toast('Profil saqlandi, lekin yangi email uchun Auth: ' + e.message);
+    }
+  }
+
+  closeModal();
+  state.appUsers = await fetchTeamUsers();
+  if (currentProfile?.id === id) {
+    currentProfile = { ...currentProfile, ...patch };
+    showApp();
+  }
+  renderExecutorSelect();
+  await renderUsersTable();
+  toast('Profil yangilandi');
 }
 
 function renderExecutorSelect() {
@@ -957,25 +1402,31 @@ function taskRowHtml(t, mode) {
   const creator = userById(t.created_by_user_id);
   const isMine = t.assignee_user_id === currentProfile?.id;
   let actions = '';
-  if (mode === 'review' && canApproveTasks() && t.status === 'tekshiruvda') {
-    actions = `<button class="btn-green" onclick="approveTask('${t.id}')">✓ Bajarildi</button>`;
+  if (mode === 'review' && canReviewTask(t) && t.status === 'tekshiruvda') {
+    actions = [
+      `<button class="btn-green" onclick="approveTask('${t.id}')">✓ Bajarildi</button>`,
+      `<button class="btn-outline" onclick="openReturnModal('${t.id}')">↩ Qayta ishlash</button>`
+    ].join('');
   } else {
     const parts = [];
-    if (canCreateTasks()) parts.push(`<button class="icon-btn" onclick="openEditModal('${t.id}')">✎</button>`);
+    if (canEditTask(t)) parts.push(`<button class="icon-btn" onclick="openEditModal('${t.id}')">✎</button>`);
     if (isMine && (eff === 'jarayonda' || eff === 'muddati_otgan')) {
-      parts.push(`<button class="btn-amber" onclick="submitForReview('${t.id}')">Tekshiruvga</button>`);
+      parts.push(`<button class="btn-amber" onclick="openSubmitReviewModal('${t.id}')">Tekshiruvga</button>`);
     }
-    if (canApproveTasks() && t.status === 'tekshiruvda') {
+    if (canReviewTask(t) && t.status === 'tekshiruvda') {
       parts.push(`<button class="btn-green" onclick="approveTask('${t.id}')">Bajarildi</button>`);
+      parts.push(`<button class="btn-outline" onclick="openReturnModal('${t.id}')">Qayta ishlash</button>`);
     }
-    if (canCreateTasks()) parts.push(`<button class="icon-btn" onclick="removeTask('${t.id}')">🗑</button>`);
+    if (canDeleteTask(t)) parts.push(`<button class="icon-btn" onclick="removeTask('${t.id}')">🗑</button>`);
     actions = parts.join('');
   }
+  const commentBits = [];
+  if (t.comment) commentBits.push('💬 ' + escapeHtml(t.comment));
   return `
     <div class="task-row">
       <div class="t-main">
         <div class="t-title">${escapeHtml(t.title)}</div>
-        <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${t.comment ? ' · 💬 ' + escapeHtml(t.comment) : ''}</div>
+        <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${commentBits.length ? ' · ' + commentBits.join(' · ') : ''}</div>
       </div>
       ${t.priority ? `<span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
       <span class="pill s-${eff}">${statusLabel(eff)}</span>
@@ -1035,7 +1486,7 @@ function renderExecCards() {
 function renderReviewList() {
   const list = document.getElementById('review-list');
   const title = document.getElementById('review-section-title');
-  if (!canApproveTasks()) return;
+  if (!list || !title) return;
   // Status filter boshqa bo'lsa, alohida tekshiruv blokini yashiramiz
   if (state.filterStatus && state.filterStatus !== 'tekshiruvda') {
     list.classList.add('hidden');
@@ -1044,9 +1495,11 @@ function renderReviewList() {
   }
   title.classList.remove('hidden');
   list.classList.remove('hidden');
-  const reviewTasks = visibleTasks().filter(t => t.status === 'tekshiruvda').filter(matchesFilters);
+  const reviewTasks = visibleTasks()
+    .filter(t => t.status === 'tekshiruvda' && canReviewTask(t))
+    .filter(matchesFilters);
   if (!reviewTasks.length) {
-    list.innerHTML = '<div class="empty-msg">Tekshiruvdagi topshiriq yo\'q</div>';
+    list.innerHTML = '<div class="empty-msg">Sizga tasdiqlash uchun kelgan topshiriq yo\'q</div>';
     return;
   }
   list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
@@ -1054,9 +1507,9 @@ function renderReviewList() {
 function renderTaskList() {
   const list = document.getElementById('task-list');
   let filtered = visibleTasks().filter(matchesFilters);
-  // Oddiy rejimda tekshiruvdagilar alohida blokda — asosiy ro'yxatdan chiqaramiz
-  if (!state.filterStatus && canApproveTasks()) {
-    filtered = filtered.filter(t => t.status !== 'tekshiruvda');
+  // Oddiy rejimda o'zingiz tasdiqlaydiganlar alohida blokda
+  if (!state.filterStatus) {
+    filtered = filtered.filter(t => !(t.status === 'tekshiruvda' && canReviewTask(t)));
   }
   filtered = filtered.slice().sort((x,y) => new Date(x.deadline||'2999-01-01') - new Date(y.deadline||'2999-01-01'));
   if (!filtered.length) { list.innerHTML = '<div class="empty-msg">Topshiriq topilmadi</div>'; return; }
@@ -1078,7 +1531,7 @@ function filterByStatus(status) {
   renderKpis();
   renderReviewList();
   renderTaskList();
-  const target = document.getElementById(state.filterStatus === 'tekshiruvda' && canApproveTasks() ? 'review-list' : 'task-list');
+  const target = document.getElementById(state.filterStatus === 'tekshiruvda' ? 'review-list' : 'task-list');
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function filterByAssignee(name) {
@@ -1125,26 +1578,93 @@ async function addTask() {
   await notifyExecutorNewTask(executor, title, deadline);
   toast('Topshiriq yaratildi va ijrochiga yuborildi');
 }
+async function openSubmitReviewModal(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || task.assignee_user_id !== currentProfile.id) return;
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Tekshiruvga yuborish</h3>
+        <p class="hint">${escapeHtml(task.title)}</p>
+        <div class="field">
+          <label>Izoh (bajarilgan ish haqida)</label>
+          <textarea id="submit-comment" rows="4" placeholder="Nima qilindi, qayerda ko'rish mumkin..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-amber" onclick="submitForReview('${id}')">Tekshiruvga yuborish</button>
+        </div>
+      </div>
+    </div>`;
+}
 async function submitForReview(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || task.assignee_user_id !== currentProfile.id) return;
-  if (!confirm('Topshiriqni tekshiruvga yuborasizmi?')) return;
-  await updateTask(id, { status: 'tekshiruvda' });
+  const commentEl = document.getElementById('submit-comment');
+  const comment = (commentEl ? commentEl.value : '').trim();
+  if (!comment) { toast('Tekshiruvga yuborishdan oldin izoh yozing'); return; }
+  await updateTask(id, { status: 'tekshiruvda', comment });
+  closeModal();
   await refreshFromDB();
-  await notifyDirectorsReview(task);
-  toast('Tekshiruvga yuborildi — direktor xabar oladi');
+  await notifyCreatorReview({ ...task, comment });
+  toast('Tekshiruvga yuborildi — yaratuvchi xabar oladi');
 }
 async function approveTask(id) {
   const task = state.tasks.find(t => t.id === id);
-  if (!task || !canApproveTasks()) return;
+  if (!task || !canReviewTask(task)) return;
   if (!confirm('Topshiriq bajarilgan deb yopilsinmi?')) return;
   await updateTask(id, { status: 'bajarildi' });
   await refreshFromDB();
   const executor = userById(task.assignee_user_id);
-  if (executor) await notifyUser(executor, `✅ <b>Topshiriq tasdiqlandi</b>\n\n${task.title}\n\nDirektor topshiriqni yopdi.`);
+  if (executor) {
+    await notifyUser(executor, `✅ <b>Topshiriq tasdiqlandi</b>\n\n${task.title}\n\nYaratuvchi topshiriqni yopdi.`);
+  }
   toast('Topshiriq bajarildi deb yopildi');
 }
+function openReturnModal(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || !canReviewTask(task) || task.status !== 'tekshiruvda') return;
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Qayta ishlashga qaytarish</h3>
+        <p class="hint">${escapeHtml(task.title)}</p>
+        <div class="field">
+          <label>Yangi muddat</label>
+          <input type="datetime-local" id="return-deadline" value="${toDatetimeLocal(task.deadline)}">
+        </div>
+        <div class="field">
+          <label>Izoh (nima tuzatilishi kerak)</label>
+          <textarea id="return-comment" rows="4" placeholder="Nima yetishmayapti / qanday tuzatish kerak..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-amber" onclick="returnForRework('${id}')">Qaytarish</button>
+        </div>
+      </div>
+    </div>`;
+}
+async function returnForRework(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || !canReviewTask(task)) return;
+  const deadline = fromDatetimeLocal(document.getElementById('return-deadline').value);
+  const comment = (document.getElementById('return-comment').value || '').trim();
+  if (!deadline) { toast('Yangi muddat belgilang'); return; }
+  if (!comment) { toast('Qaytarish izohini yozing'); return; }
+  await updateTask(id, { status: 'jarayonda', deadline, comment });
+  closeModal();
+  await refreshFromDB();
+  const executor = userById(task.assignee_user_id);
+  if (executor) {
+    await notifyUser(executor,
+      `↩ <b>Qayta ishlashga qaytarildi</b>\n\n${task.title}\nYangi muddat: <b>${formatDeadlineDisplay(deadline)}</b>\nIzoh: ${comment}`
+    );
+  }
+  toast('Topshiriq qayta ishlashga qaytarildi');
+}
 async function removeTask(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || !canDeleteTask(task)) return;
   if (!confirm("Topshiriqni o'chirmoqchimisiz?")) return;
   await deleteTaskRow(id);
   await refreshFromDB();
@@ -1152,7 +1672,7 @@ async function removeTask(id) {
 }
 function openEditModal(id) {
   const t = state.tasks.find(x => x.id === id);
-  if (!t || !canCreateTasks()) return;
+  if (!t || !canEditTask(t)) return;
   const executorOptions = getExecutors().map(u =>
     `<option value="${u.id}" ${u.id===t.assignee_user_id?'selected':''}>${assigneeOptionLabel(u)}</option>`
   ).join('');
@@ -1240,18 +1760,21 @@ async function notifyUser(user, text) {
   return sendTelegramTo(user.telegram_id, text);
 }
 async function notifyExecutorNewTask(executor, title, deadline) {
-  const creator = currentProfile?.display_name || 'Direktor';
+  const creator = currentProfile?.display_name || 'Yaratuvchi';
   const dl = deadline ? `\nMuddat: <b>${formatDeadlineDisplay(deadline)}</b>` : '';
   const ok = await notifyUser(executor, `📋 <b>Yangi topshiriq</b>\n\n${title}${dl}\n\nYaratuvchi: ${creator}`);
   if (!ok && !executor.telegram_id) toast('Ijrochining Telegram ID kiritilmagan — xabar yuborilmadi');
 }
-async function notifyDirectorsReview(task) {
-  const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}`;
-  let sent = 0;
-  for (const d of getDirectors()) {
-    if (await notifyUser(d, lines)) sent++;
+async function notifyCreatorReview(task) {
+  const creator = userById(task.created_by_user_id);
+  const note = task.comment ? `\nIzoh: ${task.comment}` : '';
+  const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}`;
+  if (!creator) {
+    toast('Yaratuvchi topilmadi — xabar yuborilmadi');
+    return;
   }
-  if (!sent) toast('Direktorlarning Telegram ID si yo\'q — xabar yuborilmadi');
+  const ok = await notifyUser(creator, lines);
+  if (!ok && !creator.telegram_id) toast('Yaratuvchining Telegram ID si yo\'q — xabar yuborilmadi');
 }
 async function saveAndTestTelegram() {
   const token = document.getElementById('tg-token').value.trim();
@@ -1371,6 +1894,13 @@ function renderSmartAnalytics() {
 
   if (typeof Chart === 'undefined') return;
   destroySmartCharts();
+  const accent = cssVar('--accent') || '#4C8DFF';
+  const success = cssVar('--success') || '#35C77A';
+  const warning = cssVar('--warning') || '#F2B84B';
+  const accent2 = cssVar('--accent2') || '#9B6BEA';
+  const danger = cssVar('--danger') || '#F2635C';
+  const tick = cssVar('--text-soft') || '#93A0B4';
+  const grid = cssVar('--border') || '#232C3D';
   const smartCtx = document.getElementById('chart-smart');
   const statusCtx = document.getElementById('chart-status');
   if (smartCtx) {
@@ -1381,7 +1911,7 @@ function renderSmartAnalytics() {
         datasets: [{
           label: 'SMART score (%)',
           data: Object.values(m.scores),
-          backgroundColor: ['#4C8DFF', '#35C77A', '#F2B84B', '#9B6BEA', '#F2635C'],
+          backgroundColor: [accent, success, warning, accent2, danger],
           borderRadius: 6,
         }]
       },
@@ -1389,8 +1919,8 @@ function renderSmartAnalytics() {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          y: { beginAtZero: true, max: 100, ticks: { color: '#93A0B4' }, grid: { color: '#232C3D' } },
-          x: { ticks: { color: '#93A0B4' }, grid: { display: false } }
+          y: { beginAtZero: true, max: 100, ticks: { color: tick }, grid: { color: grid } },
+          x: { ticks: { color: tick }, grid: { display: false } }
         },
         plugins: { legend: { display: false } }
       }
@@ -1407,7 +1937,7 @@ function renderSmartAnalytics() {
         labels: ['Jarayonda', 'Tekshiruvda', 'Bajarildi', "Kechikkan"],
         datasets: [{
           data: [jar, tek, baj, kech],
-          backgroundColor: ['#4C8DFF', '#F2B84B', '#35C77A', '#F2635C'],
+          backgroundColor: [accent, warning, success, danger],
           borderWidth: 0,
         }]
       },
@@ -1415,7 +1945,7 @@ function renderSmartAnalytics() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom', labels: { color: '#93A0B4', boxWidth: 12 } }
+          legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } }
         }
       }
     });
@@ -1472,6 +2002,7 @@ async function installPwa() {
    INIT
 ========================================================= */
 async function init() {
+  initThemeSystem();
   setupPwaInstall();
   initSupabase();
 

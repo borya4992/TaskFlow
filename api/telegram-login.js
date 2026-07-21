@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
     });
     const invited = await invitedRes.json();
     if (!invited) {
-      res.status(403).json({ ok: false, error: 'Siz tizimga kiritilmagansiz. Admin bilan bog\'laning.' });
+      res.status(403).json({ ok: false, error: 'Siz tizimga kiritilmagansiz. Bobur bilan bog\'laning. Raqami +998995594992' });
       return;
     }
 
