@@ -214,6 +214,13 @@
   header .titles{flex:1;min-width:240px;}
   header h1{margin:0;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
   header p{margin:4px 0 0;color:var(--subtitle);font-size:12.5px;}
+  header .credit-line{
+    margin:6px 0 0;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    color:#f97316;
+  }
   .kpi-row{display:flex;gap:10px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;cursor:pointer;transition:border-color .12s, background .12s;user-select:none;}
   .kpi:hover{border-color:var(--accent);}
@@ -468,6 +475,7 @@
   .office3d-tooltip b{color:var(--text);}
   .office3d-tooltip i{color:var(--accent);font-style:normal;font-size:10.5px;}
   .office3d-hint{font-size:11.5px;color:var(--text-faint);}
+  .office3d-legend{font-size:11px;color:var(--text-soft);margin-left:auto;margin-right:12px;}
 </style>
 <script type="importmap">
 {
@@ -484,6 +492,7 @@
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
     <h1>📋 TaskFlow</h1>
+    <p class="credit-line" style="margin:8px 0 0;font-size:11.5px;font-weight:600;color:#f97316;text-align:center;">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
     <p class="auth-sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
     <div class="auth-tabs">
       <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')">Parol</button>
@@ -509,6 +518,7 @@
   <header>
     <div class="titles">
       <h1>📋 Topshiriqlar monitoringi</h1>
+      <p class="credit-line">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
     </div>
     <div class="user-bar">
       <span class="user-chip" id="user-chip" title="Profilni ochish" onclick="openMyProfileModal()"></span>
@@ -624,7 +634,7 @@
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Ro'yxatdagi foydalanuvchini bosing — profilni tahrirlash oynasi ochiladi. Bo'limga biriktirish monitoring filtrida ishlaydi.</p>
+    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar</b>, <b>Ishga qabul qilish</b>, <b>Kompensatsiya</b>. 3D ofisda Admin ko'rinmaydi; bo'sh xodimlar <b>Dam olish</b>da, topshiriq berilganda o'z bo'limiga o'tadi.</p>
     <div class="user-form">
       <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label>Rol</label>
@@ -637,7 +647,17 @@
         </select>
       </div>
       <div class="auth-field"><label>Bo'lim</label>
-        <input type="text" id="u-department" list="department-suggestions" placeholder="Masalan: IT, HR, Moliya">
+        <select id="u-department">
+          <option value="Xodimlar">Xodimlar</option>
+          <option value="Ishga qabul qilish">Ishga qabul qilish</option>
+          <option value="Kompensatsiya">Kompensatsiya</option>
+        </select>
+      </div>
+      <div class="auth-field"><label>Jins</label>
+        <select id="u-gender">
+          <option value="erkak">Erkak</option>
+          <option value="ayol">Ayol</option>
+        </select>
       </div>
       <div class="auth-field"><label>Lavozim darajasi</label>
         <select id="u-position-level">
@@ -687,7 +707,7 @@
 <!-- 3D OFIS (faqat admin) -->
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
   <div class="office3d-topbar">
-    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Figuraga bosing — topshiriq yarating · Sichqoncha bilan aylantring</span></h2>
+    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Figuraga bosing — topshiriq yarating · Bo'sh → Dam olish · Band → bo'lim</span></h2>
     <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
   </div>
   <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
@@ -1040,6 +1060,25 @@ function positionLevelOptionsHtml(selected) {
     `<option value="${l}" ${l === cur ? 'selected' : ''}>${positionLevelLabel(l)}</option>`
   ).join('');
 }
+const OFFICE_DEPARTMENTS = ['Xodimlar', 'Ishga qabul qilish', 'Kompensatsiya'];
+function genderOf(u) {
+  return u?.gender === 'ayol' ? 'ayol' : 'erkak';
+}
+function genderLabel(g) {
+  return g === 'ayol' ? 'Ayol' : 'Erkak';
+}
+function genderOptionsHtml(selected) {
+  const cur = selected === 'ayol' ? 'ayol' : 'erkak';
+  return ['erkak', 'ayol'].map(g =>
+    `<option value="${g}" ${g === cur ? 'selected' : ''}>${genderLabel(g)}</option>`
+  ).join('');
+}
+function officeDepartmentOptionsHtml(selected) {
+  const cur = OFFICE_DEPARTMENTS.includes(selected) ? selected : 'Xodimlar';
+  return OFFICE_DEPARTMENTS.map(d =>
+    `<option value="${escapeHtml(d)}" ${d === cur ? 'selected' : ''}>${escapeHtml(d)}</option>`
+  ).join('');
+}
 function roleBadge(role) {
   const cls = {
     admin: 'role-admin',
@@ -1100,9 +1139,10 @@ function visibleTasks() {
 }
 
 function distinctDepartments() {
-  return Array.from(new Set(
-    state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
-  )).sort((a, b) => a.localeCompare(b, 'uz'));
+  return Array.from(new Set([
+    ...OFFICE_DEPARTMENTS,
+    ...state.appUsers.map(u => (u.department || '').trim()).filter(Boolean)
+  ])).sort((a, b) => a.localeCompare(b, 'uz'));
 }
 
 function refreshDepartmentSuggestions() {
@@ -1367,7 +1407,8 @@ function openUserEditModal(id) {
         </div>
         <div class="field"><label>Ism</label><input type="text" id="edit-u-name" value="${escapeHtml(u.display_name || '')}"></div>
         <div class="field"><label>Rol</label><select id="edit-u-role">${roleOptionsHtml(u.role)}</select></div>
-        <div class="field"><label>Bo'lim</label><input type="text" id="edit-u-department" list="department-suggestions" value="${escapeHtml(u.department || '')}" placeholder="Masalan: IT, HR, Moliya"></div>
+        <div class="field"><label>Bo'lim</label><select id="edit-u-department">${officeDepartmentOptionsHtml(u.department || 'Xodimlar')}</select></div>
+        <div class="field"><label>Jins</label><select id="edit-u-gender">${genderOptionsHtml(genderOf(u))}</select></div>
         <div class="field"><label>Lavozim darajasi</label><select id="edit-u-position-level">${positionLevelOptionsHtml(positionLevelOf(u))}</select></div>
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
         <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
@@ -1418,6 +1459,7 @@ async function saveUserEdit(id) {
   const display_name = document.getElementById('edit-u-name').value.trim();
   const role = document.getElementById('edit-u-role').value;
   const department = document.getElementById('edit-u-department').value.trim();
+  const gender = document.getElementById('edit-u-gender').value === 'ayol' ? 'ayol' : 'erkak';
   const position_level = document.getElementById('edit-u-position-level').value || 'xodim';
   const email = document.getElementById('edit-u-email').value.trim().toLowerCase() || null;
   const phoneRaw = document.getElementById('edit-u-phone').value.trim();
@@ -1426,7 +1468,7 @@ async function saveUserEdit(id) {
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy'); return; }
 
-  const patch = { display_name, role, department, position_level, email, phone, telegram_id };
+  const patch = { display_name, role, department, gender, position_level, email, phone, telegram_id };
   const fileInput = document.getElementById('edit-avatar-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file) {
@@ -1479,11 +1521,12 @@ async function addAppUser() {
   const phone = document.getElementById('u-phone').value.trim() ? normalizePhone(document.getElementById('u-phone').value) : null;
   const telegram_id = document.getElementById('u-telegram').value.trim() || null;
   const role = document.getElementById('u-role').value;
-  const department = document.getElementById('u-department').value.trim();
+  const department = document.getElementById('u-department').value.trim() || 'Xodimlar';
+  const gender = document.getElementById('u-gender').value === 'ayol' ? 'ayol' : 'erkak';
   const position_level = document.getElementById('u-position-level').value || positionLevelFromRole(role);
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy (parol orqali kirish uchun)'); return; }
-  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, position_level, is_active: true }]);
+  const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, gender, position_level, is_active: true }]);
   if (error) { toast('Xatolik: ' + error.message); return; }
   try {
     await adminManageAuthUser('create', email, display_name);
@@ -1496,7 +1539,8 @@ async function addAppUser() {
   document.getElementById('u-email').value = '';
   document.getElementById('u-phone').value = '';
   document.getElementById('u-telegram').value = '';
-  document.getElementById('u-department').value = '';
+  document.getElementById('u-department').value = 'Xodimlar';
+  document.getElementById('u-gender').value = 'erkak';
   document.getElementById('u-position-level').value = 'xodim';
   document.getElementById('u-role').value = 'executor';
   state.appUsers = await fetchTeamUsers();
@@ -2014,9 +2058,9 @@ async function openOffice3D() {
   if (!overlay || !canvas) return;
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  // users without admin-only filter — show all active team in office
+  // Admin 3D ofisda ko'rinmaydi; filtr office3d.js ichida ham bor
   Office3D.open(canvas, {
-    users: state.appUsers.filter(u => u.is_active !== false),
+    users: state.appUsers.filter(u => u.is_active !== false && u.role !== 'admin'),
     tasks: state.tasks,
     getThemeColors: getOfficeThemeColors,
     onSelectUser: (userId) => openCreateTaskForUser(userId),

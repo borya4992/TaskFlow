@@ -18,6 +18,7 @@ create table if not exists app_users (
   position_level text default 'xodim' check (position_level in (
     'direktor', 'orinbosar', 'bolim_boshligi', 'xodim'
   )),
+  gender text default 'erkak' check (gender in ('erkak', 'ayol')),
   last_seen timestamptz,
   role text not null default 'executor' check (role in (
     'admin', 'director', 'deputy_director', 'dept_head', 'executor'
@@ -35,6 +36,14 @@ alter table app_users add column if not exists avatar_url text default '';
 alter table app_users add column if not exists department text default '';
 alter table app_users add column if not exists last_seen timestamptz;
 alter table app_users add column if not exists position_level text default 'xodim';
+alter table app_users add column if not exists gender text default 'erkak';
+
+-- Jins constraint
+alter table app_users drop constraint if exists app_users_gender_check;
+update app_users set gender = 'erkak'
+where gender is null or gender = '' or gender not in ('erkak', 'ayol');
+alter table app_users add constraint app_users_gender_check
+  check (gender in ('erkak', 'ayol'));
 
 -- Lavozim darajasi constraint
 alter table app_users drop constraint if exists app_users_position_level_check;
