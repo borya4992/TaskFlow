@@ -12,43 +12,51 @@ const STAY_AT_DESK_LEVELS = new Set(['direktor', 'orinbosar']);
 /** 3D ofisdagi ish xonalari (Admin ko'rinmaydi) */
 export const OFFICE_WORK_DEPARTMENTS = ['Xodimlar', 'Ishga qabul qilish', 'Kompensatsiya'];
 
-/** Na'muna asosidagi low-poly ofis kiyimi (erkak / ayol) */
+/** Na'muna: low-poly humanoid ofis kiyimi (erkak oq + galstuk, ayol pink) */
 export const CHARACTER_PRESETS = {
   erkak: {
-    headScale: 1.0,
-    torsoW: 0.42,
-    torsoH: 0.52,
-    torsoD: 0.24,
-    shoulder: 0.28,
-    armLen: 0.38,
-    legLen: 0.42,
+    headR: 0.13,
+    shoulder: 0.2,
+    torsoR: 0.15,
+    torsoLen: 0.38,
+    upperArm: 0.28,
+    foreArm: 0.26,
+    thigh: 0.42,
+    shin: 0.4,
     hair: 'short',
     hairColor: 0x3a2a1c,
     skin: 0xe8c4a8,
-    shirt: 0xf4f6f8,
+    shirt: 0xf5f7fa,
     tie: 0x2f6bb5,
-    pants: 0x2c3038,
+    pants: 0x2a2e36,
     shoes: 0x6b4a32,
     hasTie: true,
   },
   ayol: {
-    headScale: 0.94,
-    torsoW: 0.38,
-    torsoH: 0.5,
-    torsoD: 0.22,
-    shoulder: 0.24,
-    armLen: 0.36,
-    legLen: 0.4,
+    headR: 0.12,
+    shoulder: 0.18,
+    torsoR: 0.135,
+    torsoLen: 0.36,
+    upperArm: 0.26,
+    foreArm: 0.24,
+    thigh: 0.4,
+    shin: 0.38,
     hair: 'ponytail',
     hairColor: 0x2a1f18,
     skin: 0xe8c4a8,
-    shirt: 0xf4f6f8,
+    shirt: 0xf4a4c4, // pink
     tie: null,
     pants: 0x252830,
     shoes: 0x1a1a1a,
     hasTie: false,
   },
 };
+
+/** Stol usti (workstation local Y) — qo'llar shu balandlikka tenglashadi */
+const DESK_TOP_Y = 0.72;
+const CHAIR_SEAT_Y = 0.42;
+/** O'tirganda root pastroq — qo'l stol bilan tekis */
+const SIT_ROOT_Y = 0.26;
 
 const WALK_SPEED = 2.6; // o'rtacha tezlik (birlik/sek)
 
@@ -168,128 +176,150 @@ function mat(color, opts = {}) {
   });
 }
 
-/** Low-poly ofis personaji (na'muna: oq ko'ylak, ko'k galstuk / ayol pony) */
+/** Low-poly humanoid (kapsula/sfera — kvadrat emas), na'munaga yaqin */
 function createPersonMesh(level, gender) {
   const g = genderOf({ gender });
   const p = CHARACTER_PRESETS[g] || CHARACTER_PRESETS.erkak;
   const root = new THREE.Group();
-  const scale = STAY_AT_DESK_LEVELS.has(level) ? 1.12 : 1;
+  // Boshqaruv ham bir xil o'lcham — oyoqlar polga tegadi
+  const scale = 1;
   root.scale.setScalar(scale);
 
-  const skinM = mat(p.skin, { roughness: 0.75 });
+  const skinM = mat(p.skin, { roughness: 0.72 });
   const shirtM = mat(p.shirt, { roughness: 0.55 });
   const pantsM = mat(p.pants, { roughness: 0.7 });
-  const hairM = mat(p.hairColor, { roughness: 0.9 });
+  const hairM = mat(p.hairColor, { roughness: 0.88 });
   const shoeM = mat(p.shoes, { roughness: 0.8 });
+  const segs = 6;
 
-  // —— Bosh ——
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.28 * p.headScale, 0.3 * p.headScale, 0.26 * p.headScale), skinM);
-  head.position.y = 1.42;
+  // —— Bosh (yumaloq) ——
+  const head = new THREE.Mesh(new THREE.SphereGeometry(p.headR, 10, 8), skinM);
+  head.position.y = 1.58;
   root.add(head);
 
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.08, segs), skinM);
+  neck.position.y = 1.44;
+  root.add(neck);
+
   if (p.hair === 'ponytail') {
-    const hairTop = new THREE.Mesh(new THREE.BoxGeometry(0.3 * p.headScale, 0.12, 0.28 * p.headScale), hairM);
-    hairTop.position.set(0, 1.55, 0);
-    root.add(hairTop);
-    const pony = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.28, 0.1), hairM);
-    pony.position.set(0, 1.28, -0.2);
-    pony.rotation.x = 0.35;
+    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(p.headR * 1.05, 10, 8), hairM);
+    hairCap.position.y = 1.62;
+    hairCap.scale.set(1.05, 0.75, 1.05);
+    root.add(hairCap);
+    const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.22, 3, 6), hairM);
+    pony.position.set(0, 1.42, -0.14);
+    pony.rotation.x = 0.55;
     root.add(pony);
   } else {
-    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.3 * p.headScale, 0.14, 0.28 * p.headScale), hairM);
-    hair.position.set(0, 1.54, -0.02);
-    root.add(hair);
+    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(p.headR * 1.08, 10, 8), hairM);
+    hairCap.position.y = 1.64;
+    hairCap.scale.set(1.02, 0.55, 1.05);
+    root.add(hairCap);
   }
 
-  // —— Torso (oq ko'ylak) ——
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(p.torsoW, p.torsoH, p.torsoD), shirtM);
-  torso.position.y = 1.05;
-  root.add(torso);
+  // —— Torso (kapsula — humanoid) ——
+  const torsoGroup = new THREE.Group();
+  torsoGroup.position.y = 1.12;
+  root.add(torsoGroup);
+  const torso = new THREE.Mesh(
+    new THREE.CapsuleGeometry(p.torsoR, p.torsoLen, 4, segs),
+    shirtM
+  );
+  torsoGroup.add(torso);
 
   if (p.hasTie && p.tie != null) {
-    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.04), mat(p.tie, { roughness: 0.5 }));
-    tie.position.set(0, 1.05, p.torsoD / 2 + 0.02);
-    root.add(tie);
+    const tie = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.025, 0.22, 3, 5),
+      mat(p.tie, { roughness: 0.45 })
+    );
+    tie.position.set(0, 0.02, p.torsoR + 0.02);
+    torsoGroup.add(tie);
   }
 
-  // —— Qo'llar (pivot) ——
-  const upperArmGeo = new THREE.BoxGeometry(0.1, p.armLen * 0.55, 0.1);
+  // —— Qo'llar ——
+  function makeArm(side) {
+    const arm = new THREE.Group();
+    arm.position.set(side * p.shoulder, 1.32, 0);
+    const upper = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.045, p.upperArm * 0.55, 3, segs),
+      shirtM
+    );
+    upper.position.y = -p.upperArm * 0.35;
+    arm.add(upper);
+    const forearm = new THREE.Group();
+    forearm.position.y = -p.upperArm * 0.7;
+    const foreMesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.04, p.foreArm * 0.5, 3, segs),
+      skinM
+    );
+    foreMesh.position.y = -p.foreArm * 0.32;
+    forearm.add(foreMesh);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), skinM);
+    hand.position.y = -p.foreArm * 0.62;
+    forearm.add(hand);
+    arm.add(forearm);
+    root.add(arm);
+    return { arm, forearm };
+  }
+  const left = makeArm(-1);
+  const right = makeArm(1);
 
-  const armL = new THREE.Group();
-  armL.position.set(-p.shoulder, 1.22, 0);
-  const armLMesh = new THREE.Mesh(upperArmGeo, shirtM);
-  armLMesh.position.y = -p.armLen * 0.28;
-  armL.add(armLMesh);
-  const forearmL = new THREE.Group();
-  forearmL.position.y = -p.armLen * 0.55;
-  const forearmLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.09, p.armLen * 0.5, 0.09), skinM);
-  forearmLMesh.position.y = -p.armLen * 0.22;
-  forearmL.add(forearmLMesh);
-  armL.add(forearmL);
-  root.add(armL);
-
-  const armR = new THREE.Group();
-  armR.position.set(p.shoulder, 1.22, 0);
-  const armRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, p.armLen * 0.55, 0.1), shirtM);
-  armRMesh.position.y = -p.armLen * 0.28;
-  armR.add(armRMesh);
-  const forearmR = new THREE.Group();
-  forearmR.position.y = -p.armLen * 0.55;
-  const forearmRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.09, p.armLen * 0.5, 0.09), skinM);
-  forearmRMesh.position.y = -p.armLen * 0.22;
-  forearmR.add(forearmRMesh);
-  armR.add(forearmR);
-  root.add(armR);
-
-  // —— Oyoqlar ——
+  // —— Bel / oyoqlar (oyoq pastki qismi ~ y=0) ——
   const hip = new THREE.Group();
-  hip.position.y = 0.78;
+  hip.position.y = 0.95;
   root.add(hip);
 
-  const pants = new THREE.Mesh(new THREE.BoxGeometry(p.torsoW * 0.95, 0.22, p.torsoD * 0.95), pantsM);
-  pants.position.y = -0.05;
-  hip.add(pants);
+  const pelvis = new THREE.Mesh(
+    new THREE.CapsuleGeometry(p.torsoR * 0.95, 0.08, 3, segs),
+    pantsM
+  );
+  pelvis.rotation.z = Math.PI / 2;
+  pelvis.position.y = -0.02;
+  hip.add(pelvis);
 
-  const legL = new THREE.Group();
-  legL.position.set(-0.12, -0.12, 0);
-  const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.14, p.legLen * 0.55, 0.14), pantsM);
-  thighL.position.y = -p.legLen * 0.28;
-  legL.add(thighL);
-  const shinL = new THREE.Group();
-  shinL.position.y = -p.legLen * 0.55;
-  const shinLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, p.legLen * 0.45, 0.12), pantsM);
-  shinLMesh.position.y = -p.legLen * 0.2;
-  shinL.add(shinLMesh);
-  const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.22), shoeM);
-  shoeL.position.set(0, -p.legLen * 0.42, 0.04);
-  shinL.add(shoeL);
-  legL.add(shinL);
-  hip.add(legL);
+  function makeLeg(side) {
+    const leg = new THREE.Group();
+    leg.position.set(side * 0.1, -0.04, 0);
+    const thighLen = Math.max(p.thigh, 0.4);
+    const shinLen = Math.max(p.shin, 0.38);
+    const thigh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.055, thighLen * 0.55, 3, segs),
+      pantsM
+    );
+    thigh.position.y = -thighLen * 0.35;
+    leg.add(thigh);
+    const shin = new THREE.Group();
+    shin.position.y = -thighLen * 0.72;
+    const shinMesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.048, shinLen * 0.5, 3, segs),
+      pantsM
+    );
+    shinMesh.position.y = -shinLen * 0.32;
+    shin.add(shinMesh);
+    const shoe = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.12, 3, 6), shoeM);
+    shoe.rotation.z = Math.PI / 2;
+    shoe.position.set(0, -shinLen * 0.62, 0.05);
+    shin.add(shoe);
+    leg.add(shin);
+    hip.add(leg);
+    return { leg, shin };
+  }
+  const legL = makeLeg(-1);
+  const legR = makeLeg(1);
 
-  const legR = new THREE.Group();
-  legR.position.set(0.12, -0.12, 0);
-  const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.14, p.legLen * 0.55, 0.14), pantsM);
-  thighR.position.y = -p.legLen * 0.28;
-  legR.add(thighR);
-  const shinR = new THREE.Group();
-  shinR.position.y = -p.legLen * 0.55;
-  const shinRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, p.legLen * 0.45, 0.12), pantsM);
-  shinRMesh.position.y = -p.legLen * 0.2;
-  shinR.add(shinRMesh);
-  const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.22), shoeM);
-  shoeR.position.set(0, -p.legLen * 0.42, 0.04);
-  shinR.add(shoeR);
-  legR.add(shinR);
-  hip.add(legR);
-
-  // Lavozim belgisi
   if (level === 'direktor') {
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.12, 5), mat(0xf2b84b, { metalness: 0.55, roughness: 0.35 }));
-    crown.position.y = 1.68;
+    const crown = new THREE.Mesh(
+      new THREE.ConeGeometry(0.09, 0.1, 5),
+      mat(0xf2b84b, { metalness: 0.55, roughness: 0.35 })
+    );
+    crown.position.y = 1.78;
     root.add(crown);
   } else if (level === 'orinbosar') {
-    const badge = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), mat(0xc0c8d4, { metalness: 0.65, roughness: 0.3 }));
-    badge.position.y = 1.66;
+    const badge = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.06),
+      mat(0xc0c8d4, { metalness: 0.65, roughness: 0.3 })
+    );
+    badge.position.y = 1.76;
     root.add(badge);
   }
 
@@ -297,17 +327,18 @@ function createPersonMesh(level, gender) {
     ...root.userData,
     shirtM,
     pantsM,
-    armL,
-    armR,
-    forearmL,
-    forearmR,
-    legL,
-    legR,
-    shinL,
-    shinR,
+    armL: left.arm,
+    armR: right.arm,
+    forearmL: left.forearm,
+    forearmR: right.forearm,
+    legL: legL.leg,
+    legR: legR.leg,
+    shinL: legL.shin,
+    shinR: legR.shin,
     hip,
     head,
-    torso,
+    torso: torsoGroup,
+    armRestY: 1.32,
     baseScale: scale,
     gender: g,
     standY: 0,
@@ -387,7 +418,9 @@ function createWorkstation(rotY = 0) {
   g.add(pole);
 
   g.userData.isOfficeProp = true;
-  g.userData.sitLocal = new THREE.Vector3(0, 0.05, 0.55);
+  g.userData.sitLocal = new THREE.Vector3(0, 0, 0.55);
+  g.userData.deskTopY = DESK_TOP_Y;
+  g.userData.chairSeatY = CHAIR_SEAT_Y;
   g.userData.faceYaw = rotY + Math.PI; // stulga o'tirib monitorga qarash
   return g;
 }
@@ -442,10 +475,12 @@ function applyStatusVisual(person, status) {
 function resetLimbPose(person) {
   const ud = person.userData;
   if (ud.armL) {
-    ud.armL.rotation.set(0, 0, 0.15);
+    ud.armL.rotation.set(0, 0, 0.12);
+    if (ud.armRestY != null) ud.armL.position.y = ud.armRestY;
   }
   if (ud.armR) {
-    ud.armR.rotation.set(0, 0, -0.15);
+    ud.armR.rotation.set(0, 0, -0.12);
+    if (ud.armRestY != null) ud.armR.position.y = ud.armRestY;
   }
   if (ud.forearmL) ud.forearmL.rotation.set(0, 0, 0);
   if (ud.forearmR) ud.forearmR.rotation.set(0, 0, 0);
@@ -455,30 +490,26 @@ function resetLimbPose(person) {
   if (ud.shinR) ud.shinR.rotation.set(0, 0, 0);
   if (ud.hip) ud.hip.rotation.set(0, 0, 0);
   if (ud.torso) ud.torso.rotation.set(0, 0, 0);
+  if (ud.head) ud.head.rotation.set(0, 0, 0);
 }
 
 function applySitPose(person, t) {
   const ud = person.userData;
-  if (ud.hip) ud.hip.rotation.x = -0.15;
-  if (ud.legL) {
-    ud.legL.rotation.x = -Math.PI / 2 + 0.15;
-  }
-  if (ud.legR) {
-    ud.legR.rotation.x = -Math.PI / 2 + 0.15;
-  }
-  if (ud.shinL) ud.shinL.rotation.x = Math.PI / 2 - 0.1;
-  if (ud.shinR) ud.shinR.rotation.x = Math.PI / 2 - 0.1;
-  // Typing
-  if (ud.armL) {
-    ud.armL.rotation.set(-1.05, 0.1, 0.35);
-  }
-  if (ud.armR) {
-    ud.armR.rotation.set(-1.05, -0.1, -0.35);
-  }
-  if (ud.forearmL) ud.forearmL.rotation.x = -0.35 + Math.sin(t * 10) * 0.22;
-  if (ud.forearmR) ud.forearmR.rotation.x = -0.35 + Math.sin(t * 10 + 1.3) * 0.22;
-  if (ud.torso) ud.torso.rotation.x = 0.12;
-  if (ud.head) ud.head.rotation.x = -0.08;
+  // Yelkalar pastroq — qo'l stol usti (DESK_TOP_Y) bilan tekis
+  if (ud.armL) ud.armL.position.y = (ud.armRestY || 1.32) - 0.28;
+  if (ud.armR) ud.armR.position.y = (ud.armRestY || 1.32) - 0.28;
+  if (ud.hip) ud.hip.rotation.x = 0.05;
+  if (ud.legL) ud.legL.rotation.set(-Math.PI / 2 + 0.08, 0.04, 0);
+  if (ud.legR) ud.legR.rotation.set(-Math.PI / 2 + 0.08, -0.04, 0);
+  if (ud.shinL) ud.shinL.rotation.x = Math.PI / 2 - 0.05;
+  if (ud.shinR) ud.shinR.rotation.x = Math.PI / 2 - 0.05;
+  // Qo'llar: bilak stol ustida, barmoqlar klaviaturada
+  if (ud.armL) ud.armL.rotation.set(-1.25, 0.12, 0.65);
+  if (ud.armR) ud.armR.rotation.set(-1.25, -0.12, -0.65);
+  if (ud.forearmL) ud.forearmL.rotation.set(-0.75 + Math.sin(t * 11) * 0.16, 0, 0.08);
+  if (ud.forearmR) ud.forearmR.rotation.set(-0.75 + Math.sin(t * 11 + 1.2) * 0.16, 0, -0.08);
+  if (ud.torso) ud.torso.rotation.x = 0.1;
+  if (ud.head) ud.head.rotation.set(-0.06, 0, 0);
 }
 
 function applyIdlePose(person, t) {
@@ -491,6 +522,10 @@ function applyIdlePose(person, t) {
 
 function applyWalkPose(person, t) {
   const ud = person.userData;
+  if (ud.armRestY != null) {
+    if (ud.armL) ud.armL.position.y = ud.armRestY;
+    if (ud.armR) ud.armR.position.y = ud.armRestY;
+  }
   const swing = Math.sin(t * 8) * 0.55;
   if (ud.legL) ud.legL.rotation.x = swing;
   if (ud.legR) ud.legR.rotation.x = -swing;
@@ -592,7 +627,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722b — fixed rooms + low-poly + Dam olish');
+      console.info('[Office3D] build 20260722c — humanoid capsules, pink women, sit desk-align');
     } catch (_) {}
   },
 
@@ -744,12 +779,15 @@ export const Office3D = {
     st.workstations.push(ws);
     const sit = ws.userData.sitLocal.clone();
     sit.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY);
+    // Platforma usti (pol) — oyoqlar shu yerga tegadi
+    const floorY = platformY + 0.04;
     return {
       x: x + sit.x,
-      y: platformY + 0.42,
+      y: platformY + SIT_ROOT_Y,
       z: z + sit.z,
       rotY: ws.userData.faceYaw,
-      standY: platformY,
+      standY: floorY,
+      deskTopWorldY: platformY + DESK_TOP_Y,
       zone: 'work',
     };
   },
@@ -814,10 +852,11 @@ export const Office3D = {
 
     this._floor(42, 42, 0, colors.panel, 0, 0);
 
-    // —— Boshqaruv ——
+    // —— Boshqaruv (platforma) ——
     const platformY = 0.35;
     this._floor(14, 5, platformY, colors.border, 0, -8);
     this._roomLabel('Boshqaruv', 0, -8);
+    const mgrFloorY = platformY + 0.04;
 
     const managers = team
       .filter((u) => {
@@ -831,8 +870,8 @@ export const Office3D = {
       const n = managers.length;
       const x = (i - (n - 1) / 2) * 3.2;
       const seat = this._addWorkstationAt(x, -8.15, 0, platformY);
-      // Bo'sh holatda tik turish nuqtasi (stul yonida)
-      seat.standPos = { x: seat.x, y: platformY, z: seat.z + 0.15 };
+      // Bo'sh: platforma polida tik turish (oyoqlar tegadi)
+      seat.standPos = { x: seat.x, y: mgrFloorY, z: seat.z + 0.2 };
       mgrSeats.push(seat);
     });
     st.deskSlots.boshqaruv = { managers: managers.map((u) => u.id), seats: mgrSeats };
@@ -936,7 +975,7 @@ export const Office3D = {
       };
     }
     if (STAY_AT_DESK_LEVELS.has(level) && !pose.seated) {
-      return { ...pose, y: pose.standY ?? 0.35, seated: false };
+      return { ...pose, y: pose.standY ?? pose.standPos?.y ?? 0.39, seated: false };
     }
     return pose;
   },
