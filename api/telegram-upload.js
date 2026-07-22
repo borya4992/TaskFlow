@@ -100,7 +100,7 @@ async function deleteFromStorage(supabaseUrl, serviceKey, storagePath) {
 
 async function sendToTelegram(token, chatId, filename, mime, buffer) {
   const form = new FormData();
-  form.append('chat_id', chatId);
+  form.append('chat_id', String(chatId).trim());
   form.append('document', new Blob([buffer], { type: mime || 'application/octet-stream' }), filename);
   form.append('caption', `📎 ${filename}`);
   const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
@@ -108,6 +108,38 @@ async function sendToTelegram(token, chatId, filename, mime, buffer) {
     body: form
   });
   return tgRes.json();
+}
+
+function normalizeChatId(raw) {
+  let s = String(raw || '').trim().replace(/\s+/g, '');
+  if (!s) return '';
+  // @username qolishi mumkin; raqamli ID afzal
+  return s;
+}
+
+async function sendDocumentToAnyChat(token, chatIds, filename, mime, buffer) {
+  const tried = [];
+  let last = null;
+  for (const raw of chatIds) {
+    const chatId = normalizeChatId(raw);
+    if (!chatId || tried.includes(chatId)) continue;
+    tried.push(chatId);
+    const tgData = await sendToTelegram(token, chatId, filename, mime, buffer);
+    if (tgData && tgData.ok) return tgData;
+    last = tgData;
+  }
+  return last || { ok: false, description: 'chat_id yo\'q' };
+}
+
+function explainTelegramError(tgData) {
+  const desc = String(tgData?.description || 'noma\'lum');
+  if (/chat not found/i.test(desc)) {
+    return 'Telegram Chat ID topilmadi. Sozlamalarda to\'g\'ri Chat ID kiriting: botga /start yozing, ID ni @userinfobot dan oling, so\'ng «Saqlash va test yuborish» ni bosing.';
+  }
+  if (/bot was blocked|forbidden/i.test(desc)) {
+    return 'Bot bloklangan yoki chatga yozish mumkin emas. Botga /start yuboring.';
+  }
+  return 'Telegram xatosi: ' + desc;
 }
 
 module.exports = async function handler(req, res) {
@@ -124,39 +156,40 @@ module.exports = async function handler(req, res) {
   }
 
   let stagedPath = null;
+  let requestBody = {};
 
   try {
     const { token, chatId } = await getTelegramSettings(supabaseUrl, serviceKey);
-    if (!token || !chatId) {
-      res.status(400).json({ ok: false, error: 'Avval saytda Telegram token va Chat ID sozlanmagan' });
+    if (!token) {
+      res.status(400).json({ ok: false, error: 'Avval saytda Telegram Bot Token sozlanmagan' });
       return;
     }
 
     let filename = '';
     let mime = 'application/octet-stream';
     let buffer = null;
+    let fallbackChatId = '';
 
     const ct = String(req.headers['content-type'] || '');
 
     if (ct.includes('application/json') || ct.includes('text/plain') || !ct.includes('multipart/')) {
       const raw = await readRawBody(req);
-      let body = {};
       try {
-        body = JSON.parse(raw.toString('utf8') || '{}');
+        requestBody = JSON.parse(raw.toString('utf8') || '{}');
       } catch (_) {
         res.status(400).json({ ok: false, error: 'JSON o\'qilmadi' });
         return;
       }
+      fallbackChatId = requestBody.fallback_chat_id || requestBody.chat_id || '';
 
-      if (body.storagePath) {
-        // Staging yo'li — 10 MB gacha
-        stagedPath = String(body.storagePath).replace(/^\/+/, '').replace(/\.\./g, '');
+      if (requestBody.storagePath) {
+        stagedPath = String(requestBody.storagePath).replace(/^\/+/, '').replace(/\.\./g, '');
         if (!stagedPath || stagedPath.includes('..')) {
           res.status(400).json({ ok: false, error: 'storagePath noto\'g\'ri' });
           return;
         }
-        filename = body.filename || stagedPath.split('/').pop() || 'fayl';
-        mime = body.mime || mime;
+        filename = requestBody.filename || stagedPath.split('/').pop() || 'fayl';
+        mime = requestBody.mime || mime;
         buffer = await downloadFromStorage(supabaseUrl, serviceKey, stagedPath);
         if (buffer.length > MAX_STAGED_BYTES) {
           await deleteFromStorage(supabaseUrl, serviceKey, stagedPath);
@@ -164,10 +197,10 @@ module.exports = async function handler(req, res) {
           res.status(400).json({ ok: false, error: 'Fayl juda katta (maksimum 10 MB)' });
           return;
         }
-      } else if (body.data && body.filename) {
-        filename = body.filename;
-        mime = body.mime || mime;
-        buffer = Buffer.from(body.data, 'base64');
+      } else if (requestBody.data && requestBody.filename) {
+        filename = requestBody.filename;
+        mime = requestBody.mime || mime;
+        buffer = Buffer.from(requestBody.data, 'base64');
         if (buffer.length > MAX_DIRECT_BYTES) {
           res.status(413).json({
             ok: false,
@@ -180,7 +213,6 @@ module.exports = async function handler(req, res) {
         return;
       }
     } else {
-      // multipart — faqat kichik fayllar
       const raw = await readRawBody(req);
       if (raw.length > MAX_DIRECT_BYTES + 64 * 1024) {
         res.status(413).json({
@@ -191,6 +223,8 @@ module.exports = async function handler(req, res) {
       }
       const parts = parseMultipart(raw, ct);
       const filePart = parts.find((p) => p.name === 'file' || p.filename);
+      const chatPart = parts.find((p) => p.name === 'fallback_chat_id' || p.name === 'chat_id');
+      if (chatPart?.data) fallbackChatId = chatPart.data.toString('utf8');
       if (!filePart || !filePart.data?.length) {
         res.status(400).json({ ok: false, error: 'file maydoni topilmadi' });
         return;
@@ -198,6 +232,15 @@ module.exports = async function handler(req, res) {
       filename = filePart.filename || 'fayl';
       mime = filePart.mime || mime;
       buffer = filePart.data;
+    }
+
+    const chatCandidates = [chatId, fallbackChatId].filter(Boolean);
+    if (!chatCandidates.length) {
+      res.status(400).json({
+        ok: false,
+        error: 'Telegram Chat ID sozlanmagan. Sozlamalarga Chat ID kiriting yoki profilingizga Telegram ID qo\'ying.'
+      });
+      return;
     }
 
     if (!filename || !buffer?.length) {
@@ -209,7 +252,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const tgData = await sendToTelegram(token, chatId, filename, mime, buffer);
+    const tgData = await sendDocumentToAnyChat(token, chatCandidates, filename, mime, buffer);
 
     if (stagedPath) {
       await deleteFromStorage(supabaseUrl, serviceKey, stagedPath);
@@ -217,7 +260,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (!tgData.ok) {
-      res.status(400).json({ ok: false, error: 'Telegram xatosi: ' + (tgData.description || 'nomalum') });
+      res.status(400).json({ ok: false, error: explainTelegramError(tgData) });
       return;
     }
 

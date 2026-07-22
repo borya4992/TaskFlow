@@ -765,7 +765,9 @@
       <button class="btn-blue" onclick="saveAndTestTelegram()">Saqlash va test yuborish</button>
     </div>
     <div class="help-text">
-      Telegram ulanmagan. Bot yaratish: <b>@BotFather</b> → token oling; keyin botga <b>/start</b> yozing va Chat ID'ni <b>@userinfobot</b> orqali toping.
+      Fayl saqlash uchun ham shu Chat ID ishlatiladi. Bot yaratish: <b>@BotFather</b> → token;
+      botga <b>/start</b> yozing; Chat ID ni <b>@userinfobot</b> dan oling (faqat raqam, masalan <b>123456789</b>).
+      Keyin <b>Saqlash va test yuborish</b> — muvaffaqiyatli bo'lsa fayl yuklash ham ishlaydi.
     </div>
     <button class="btn-ghost" onclick="checkDeadlinesNow()">⏰ Hozir muddatlarni tekshirish</button>
     <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent2)"></span> 3D Ofis</h2>
@@ -1855,7 +1857,8 @@ async function uploadViaSignedStaging(file) {
     body: JSON.stringify({
       storagePath: signJson.storagePath,
       filename: file.name,
-      mime: file.type || 'application/octet-stream'
+      mime: file.type || 'application/octet-stream',
+      fallback_chat_id: currentProfile?.telegram_id || ''
     })
   });
   const json = await res.json().catch(() => ({}));
@@ -2254,9 +2257,9 @@ function renderExecCards() {
     const pct = total ? Math.round((done/total)*100) : 0;
     const user = state.appUsers.find(u => u.display_name === name);
     const dept = user?.department ? `<span class="dept-tag">${escapeHtml(user.department)}</span>` : '';
-    const nameArg = JSON.stringify(name);
+    // Apostrof/maxsus belgilar uchun onclick emas — data + encodeURIComponent
     return `
-      <div class="exec-card" onclick='openAssigneeTasksModal(${nameArg})'>
+      <div class="exec-card" role="button" tabindex="0" data-assignee="${encodeURIComponent(name)}">
         <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}${dept}</div>
         <div class="exec-stats"><span>Jami: ${total}</span><span style="color:var(--blue)">Jarayonda: ${progress}</span></div>
         <div class="exec-stats"><span style="color:var(--amber)">Tekshiruv: ${review}</span><span style="color:var(--green)">Bajarildi: ${done}</span></div>
@@ -2281,11 +2284,21 @@ function assigneeColumnHtml(title, cls, tasks) {
     ${content}
   </div>`;
 }
+function normalizePersonName(s) {
+  return String(s || '')
+    .normalize('NFC')
+    .replace(/[\u2018\u2019\u02BC\u02BB\u0060\u00B4]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 function openAssigneeTasksModal(name) {
+  const key = normalizePersonName(name);
   const own = state.tasks
-    .filter(t => t.assignee === name)
+    .filter(t => !t.deleted_at && normalizePersonName(t.assignee) === key)
     .slice()
     .sort((a,b) => new Date(a.deadline || '2999-01-01') - new Date(b.deadline || '2999-01-01'));
+  const titleName = own[0]?.assignee || name;
   const by = {
     jarayonda: own.filter(t => effectiveStatus(t) === 'jarayonda'),
     tekshiruvda: own.filter(t => effectiveStatus(t) === 'tekshiruvda'),
@@ -2296,7 +2309,7 @@ function openAssigneeTasksModal(name) {
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal wide" style="max-width:1100px;">
         <div class="modal-head">
-          <h3>${escapeHtml(name)} — barcha topshiriqlar</h3>
+          <h3>${escapeHtml(titleName)} — barcha topshiriqlar</h3>
           <button type="button" class="btn-ghost" onclick="closeModal()">✕ Yopish</button>
         </div>
         <div class="assignee-board">
@@ -3364,6 +3377,29 @@ function toast(msg) {
   root.appendChild(el);
   setTimeout(() => el.remove(), 3200);
 }
+function setupExecCardClicks() {
+  const grid = document.getElementById('exec-grid');
+  if (!grid || grid.dataset.bound === '1') return;
+  grid.dataset.bound = '1';
+  grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.exec-card[data-assignee]');
+    if (!card) return;
+    try {
+      const name = decodeURIComponent(card.getAttribute('data-assignee') || '');
+      if (name) openAssigneeTasksModal(name);
+    } catch (err) {
+      console.error(err);
+      toast('Kartochkani ochib bo\'lmadi');
+    }
+  });
+  grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('.exec-card[data-assignee]');
+    if (!card) return;
+    e.preventDefault();
+    card.click();
+  });
+}
 
 /* =========================================================
    PWA — desktop/mobile ilova
@@ -3406,6 +3442,7 @@ async function installPwa() {
 async function init() {
   initThemeSystem();
   setupPwaInstall();
+  setupExecCardClicks();
   initSupabase();
 
   if (usingLocalFallback) {
