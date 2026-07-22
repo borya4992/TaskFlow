@@ -2208,11 +2208,12 @@ function taskRowHtml(t, mode) {
   if (t.status === 'tekshiruvda' && reviewer) commentBits.push('🔍 Tekshiruvchi: ' + escapeHtml(reviewer.display_name));
   if (delegatedBy) commentBits.push('↪ ' + escapeHtml(delegatedBy.display_name) + ' yo\'naltirdi');
   const attach = attachmentLinkHtml(t);
+  const created = t.created_at ? formatDeadlineDisplay(t.created_at) : '';
   return `
     <div class="task-row" onclick="if(!event.target.closest('button,a')) openTaskDetailModal('${t.id}')" style="cursor:pointer;">
       <div class="t-main">
         <div class="t-title">${escapeHtml(t.title)}</div>
-        <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${commentBits.length ? ' · ' + commentBits.join(' · ') : ''}</div>
+        <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${created ? ' · Yaratilgan: ' + escapeHtml(created) : ''}${commentBits.length ? ' · ' + commentBits.join(' · ') : ''}</div>
         ${attach}
       </div>
       ${t.priority ? `<span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
@@ -2274,7 +2275,7 @@ function assigneeColumnHtml(title, cls, tasks) {
       const dl = deadlineInfo(t);
       return `<div class="task-mini" style="cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
         <div class="title">${escapeHtml(t.title)}</div>
-        <div class="meta">${t.priority ? escapeHtml(t.priority) + ' · ' : ''}${dl.text} · ${escapeHtml(statusLabel(effectiveStatus(t)))}</div>
+        <div class="meta">${t.priority ? escapeHtml(t.priority) + ' · ' : ''}${dl.text} · ${escapeHtml(statusLabel(effectiveStatus(t)))}${t.created_at ? ' · ' + escapeHtml(formatDeadlineDisplay(t.created_at)) : ''}</div>
         ${attachmentLinkHtml(t)}
       </div>`;
     }).join('')
@@ -2931,7 +2932,11 @@ function openTaskDetailModal(id) {
           <span class="pill s-${eff}">${statusLabel(eff)}</span>
           ${t.priority ? ` · <span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
           · Muddat: ${dl.text}
+          ${t.created_at ? ' · Yaratilgan: ' + escapeHtml(formatDeadlineDisplay(t.created_at)) : ''}
         </p>
+        <div class="field"><label>Yaratilgan vaqt</label>
+          <div>${t.created_at ? escapeHtml(formatDeadlineDisplay(t.created_at)) : '—'}</div>
+        </div>
         <div class="field"><label>Hozir kimda (ijrochi)</label>
           <div>${escapeHtml(assignee?.display_name || t.assignee || '—')}${assignee?.department ? ' · ' + escapeHtml(assignee.department) : ''}</div>
         </div>
