@@ -1274,9 +1274,9 @@ function userAvatarHtml(u, cls) {
 }
 function visibleTasks() {
   let tasks = state.tasks.filter(t => !t.deleted_at);
-  // Ijrochi monitoringda faqat o'z topshiriqlarini ko'radi
-  if (isExecutor()) {
-    tasks = tasks.filter(t => t.assignee_user_id === currentProfile.id);
+  // Ijrochi filtri: bo'sh = barcha ijrochilar; tanlangan ism = faqat shu
+  if (state.filterAssignee) {
+    tasks = tasks.filter(t => t.assignee === state.filterAssignee);
   }
   if (state.filterDepartment) {
     const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.filterDepartment);
@@ -1333,6 +1333,11 @@ function showApp() {
   }
   renderExecutorSelect();
   fillDepartmentSelects();
+  // Ijrochi kirganda standart — o'z topshiriqlari; "Barcha ijrochilar" ni tanlasa — hammasi
+  if (isExecutor() && currentProfile?.display_name && !state._executorFilterInit) {
+    state.filterAssignee = currentProfile.display_name;
+    state._executorFilterInit = true;
+  }
   renderOnlineUsers();
   updateOffice3DPublicUI();
   switchAppView('monitoring');
@@ -1795,6 +1800,70 @@ function setAttachStatus(el, text, kind) {
   el.classList.toggle('busy', kind === 'busy');
   el.classList.toggle('ok', kind === 'ok');
 }
+async function ensureTaskTempBucket() {
+  try {
+    const res = await fetch('/api/ensure-task-temp', { method: 'POST' });
+    const json = await res.json().catch(() => ({}));
+    return !!(res.ok && json.ok);
+  } catch (e) {
+    console.warn('ensure-task-temp', e);
+    return false;
+  }
+}
+async function uploadViaSignedStaging(file) {
+  const { data: sess } = await sb.auth.getSession();
+  const folder = sess?.session?.user?.id || currentProfile?.auth_user_id || 'uploads';
+  const signRes = await fetch('/api/task-temp-sign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: file.name,
+      mime: file.type || 'application/octet-stream',
+      folder
+    })
+  });
+  const signJson = await signRes.json().catch(() => ({}));
+  if (!signRes.ok || !signJson.ok || !signJson.storagePath) {
+    throw new Error(signJson.error || 'Vaqtinchalik yuklash URL olinmadi');
+  }
+
+  // Supabase signed upload: PUT with token header
+  const putHeaders = {
+    'Content-Type': file.type || 'application/octet-stream'
+  };
+  if (signJson.token) putHeaders['x-upsert'] = 'false';
+
+  let putUrl = signJson.signedUrl;
+  // Ba'zi versiyalarda token alohida
+  if (signJson.token && putUrl && !/[?&]token=/.test(putUrl)) {
+    putUrl += (putUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(signJson.token);
+  }
+
+  const putRes = await fetch(putUrl, {
+    method: 'PUT',
+    headers: putHeaders,
+    body: file
+  });
+  if (!putRes.ok) {
+    const t = await putRes.text().catch(() => '');
+    throw new Error('Vaqtinchalik yuklash xatosi: ' + (t || putRes.status));
+  }
+
+  const res = await fetch('/api/telegram-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      storagePath: signJson.storagePath,
+      filename: file.name,
+      mime: file.type || 'application/octet-stream'
+    })
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok || !json.file_id) {
+    throw new Error(json.error || ('HTTP ' + res.status));
+  }
+  return json;
+}
 async function uploadTaskAttachment(file, statusEl) {
   if (!file) return null;
   if (file.size > MAX_ATTACHMENT_BYTES) {
@@ -1806,50 +1875,35 @@ async function uploadTaskAttachment(file, statusEl) {
   try {
     let json = {};
 
-    // Asosiy yo'l: vaqtinchalik Supabase → Telegram → temp o'chiriladi (10 MB)
     if (!usingLocalFallback && sb) {
-      const { data: sess } = await sb.auth.getSession();
-      const uid = sess?.session?.user?.id || currentProfile?.auth_user_id || currentProfile?.id;
-      if (!uid) throw new Error('Sessiya topilmadi — qayta kiring');
-      const safeName = String(file.name || 'fayl').replace(/[^\w.\-()\s\u0400-\u04FF]+/g, '_').slice(0, 120);
-      const storagePath = `${uid}/${Date.now()}_${safeName}`;
-      setAttachStatus(statusEl, 'Vaqtinchalik yuklanmoqda...', 'busy');
-      const { error: upErr } = await sb.storage.from('task-temp').upload(storagePath, file, {
-        upsert: false,
-        contentType: file.type || 'application/octet-stream'
-      });
-      if (upErr) throw new Error(upErr.message || 'Vaqtinchalik yuklash xatosi');
-
-      setAttachStatus(statusEl, 'Telegramga yuborilmoqda...', 'busy');
-      const res = await fetch('/api/telegram-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storagePath,
-          filename: file.name,
-          mime: file.type || 'application/octet-stream'
-        })
-      });
-      try { json = await res.json(); } catch (_) {}
-      // API o'chirishi kerak; muvaffaqiyatsiz bo'lsa ham tozalashga urinish
-      if (!res.ok || !json.ok) {
-        try { await sb.storage.from('task-temp').remove([storagePath]); } catch (_) {}
-      }
-      if (res.status === 413) {
-        throw new Error('So\'rov limitti. Qayta urinib ko\'ring.');
-      }
-      if (!res.ok || !json.ok || !json.file_id) {
-        throw new Error(json.error || ('HTTP ' + res.status));
+      setAttachStatus(statusEl, 'Telegramga yuklanmoqda (10 MB gacha)...', 'busy');
+      try {
+        json = await uploadViaSignedStaging(file);
+      } catch (stageErr) {
+        console.warn('staging failed, try direct', stageErr);
+        if (file.size > 3.5 * 1024 * 1024) {
+          throw new Error(
+            (stageErr.message || 'Bucket xatosi') +
+            ' — SQL Editor\'da supabase_schema.sql ni ishga tushiring yoki kichikroq fayl tanlang.'
+          );
+        }
+        setAttachStatus(statusEl, 'To\'g\'ridan-to\'g\'ri yuklanmoqda...', 'busy');
+        const form = new FormData();
+        form.append('file', file, file.name);
+        const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+        json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok || !json.file_id) {
+          throw new Error(json.error || stageErr.message || ('HTTP ' + res.status));
+        }
       }
     } else {
-      // Lokal fallback: faqat kichik multipart
       if (file.size > 3.5 * 1024 * 1024) {
         throw new Error('Lokal rejimda maksimum ~3.5 MB. Supabase ulang.');
       }
       const form = new FormData();
       form.append('file', file, file.name);
       const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
-      try { json = await res.json(); } catch (_) {}
+      json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok || !json.file_id) {
         throw new Error(json.error || ('HTTP ' + res.status));
       }
@@ -2089,7 +2143,28 @@ function matchesFilters(t) {
   return true;
 }
 function distinctAssignees() {
-  return Array.from(new Set(visibleTasks().map(t => t.assignee).filter(Boolean))).sort();
+  // Filtr ro'yxati — barcha ijrochilar (hozirgi filtdan mustaqil)
+  const names = Array.from(new Set(state.tasks.filter(t => !t.deleted_at).map(t => t.assignee).filter(Boolean)));
+  if (currentProfile?.display_name && !names.includes(currentProfile.display_name)) {
+    names.push(currentProfile.display_name);
+  }
+  return names.sort((a, b) => a.localeCompare(b, 'uz'));
+}
+function renderAssigneeOptions() {
+  const names = distinctAssignees();
+  const filterSel = document.getElementById('filter-assignee');
+  if (!filterSel) return;
+  const cur = state.filterAssignee || '';
+  filterSel.innerHTML = '<option value="">Barcha ijrochilar</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  filterSel.value = cur;
+}
+function onFilterAssignee(v){
+  state.filterAssignee = v;
+  renderKpis();
+  renderExecCards();
+  renderTaskList();
+  renderReviewList();
 }
 function taskRowHtml(t, mode) {
   const eff = effectiveStatus(t);
@@ -2163,13 +2238,6 @@ function renderKpis() {
     const st = el.getAttribute('data-status') || '';
     el.classList.toggle('active', st === (state.filterStatus || ''));
   });
-}
-function renderAssigneeOptions() {
-  const names = distinctAssignees();
-  const filterSel = document.getElementById('filter-assignee');
-  const cur = filterSel.value;
-  filterSel.innerHTML = '<option value="">Barcha ijrochilar</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  filterSel.value = cur;
 }
 function renderExecCards() {
   const tasks = visibleTasks();
@@ -2299,12 +2367,13 @@ function filterByStatus(status) {
 function filterByAssignee(name) {
   state.filterAssignee = name;
   document.getElementById('filter-assignee').value = name;
+  renderKpis();
+  renderExecCards();
   renderTaskList();
   renderReviewList();
   document.getElementById('task-list').scrollIntoView({ behavior:'smooth' });
 }
 function onSearch(v){ state.search = v; renderTaskList(); renderReviewList(); }
-function onFilterAssignee(v){ state.filterAssignee = v; renderTaskList(); renderReviewList(); }
 function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); renderReviewList(); }
 function onFilterDepartment(v){
   state.filterDepartment = v || '';

@@ -448,9 +448,13 @@ create policy "avatars_admin_delete" on storage.objects
 -- ============================================================
 -- 8) TASK TEMP STORAGE (faqat Telegramga o'tkazish uchun, keyin o'chiriladi)
 -- ============================================================
-insert into storage.buckets (id, name, public, file_size_limit)
-values ('task-temp', 'task-temp', false, 10485760)
-on conflict (id) do update set file_size_limit = 10485760;
+insert into storage.buckets (id, name, public)
+values ('task-temp', 'task-temp', false)
+on conflict (id) do nothing;
+
+update storage.buckets
+set file_size_limit = 10485760
+where id = 'task-temp';
 
 drop policy if exists "task_temp_insert" on storage.objects;
 create policy "task_temp_insert" on storage.objects
@@ -471,6 +475,14 @@ create policy "task_temp_select_own" on storage.objects
 drop policy if exists "task_temp_delete_own" on storage.objects;
 create policy "task_temp_delete_own" on storage.objects
   for delete using (
+    bucket_id = 'task-temp'
+    and auth.role() = 'authenticated'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "task_temp_update_own" on storage.objects;
+create policy "task_temp_update_own" on storage.objects
+  for update using (
     bucket_id = 'task-temp'
     and auth.role() = 'authenticated'
     and (storage.foldername(name))[1] = auth.uid()::text
