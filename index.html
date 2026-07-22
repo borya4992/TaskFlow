@@ -272,7 +272,14 @@
     color:var(--accent);text-decoration:none;font-weight:600;
   }
   .task-attach:hover{text-decoration:underline;}
+  .task-attach-wrap{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;
+    padding:8px 10px;border-radius:8px;background:var(--accent-tint);border:1px solid var(--border);
+  }
+  .task-attach-wrap .task-attach{margin-top:0;}
+  .task-attach-wrap .btn-ghost{padding:6px 10px;font-size:11px;min-height:32px;}
   .task-mini .task-attach{margin-top:4px;font-size:11px;}
+  .task-mini .task-attach-wrap{padding:6px 8px;margin-top:6px;}
 
   .section-title{font-size:15px;font-weight:700;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
   .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
@@ -1813,7 +1820,8 @@ async function uploadTaskAttachment(file, statusEl) {
       attachment_name: json.file_name || file.name,
       attachment_size: json.file_size || file.size
     };
-    setAttachStatus(statusEl, '✅ ' + att.attachment_name + ' (' + formatFileSize(att.attachment_size) + ')', 'ok');
+    setAttachStatus(statusEl, '✅ Telegramga yuklandi: ' + att.attachment_name + ' (' + formatFileSize(att.attachment_size) + ')', 'ok');
+    toast('Fayl Telegramga yuklandi (Supabase xotirasi band qilinmadi)');
     return att;
   } catch (e) {
     console.error(e);
@@ -1868,20 +1876,32 @@ function attachmentFieldsFromDraft(draft) {
     attachment_size: draft.attachment_size || 0
   };
 }
+/** Telegram orqali saqlangan faylni yuklab olish URL (Supabase Storage emas) */
+function attachmentDownloadUrl(t) {
+  if (!t?.attachment_file_id) return '';
+  const name = t.attachment_name || 'fayl';
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : '';
+  return origin + '/api/telegram-file?file_id=' + encodeURIComponent(t.attachment_file_id) +
+    '&name=' + encodeURIComponent(name);
+}
 function attachmentLinkHtml(t) {
   if (!t?.attachment_file_id) return '';
   const name = t.attachment_name || 'fayl';
   const size = t.attachment_size ? ' · ' + formatFileSize(t.attachment_size) : '';
   const fileIdJs = JSON.stringify(String(t.attachment_file_id));
   const nameJs = JSON.stringify(String(name));
-  return `<a class="task-attach" href="#" onclick="event.preventDefault();event.stopPropagation();openTaskAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>`;
+  const url = attachmentDownloadUrl(t);
+  return `<div class="task-attach-wrap" onclick="event.stopPropagation()">
+    <a class="task-attach" href="${escapeHtml(url)}" target="_blank" rel="noopener"
+       onclick="event.preventDefault();openTaskAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>
+    <button type="button" class="btn-ghost" onclick="openTaskAttachment(${fileIdJs}, ${nameJs})">⬇ Yuklab olish</button>
+  </div>`;
 }
 function openTaskAttachment(fileId, name) {
   if (!fileId) return;
-  window.open(
-    '/api/telegram-file?file_id=' + encodeURIComponent(fileId) + '&name=' + encodeURIComponent(name || 'fayl'),
-    '_blank'
-  );
+  const url = '/api/telegram-file?file_id=' + encodeURIComponent(fileId) +
+    '&name=' + encodeURIComponent(name || 'fayl');
+  window.open(url, '_blank', 'noopener');
 }
 
 /* =========================================================
@@ -2038,10 +2058,16 @@ function taskRowHtml(t, mode) {
   const isMine = t.assignee_user_id === currentProfile?.id;
   let actions = '';
   if (mode === 'review' && canReviewTask(t) && t.status === 'tekshiruvda') {
-    actions = [
+    const parts = [
       `<button class="btn-green" onclick="approveTask('${t.id}')">✓ Bajarildi</button>`,
       `<button class="btn-outline" onclick="openReturnModal('${t.id}')">↩ Qayta ishlash</button>`
-    ].join('');
+    ];
+    if (t.attachment_file_id) {
+      const fileIdJs = JSON.stringify(String(t.attachment_file_id));
+      const nameJs = JSON.stringify(String(t.attachment_name || 'fayl'));
+      parts.unshift(`<button class="btn-blue" onclick="openTaskAttachment(${fileIdJs}, ${nameJs})">📎 Faylni yuklash</button>`);
+    }
+    actions = parts.join('');
   } else {
     const parts = [];
     parts.push(`<button class="icon-btn" title="Batafsil" onclick="openTaskDetailModal('${t.id}')">ℹ</button>`);
@@ -2467,7 +2493,7 @@ async function openSubmitReviewModal(id) {
           ${existingAttach}
           <input type="file" id="submit-attachment" onchange="onSubmitAttachmentChange(this)">
           <div class="attach-status" id="submit-attachment-status" style="margin-top:6px;"></div>
-          <p class="help-text" style="margin:8px 0 0;">Yuklangan fayl yaratuvchi (rahbar) ga ko'rinadi.</p>
+          <p class="help-text" style="margin:8px 0 0;">Fayl Telegramga yuklanadi (maks. 3.5 MB). Rahbar tekshiruvda havola orqali yuklab oladi.</p>
         </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
@@ -2746,9 +2772,14 @@ async function notifyExecutorNewTask(executor, title, deadline) {
 async function notifyCreatorReview(task) {
   const reviewer = userById(task.reviewer_user_id) || userById(task.created_by_user_id);
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
-  const fileNote = task.attachment_file_id
-    ? `\n📎 Fayl: ${task.attachment_name || 'biriktirilgan'} (saytda oching)`
-    : '';
+  let fileNote = '';
+  if (task.attachment_file_id) {
+    const url = attachmentDownloadUrl(task);
+    const fname = escapeHtml(task.attachment_name || 'fayl');
+    fileNote = url
+      ? `\n📎 Fayl (Telegram): <a href="${url}">${fname} — yuklab olish</a>`
+      : `\n📎 Fayl: ${fname} (saytdagi tekshiruv bo'limidan yuklab oling)`;
+  }
   const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
   if (!reviewer) {
     toast('Tekshiruvchi topilmadi — xabar yuborilmadi');
@@ -2796,7 +2827,11 @@ function openTaskDetailModal(id) {
         <div class="field"><label>Izoh</label>
           <div style="white-space:pre-wrap;font-size:13px;">${escapeHtml(t.comment || '—')}</div>
         </div>
-        ${t.attachment_file_id ? `<div class="field"><label>Fayl</label>${attachmentLinkHtml(t)}</div>` : ''}
+        <div class="field"><label>Fayl (Telegram orqali, Supabase Storage emas)</label>
+          ${t.attachment_file_id
+            ? attachmentLinkHtml(t)
+            : '<div style="font-size:12px;color:var(--text-faint);">Biriktirilmagan</div>'}
+        </div>
         <div class="modal-actions">
           ${canDelegateTask(t) ? `<button class="btn-outline" onclick="closeModal();openDelegateModal('${t.id}')">↪ Yo'naltirish</button>` : ''}
           <button class="btn-ghost" onclick="closeModal()">Yopish</button>
