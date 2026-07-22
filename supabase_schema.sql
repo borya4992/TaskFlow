@@ -132,6 +132,11 @@ alter table tasks add column if not exists attachment_file_id text default '';
 alter table tasks add column if not exists attachment_name text default '';
 alter table tasks add column if not exists attachment_size bigint default 0;
 
+-- Ierarxiya: kim tekshiradi, kim yo'naltirdi, qachon yopildi
+alter table tasks add column if not exists reviewer_user_id uuid references app_users(id) on delete set null;
+alter table tasks add column if not exists delegated_by_user_id uuid references app_users(id) on delete set null;
+alter table tasks add column if not exists completed_at timestamptz;
+
 -- Bo'lim nomlarini kanoniklashtirish (dublikatlarni yo'qotish)
 update app_users set department = case
   when lower(coalesce(department, '')) ~ '(qabul|hr|recruit)' then 'Ishga qabul qilish bo''limi'
@@ -366,24 +371,17 @@ create policy "tasks_insert" on tasks
     and created_by_user_id = public.my_user_id()
   );
 
--- Ijrochi: jarayonda → tekshiruvda
--- Yaratuvchi/admin: tekshiruvda → bajarildi yoki qayta ishlash (jarayonda + muddat)
+-- Ijrochi: jarayonda → tekshiruvda / yo'naltirish
+-- Tekshiruvchi (reviewer) yoki yaratuvchi/admin: tasdiqlash / qaytarish
 create policy "tasks_update" on tasks
   for update using (
     public.is_admin()
     or created_by_user_id = public.my_user_id()
-    or (
-      assignee_user_id = public.my_user_id()
-      and status in ('jarayonda', 'muddati_otgan')
-    )
+    or reviewer_user_id = public.my_user_id()
+    or assignee_user_id = public.my_user_id()
   )
   with check (
-    public.is_admin()
-    or created_by_user_id = public.my_user_id()
-    or (
-      assignee_user_id = public.my_user_id()
-      and status = 'tekshiruvda'
-    )
+    auth.role() = 'authenticated'
   );
 
 create policy "tasks_delete" on tasks

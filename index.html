@@ -633,7 +633,7 @@
         <option value="O'rta">O'rta</option>
         <option value="Past">Past</option>
       </select>
-      <input type="datetime-local" id="new-deadline" title="Muddat (sana va soat)">
+      <input type="datetime-local" id="new-deadline" title="Muddat (majburiy)" required>
       <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
     </div>
     <div class="attach-row">
@@ -642,7 +642,7 @@
       </label>
       <span class="attach-status" id="new-attachment-status"></span>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. Tekshiruv yaratuvchiga boradi. Telegram ID bo'lsa xabar yuboriladi. Fayl Telegram orqali saqlanadi (maks. 19 MB).</p>
+    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 3.5 MB).</p>
   </div>
 
   <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
@@ -676,7 +676,12 @@
       </div>
     </div>
     <div class="panel">
+      <h2><span class="dot" style="background:var(--accent2)"></span> Bo'limlar kesimida topshiriqlar</h2>
+      <div class="chart-wrap" style="height:260px;"><canvas id="chart-dept"></canvas></div>
+    </div>
+    <div class="panel">
       <h2><span class="dot" style="background:var(--success)"></span> Kunlik topshiriqlar trendi (so'nggi 30 kun)</h2>
+      <p class="help-text" style="margin-top:0;">Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.</p>
       <div class="chart-wrap" style="height:220px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel">
@@ -1191,15 +1196,52 @@ function roleOptionsHtml(selected) {
 function isAdmin() { return currentProfile?.role === 'admin'; }
 function isDirector() { return currentProfile?.role === 'director'; }
 function isExecutor() { return currentProfile?.role === 'executor'; }
+function isDeptHead() { return currentProfile?.role === 'dept_head'; }
 function canCreateTasks() { return !!currentProfile; }
 function canManageUsers() { return isAdmin(); }
 function canViewOffice3D() {
   return isAdmin() || !!state.settings?.office3d_public;
 }
 function isTaskCreator(t) { return !!t && t.created_by_user_id === currentProfile?.id; }
-function canReviewTask(t) { return isAdmin() || isTaskCreator(t); }
+function isTaskReviewer(t) {
+  if (!t || !currentProfile) return false;
+  if (t.reviewer_user_id) return t.reviewer_user_id === currentProfile.id;
+  return isTaskCreator(t);
+}
+function canReviewTask(t) { return isAdmin() || isTaskReviewer(t); }
 function canEditTask(t) { return isAdmin() || isTaskCreator(t); }
 function canDeleteTask(t) { return isAdmin() || isTaskCreator(t); }
+function canDelegateTask(t) {
+  return !!t && t.assignee_user_id === currentProfile?.id && isDeptHead() &&
+    (t.status === 'jarayonda' || t.status === 'muddati_otgan' ||
+      (t.status !== 'bajarildi' && t.status !== 'tekshiruvda'));
+}
+function findDepartmentHead(user) {
+  if (!user) return null;
+  const dept = normalizeDepartment(user.department);
+  return state.appUsers.find(u =>
+    u.role === 'dept_head' &&
+    u.is_active !== false &&
+    u.id !== user.id &&
+    normalizeDepartment(u.department) === dept
+  ) || null;
+}
+function resolveReviewerOnSubmit(task, executor) {
+  const head = findDepartmentHead(executor);
+  if (head && head.id !== executor.id) return head.id;
+  if (executor?.role === 'dept_head' && task.created_by_user_id) return task.created_by_user_id;
+  return task.created_by_user_id || null;
+}
+function departmentStaffOf(headUser) {
+  if (!headUser) return [];
+  const dept = normalizeDepartment(headUser.department);
+  return state.appUsers.filter(u =>
+    u.is_active !== false &&
+    u.id !== headUser.id &&
+    u.role === 'executor' &&
+    normalizeDepartment(u.department) === dept
+  ).sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
+}
 function getExecutors() {
   return state.appUsers
     .slice()
@@ -1225,6 +1267,10 @@ function userAvatarHtml(u, cls) {
 }
 function visibleTasks() {
   let tasks = state.tasks.filter(t => !t.deleted_at);
+  // Ijrochi monitoringda faqat o'z topshiriqlarini ko'radi
+  if (isExecutor()) {
+    tasks = tasks.filter(t => t.assignee_user_id === currentProfile.id);
+  }
   if (state.filterDepartment) {
     const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.filterDepartment);
     const ids = new Set(deptUsers.map(u => u.id));
@@ -1683,7 +1729,7 @@ let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_c
 let draftAttachment = null;
 let editDraftAttachment = null;
 let submitDraftAttachment = null;
-const MAX_ATTACHMENT_BYTES = 19 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = Math.floor(3.5 * 1024 * 1024); // Vercel ~4.5MB body limitti
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -1745,24 +1791,20 @@ function setAttachStatus(el, text, kind) {
 async function uploadTaskAttachment(file, statusEl) {
   if (!file) return null;
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    toast('Fayl juda katta (maksimum 19 MB). Kichikroq fayl tanlang.');
+    toast('Fayl juda katta (maksimum 3.5 MB). Kichikroq fayl tanlang.');
     setAttachStatus(statusEl, '', '');
     return null;
   }
   setAttachStatus(statusEl, 'Yuklanmoqda...', 'busy');
   try {
-    const data = await readFileAsBase64(file);
-    const res = await fetch('/api/telegram-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: file.name,
-        mime: file.type || 'application/octet-stream',
-        data
-      })
-    });
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
     let json = {};
     try { json = await res.json(); } catch (_) {}
+    if (res.status === 413) {
+      throw new Error('Fayl juda katta (maksimum 3.5 MB). Vercel limitti.');
+    }
     if (!res.ok || !json.ok || !json.file_id) {
       throw new Error(json.error || ('HTTP ' + res.status));
     }
@@ -2002,7 +2044,9 @@ function taskRowHtml(t, mode) {
     ].join('');
   } else {
     const parts = [];
+    parts.push(`<button class="icon-btn" title="Batafsil" onclick="openTaskDetailModal('${t.id}')">ℹ</button>`);
     if (canEditTask(t)) parts.push(`<button class="icon-btn" onclick="openEditModal('${t.id}')">✎</button>`);
+    if (canDelegateTask(t)) parts.push(`<button class="btn-outline" onclick="openDelegateModal('${t.id}')">↪ Yo'naltirish</button>`);
     if (isMine && (eff === 'jarayonda' || eff === 'muddati_otgan')) {
       parts.push(`<button class="btn-amber" onclick="openSubmitReviewModal('${t.id}')">Tekshiruvga</button>`);
     }
@@ -2015,9 +2059,13 @@ function taskRowHtml(t, mode) {
   }
   const commentBits = [];
   if (t.comment) commentBits.push('💬 ' + escapeHtml(t.comment));
+  const reviewer = userById(t.reviewer_user_id);
+  const delegatedBy = userById(t.delegated_by_user_id);
+  if (t.status === 'tekshiruvda' && reviewer) commentBits.push('🔍 Tekshiruvchi: ' + escapeHtml(reviewer.display_name));
+  if (delegatedBy) commentBits.push('↪ ' + escapeHtml(delegatedBy.display_name) + ' yo\'naltirdi');
   const attach = attachmentLinkHtml(t);
   return `
-    <div class="task-row">
+    <div class="task-row" onclick="if(!event.target.closest('button,a')) openTaskDetailModal('${t.id}')" style="cursor:pointer;">
       <div class="t-main">
         <div class="t-title">${escapeHtml(t.title)}</div>
         <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${commentBits.length ? ' · ' + commentBits.join(' · ') : ''}</div>
@@ -2026,7 +2074,7 @@ function taskRowHtml(t, mode) {
       ${t.priority ? `<span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
       <span class="pill s-${eff}">${statusLabel(eff)}</span>
       <span class="deadline-tag ${dl.cls}">${dl.text}</span>
-      <div class="task-actions">${actions}</div>
+      <div class="task-actions" onclick="event.stopPropagation()">${actions}</div>
     </div>`;
 }
 
@@ -2072,9 +2120,9 @@ function renderExecCards() {
     const pct = total ? Math.round((done/total)*100) : 0;
     const user = state.appUsers.find(u => u.display_name === name);
     const dept = user?.department ? `<span class="dept-tag">${escapeHtml(user.department)}</span>` : '';
-    const safeName = escapeHtml(name).replace(/'/g,"\\'");
+    const nameArg = JSON.stringify(name);
     return `
-      <div class="exec-card" onclick="openAssigneeTasksModal('${safeName}')">
+      <div class="exec-card" onclick='openAssigneeTasksModal(${nameArg})'>
         <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}${dept}</div>
         <div class="exec-stats"><span>Jami: ${total}</span><span style="color:var(--blue)">Jarayonda: ${progress}</span></div>
         <div class="exec-stats"><span style="color:var(--amber)">Tekshiruv: ${review}</span><span style="color:var(--green)">Bajarildi: ${done}</span></div>
@@ -2087,9 +2135,9 @@ function assigneeColumnHtml(title, cls, tasks) {
   const content = tasks.length
     ? tasks.map(t => {
       const dl = deadlineInfo(t);
-      return `<div class="task-mini">
+      return `<div class="task-mini" style="cursor:pointer;" onclick="openTaskDetailModal('${t.id}')">
         <div class="title">${escapeHtml(t.title)}</div>
-        <div class="meta">${t.priority ? escapeHtml(t.priority) + ' · ' : ''}${dl.text}</div>
+        <div class="meta">${t.priority ? escapeHtml(t.priority) + ' · ' : ''}${dl.text} · ${escapeHtml(statusLabel(effectiveStatus(t)))}</div>
         ${attachmentLinkHtml(t)}
       </div>`;
     }).join('')
@@ -2223,9 +2271,11 @@ async function addTask() {
   const executorId = document.getElementById('new-executor').value;
   const title = document.getElementById('new-title').value.trim();
   const priority = document.getElementById('new-priority').value;
-  const deadline = fromDatetimeLocal(document.getElementById('new-deadline').value);
+  const deadlineRaw = document.getElementById('new-deadline').value;
+  const deadline = fromDatetimeLocal(deadlineRaw);
   const executor = userById(executorId);
   if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
   const statusEl = document.getElementById('new-attachment-status');
   if (statusEl && statusEl.classList.contains('busy')) {
     toast('Fayl hali yuklanmoqda — biroz kuting');
@@ -2235,6 +2285,7 @@ async function addTask() {
     assignee_user_id: executorId,
     assignee: executor.display_name,
     created_by_user_id: currentProfile.id,
+    reviewer_user_id: currentProfile.id,
     title, priority, deadline,
     status: 'jarayonda',
     start_date: todayISO(),
@@ -2276,7 +2327,7 @@ function openCreateTaskForUser(userId) {
             <option value="Past">Past</option>
           </select>
         </div>
-        <div class="field"><label>Muddat</label><input type="datetime-local" id="m-deadline"></div>
+        <div class="field"><label>Muddat (majburiy)</label><input type="datetime-local" id="m-deadline" required></div>
         <div class="field"><label>📎 Fayl biriktirish (ixtiyoriy)</label>
           <input type="file" id="m-attachment" onchange="onModalAttachmentChange(this)">
           <div class="attach-status" id="m-attachment-status" style="margin-top:6px;"></div>
@@ -2293,9 +2344,11 @@ async function saveCreateTaskModal() {
   const executorId = document.getElementById('m-executor').value;
   const title = document.getElementById('m-title').value.trim();
   const priority = document.getElementById('m-priority').value;
-  const deadline = fromDatetimeLocal(document.getElementById('m-deadline').value);
+  const deadlineRaw = document.getElementById('m-deadline').value;
+  const deadline = fromDatetimeLocal(deadlineRaw);
   const executor = userById(executorId);
   if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
   const statusEl = document.getElementById('m-attachment-status');
   if (statusEl && statusEl.classList.contains('busy')) {
     toast('Fayl hali yuklanmoqda — biroz kuting');
@@ -2305,6 +2358,7 @@ async function saveCreateTaskModal() {
     assignee_user_id: executorId,
     assignee: executor.display_name,
     created_by_user_id: currentProfile.id,
+    reviewer_user_id: currentProfile.id,
     title, priority, deadline,
     status: 'jarayonda',
     start_date: todayISO(),
@@ -2434,24 +2488,61 @@ async function submitForReview(id) {
     return;
   }
   const attachPatch = attachmentFieldsFromDraft(submitDraftAttachment);
-  const patch = { status: 'tekshiruvda', comment, ...attachPatch };
+  const reviewerId = resolveReviewerOnSubmit(task, userById(task.assignee_user_id) || currentProfile);
+  const patch = {
+    status: 'tekshiruvda',
+    comment,
+    reviewer_user_id: reviewerId,
+    ...attachPatch
+  };
   await updateTask(id, patch);
   const updated = { ...task, ...patch };
   submitDraftAttachment = null;
   closeModal();
   await refreshFromDB();
   await notifyCreatorReview(updated);
-  toast('Tekshiruvga yuborildi — yaratuvchi xabar oladi');
+  toast('Tekshiruvga yuborildi — rahbar/yaratuvchi xabar oladi');
 }
 async function approveTask(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || !canReviewTask(task)) return;
+
+  // Ierarxiya: rahbar tasdiqlasa, keyingi bosqich — asl yaratuvchi
+  const needsEscalate =
+    task.created_by_user_id &&
+    task.reviewer_user_id &&
+    task.reviewer_user_id === currentProfile.id &&
+    task.created_by_user_id !== currentProfile.id &&
+    !isAdmin();
+
+  if (needsEscalate) {
+    if (!confirm('O\'z bo\'limingizda tasdiqlaysizmi? Keyin yaratuvchiga yuboriladi.')) return;
+    await updateTask(id, {
+      status: 'tekshiruvda',
+      reviewer_user_id: task.created_by_user_id
+    });
+    await refreshFromDB();
+    const creator = userById(task.created_by_user_id);
+    if (creator) {
+      await notifyUser(
+        creator,
+        `🔍 <b>Bo'lim boshlig'i tasdiqladi — yakuniy tekshiruv</b>\n\n${task.title}\nIjrochi: ${task.assignee}\nRahbar: ${currentProfile.display_name}`
+      );
+    }
+    toast('Tasdiqlandi — yaratuvchiga yakuniy tekshiruvga yuborildi');
+    return;
+  }
+
   if (!confirm('Topshiriq bajarilgan deb yopilsinmi?')) return;
-  await updateTask(id, { status: 'bajarildi' });
+  await updateTask(id, {
+    status: 'bajarildi',
+    completed_at: new Date().toISOString(),
+    reviewer_user_id: task.reviewer_user_id || currentProfile.id
+  });
   await refreshFromDB();
   const executor = userById(task.assignee_user_id);
   if (executor) {
-    await notifyUser(executor, `✅ <b>Topshiriq tasdiqlandi</b>\n\n${task.title}\n\nYaratuvchi topshiriqni yopdi.`);
+    await notifyUser(executor, `✅ <b>Topshiriq tasdiqlandi</b>\n\n${task.title}\n\nYaratuvchi/rahbar topshiriqni yopdi.`);
   }
   toast('Topshiriq bajarildi deb yopildi');
 }
@@ -2485,7 +2576,13 @@ async function returnForRework(id) {
   const comment = (document.getElementById('return-comment').value || '').trim();
   if (!deadline) { toast('Yangi muddat belgilang'); return; }
   if (!comment) { toast('Qaytarish izohini yozing'); return; }
-  await updateTask(id, { status: 'jarayonda', deadline, comment });
+  await updateTask(id, {
+    status: 'jarayonda',
+    deadline,
+    comment,
+    reviewer_user_id: task.created_by_user_id || task.reviewer_user_id || null,
+    completed_at: null
+  });
   closeModal();
   await refreshFromDB();
   const executor = userById(task.assignee_user_id);
@@ -2647,18 +2744,125 @@ async function notifyExecutorNewTask(executor, title, deadline) {
   if (!ok && !executor.telegram_id) toast('Ijrochining Telegram ID kiritilmagan — xabar yuborilmadi');
 }
 async function notifyCreatorReview(task) {
-  const creator = userById(task.created_by_user_id);
+  const reviewer = userById(task.reviewer_user_id) || userById(task.created_by_user_id);
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
   const fileNote = task.attachment_file_id
     ? `\n📎 Fayl: ${task.attachment_name || 'biriktirilgan'} (saytda oching)`
     : '';
   const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
-  if (!creator) {
-    toast('Yaratuvchi topilmadi — xabar yuborilmadi');
+  if (!reviewer) {
+    toast('Tekshiruvchi topilmadi — xabar yuborilmadi');
     return;
   }
-  const ok = await notifyUser(creator, lines);
-  if (!ok && !creator.telegram_id) toast('Yaratuvchining Telegram ID si yo\'q — xabar yuborilmadi');
+  const ok = await notifyUser(reviewer, lines);
+  if (!ok && !reviewer.telegram_id) toast('Tekshiruvchining Telegram ID si yo\'q — xabar yuborilmadi');
+}
+
+function openTaskDetailModal(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  const creator = userById(t.created_by_user_id);
+  const assignee = userById(t.assignee_user_id);
+  const reviewer = userById(t.reviewer_user_id);
+  const delegatedBy = userById(t.delegated_by_user_id);
+  const eff = effectiveStatus(t);
+  const dl = deadlineInfo(t);
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal wide">
+        <div class="modal-head">
+          <h3>${escapeHtml(t.title)}</h3>
+          <button type="button" class="btn-ghost" onclick="closeModal()">✕</button>
+        </div>
+        <p class="hint" style="margin-top:0;">
+          <span class="pill s-${eff}">${statusLabel(eff)}</span>
+          ${t.priority ? ` · <span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
+          · Muddat: ${dl.text}
+        </p>
+        <div class="field"><label>Hozir kimda (ijrochi)</label>
+          <div>${escapeHtml(assignee?.display_name || t.assignee || '—')}${assignee?.department ? ' · ' + escapeHtml(assignee.department) : ''}</div>
+        </div>
+        <div class="field"><label>Yaratuvchi</label>
+          <div>${escapeHtml(creator?.display_name || '—')}</div>
+        </div>
+        <div class="field"><label>Tekshiruvchi (navbat)</label>
+          <div>${t.status === 'tekshiruvda'
+            ? escapeHtml(reviewer?.display_name || creator?.display_name || '—')
+            : '—'}</div>
+        </div>
+        <div class="field"><label>Yo'naltirgan</label>
+          <div>${escapeHtml(delegatedBy?.display_name || '—')}</div>
+        </div>
+        <div class="field"><label>Izoh</label>
+          <div style="white-space:pre-wrap;font-size:13px;">${escapeHtml(t.comment || '—')}</div>
+        </div>
+        ${t.attachment_file_id ? `<div class="field"><label>Fayl</label>${attachmentLinkHtml(t)}</div>` : ''}
+        <div class="modal-actions">
+          ${canDelegateTask(t) ? `<button class="btn-outline" onclick="closeModal();openDelegateModal('${t.id}')">↪ Yo'naltirish</button>` : ''}
+          <button class="btn-ghost" onclick="closeModal()">Yopish</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openDelegateModal(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t || !canDelegateTask(t)) return;
+  const staff = departmentStaffOf(currentProfile);
+  if (!staff.length) {
+    toast('Bo\'limingizda yo\'naltirish uchun xodim yo\'q');
+    return;
+  }
+  const opts = staff.map(u =>
+    `<option value="${u.id}">${assigneeOptionLabel(u)}</option>`
+  ).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Topshiriqni yo'naltirish</h3>
+        <p class="hint">${escapeHtml(t.title)}</p>
+        <div class="field">
+          <label>Bo'lim xodimi</label>
+          <select id="delegate-user">${opts}</select>
+        </div>
+        <div class="field">
+          <label>Izoh (ixtiyoriy)</label>
+          <textarea id="delegate-comment" rows="3" placeholder="Nima qilish kerak..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
+          <button class="btn-blue" onclick="confirmDelegate('${id}')">Yo'naltirish</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function confirmDelegate(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t || !canDelegateTask(t)) return;
+  const uid = document.getElementById('delegate-user').value;
+  const staff = userById(uid);
+  if (!staff) { toast('Xodim tanlang'); return; }
+  const note = (document.getElementById('delegate-comment').value || '').trim();
+  const comment = note
+    ? ((t.comment ? t.comment + '\n' : '') + '↪ ' + currentProfile.display_name + ': ' + note)
+    : t.comment;
+  await updateTask(id, {
+    assignee_user_id: staff.id,
+    assignee: staff.display_name,
+    delegated_by_user_id: currentProfile.id,
+    reviewer_user_id: currentProfile.id,
+    status: 'jarayonda',
+    comment: comment || ''
+  });
+  closeModal();
+  await refreshFromDB();
+  await notifyUser(
+    staff,
+    `↪ <b>Sizga topshiriq yo'naltirildi</b>\n\n${t.title}\nRahbar: ${currentProfile.display_name}` +
+      (note ? `\nIzoh: ${note}` : '')
+  );
+  toast('Topshiriq ' + staff.display_name + ' ga yo\'naltirildi');
 }
 async function saveAndTestTelegram() {
   const token = document.getElementById('tg-token').value.trim();
@@ -2686,12 +2890,13 @@ async function checkDeadlinesNow() {
 /* =========================================================
    SMART ANALYTICS (dashboard)
 ========================================================= */
-let smartCharts = { smart: null, status: null, trend: null };
+let smartCharts = { smart: null, status: null, trend: null, dept: null };
 
 function destroySmartCharts() {
   if (smartCharts.smart) { smartCharts.smart.destroy(); smartCharts.smart = null; }
   if (smartCharts.status) { smartCharts.status.destroy(); smartCharts.status = null; }
   if (smartCharts.trend) { smartCharts.trend.destroy(); smartCharts.trend = null; }
+  if (smartCharts.dept) { smartCharts.dept.destroy(); smartCharts.dept = null; }
 }
 
 function computeSmartMetrics(tasks) {
@@ -2872,7 +3077,61 @@ function renderSmartAnalytics() {
     });
   }
 
-  // --- Chart 3: Kunlik trend (so'nggi 30 kun) ---
+  // --- Chart 3: Bo'limlar kesimi ---
+  const deptCtx = document.getElementById('chart-dept');
+  if (deptCtx) {
+    const deptStats = OFFICE_DEPARTMENTS.map(dept => {
+      const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === dept);
+      const ids = new Set(deptUsers.map(u => u.id));
+      const names = new Set(deptUsers.map(u => u.display_name));
+      const own = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
+      return {
+        name: dept.replace(/ bo'limi$/i, ''),
+        total: own.length,
+        done: own.filter(t => effectiveStatus(t) === 'bajarildi').length,
+        overdue: own.filter(t => effectiveStatus(t) === 'muddati_otgan').length,
+      };
+    });
+    smartCharts.dept = new Chart(deptCtx, {
+      type: 'bar',
+      data: {
+        labels: deptStats.map(d => d.name),
+        datasets: [
+          {
+            label: 'Jami',
+            data: deptStats.map(d => d.total),
+            backgroundColor: accent,
+            borderRadius: 6,
+          },
+          {
+            label: 'Bajarilgan',
+            data: deptStats.map(d => d.done),
+            backgroundColor: success,
+            borderRadius: 6,
+          },
+          {
+            label: 'Kechikkan',
+            data: deptStats.map(d => d.overdue),
+            backgroundColor: danger,
+            borderRadius: 6,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: tick }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: tick, stepSize: 1 }, grid: { color: grid } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: tick, boxWidth: 12 } }
+        }
+      }
+    });
+  }
+
+  // --- Chart 4: Kunlik trend (so'nggi 30 kun) ---
   const trendCtx = document.getElementById('chart-trend');
   if (trendCtx) {
     // So'nggi 30 kunni sanab chiqamiz
@@ -2892,7 +3151,11 @@ function renderSmartAnalytics() {
         tasks.filter(t => (t.created_at || '').slice(0, 10) === dayStr).length
       );
       doneCounts.push(
-        tasks.filter(t => t.status === 'bajarildi' && (t.created_at || '').slice(0, 10) === dayStr).length
+        tasks.filter(t => {
+          if (effectiveStatus(t) !== 'bajarildi' && t.status !== 'bajarildi') return false;
+          const doneDay = (t.completed_at || t.created_at || '').slice(0, 10);
+          return doneDay === dayStr;
+        }).length
       );
     }
 
@@ -2902,7 +3165,7 @@ function renderSmartAnalytics() {
         labels,
         datasets: [
           {
-            label: "Yaratilgan",
+            label: 'Jami topshiriqlar',
             data: createdCounts,
             borderColor: accent,
             backgroundColor: accent + '22',
@@ -2913,7 +3176,7 @@ function renderSmartAnalytics() {
             borderWidth: 2,
           },
           {
-            label: "Bajarildi",
+            label: 'Bajarilgan topshiriqlar',
             data: doneCounts,
             borderColor: success,
             backgroundColor: success + '22',
