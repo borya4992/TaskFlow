@@ -649,7 +649,7 @@
       </label>
       <span class="attach-status" id="new-attachment-status"></span>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 3.5 MB).</p>
+    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
   </div>
 
   <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
@@ -1736,7 +1736,7 @@ let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_c
 let draftAttachment = null;
 let editDraftAttachment = null;
 let submitDraftAttachment = null;
-const MAX_ATTACHMENT_BYTES = Math.floor(3.5 * 1024 * 1024); // Vercel ~4.5MB body limitti
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB (staging orqali; Vercel to'g'ridan-to'g'ri ~4.5 MB)
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -1798,30 +1798,70 @@ function setAttachStatus(el, text, kind) {
 async function uploadTaskAttachment(file, statusEl) {
   if (!file) return null;
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    toast('Fayl juda katta (maksimum 3.5 MB). Kichikroq fayl tanlang.');
+    toast('Fayl juda katta (maksimum 10 MB). Kichikroq fayl tanlang.');
     setAttachStatus(statusEl, '', '');
     return null;
   }
   setAttachStatus(statusEl, 'Yuklanmoqda...', 'busy');
   try {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
     let json = {};
-    try { json = await res.json(); } catch (_) {}
-    if (res.status === 413) {
-      throw new Error('Fayl juda katta (maksimum 3.5 MB). Vercel limitti.');
+
+    // Asosiy yo'l: vaqtinchalik Supabase → Telegram → temp o'chiriladi (10 MB)
+    if (!usingLocalFallback && sb) {
+      const { data: sess } = await sb.auth.getSession();
+      const uid = sess?.session?.user?.id || currentProfile?.auth_user_id || currentProfile?.id;
+      if (!uid) throw new Error('Sessiya topilmadi — qayta kiring');
+      const safeName = String(file.name || 'fayl').replace(/[^\w.\-()\s\u0400-\u04FF]+/g, '_').slice(0, 120);
+      const storagePath = `${uid}/${Date.now()}_${safeName}`;
+      setAttachStatus(statusEl, 'Vaqtinchalik yuklanmoqda...', 'busy');
+      const { error: upErr } = await sb.storage.from('task-temp').upload(storagePath, file, {
+        upsert: false,
+        contentType: file.type || 'application/octet-stream'
+      });
+      if (upErr) throw new Error(upErr.message || 'Vaqtinchalik yuklash xatosi');
+
+      setAttachStatus(statusEl, 'Telegramga yuborilmoqda...', 'busy');
+      const res = await fetch('/api/telegram-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storagePath,
+          filename: file.name,
+          mime: file.type || 'application/octet-stream'
+        })
+      });
+      try { json = await res.json(); } catch (_) {}
+      // API o'chirishi kerak; muvaffaqiyatsiz bo'lsa ham tozalashga urinish
+      if (!res.ok || !json.ok) {
+        try { await sb.storage.from('task-temp').remove([storagePath]); } catch (_) {}
+      }
+      if (res.status === 413) {
+        throw new Error('So\'rov limitti. Qayta urinib ko\'ring.');
+      }
+      if (!res.ok || !json.ok || !json.file_id) {
+        throw new Error(json.error || ('HTTP ' + res.status));
+      }
+    } else {
+      // Lokal fallback: faqat kichik multipart
+      if (file.size > 3.5 * 1024 * 1024) {
+        throw new Error('Lokal rejimda maksimum ~3.5 MB. Supabase ulang.');
+      }
+      const form = new FormData();
+      form.append('file', file, file.name);
+      const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+      try { json = await res.json(); } catch (_) {}
+      if (!res.ok || !json.ok || !json.file_id) {
+        throw new Error(json.error || ('HTTP ' + res.status));
+      }
     }
-    if (!res.ok || !json.ok || !json.file_id) {
-      throw new Error(json.error || ('HTTP ' + res.status));
-    }
+
     const att = {
       attachment_file_id: json.file_id,
       attachment_name: json.file_name || file.name,
       attachment_size: json.file_size || file.size
     };
     setAttachStatus(statusEl, '✅ Telegramga yuklandi: ' + att.attachment_name + ' (' + formatFileSize(att.attachment_size) + ')', 'ok');
-    toast('Fayl Telegramga yuklandi (Supabase xotirasi band qilinmadi)');
+    toast('Fayl Telegramga yuklandi (doimiy saqlash Supabase\'da emas)');
     return att;
   } catch (e) {
     console.error(e);
@@ -2493,7 +2533,7 @@ async function openSubmitReviewModal(id) {
           ${existingAttach}
           <input type="file" id="submit-attachment" onchange="onSubmitAttachmentChange(this)">
           <div class="attach-status" id="submit-attachment-status" style="margin-top:6px;"></div>
-          <p class="help-text" style="margin:8px 0 0;">Fayl Telegramga yuklanadi (maks. 3.5 MB). Rahbar tekshiruvda havola orqali yuklab oladi.</p>
+          <p class="help-text" style="margin:8px 0 0;">Fayl Telegramga yuklanadi (maks. 10 MB). Rahbar tekshiruvda havola orqali yuklab oladi.</p>
         </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>

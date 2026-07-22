@@ -1,8 +1,15 @@
-// Faylni brauzerdan qabul qiladi (multipart yoki JSON base64) va Telegram botiga yuboradi.
-// Multipart afzal — base64 JSON Vercel 4.5MB limtidan tez chiqib ketadi (HTTP 413).
+// Faylni Telegram botiga yuboradi; doimiy saqlash Telegramda (Supabase Storage emas).
+//
+// 2 usul:
+// 1) JSON { storagePath, filename, mime } — brauzer avval task-temp bucket'ga yuklaydi
+//    (Vercel 4.5MB limtidan o'tish uchun, 10 MB gacha).
+// 2) multipart/form-data — kichik fayllar uchun to'g'ridan-to'g'ri (~3.5 MB).
+//
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-const MAX_BYTES = 3.5 * 1024 * 1024; // Vercel request body ~4.5MB; xavfsiz chegara
+const MAX_DIRECT_BYTES = 3.5 * 1024 * 1024;
+const MAX_STAGED_BYTES = 10 * 1024 * 1024;
+const TEMP_BUCKET = 'task-temp';
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -21,7 +28,7 @@ function parseMultipart(buffer, contentType) {
   const parts = [];
   let start = buffer.indexOf(sep) + sep.length;
   while (start < buffer.length) {
-    if (buffer[start] === 45 && buffer[start + 1] === 45) break; // --
+    if (buffer[start] === 45 && buffer[start + 1] === 45) break;
     if (buffer[start] === 13 && buffer[start + 1] === 10) start += 2;
     const next = buffer.indexOf(sep, start);
     if (next < 0) break;
@@ -60,6 +67,37 @@ async function getTelegramSettings(supabaseUrl, serviceKey) {
   };
 }
 
+async function downloadFromStorage(supabaseUrl, serviceKey, storagePath) {
+  const url = `${supabaseUrl}/storage/v1/object/${TEMP_BUCKET}/${storagePath.split('/').map(encodeURIComponent).join('/')}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`
+    }
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error('Vaqtinchalik faylni o\'qib bo\'lmadi: ' + (errText || res.status));
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function deleteFromStorage(supabaseUrl, serviceKey, storagePath) {
+  try {
+    await fetch(`${supabaseUrl}/storage/v1/object/${TEMP_BUCKET}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prefixes: [storagePath] })
+    });
+  } catch (e) {
+    console.warn('temp delete failed', e);
+  }
+}
+
 async function sendToTelegram(token, chatId, filename, mime, buffer) {
   const form = new FormData();
   form.append('chat_id', chatId);
@@ -85,6 +123,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  let stagedPath = null;
+
   try {
     const { token, chatId } = await getTelegramSettings(supabaseUrl, serviceKey);
     if (!token || !chatId) {
@@ -97,10 +137,56 @@ module.exports = async function handler(req, res) {
     let buffer = null;
 
     const ct = String(req.headers['content-type'] || '');
-    if (ct.includes('multipart/form-data')) {
+
+    if (ct.includes('application/json') || ct.includes('text/plain') || !ct.includes('multipart/')) {
       const raw = await readRawBody(req);
-      if (raw.length > MAX_BYTES + 64 * 1024) {
-        res.status(413).json({ ok: false, error: 'Fayl juda katta (maksimum 3.5 MB). Vercel limitti.' });
+      let body = {};
+      try {
+        body = JSON.parse(raw.toString('utf8') || '{}');
+      } catch (_) {
+        res.status(400).json({ ok: false, error: 'JSON o\'qilmadi' });
+        return;
+      }
+
+      if (body.storagePath) {
+        // Staging yo'li — 10 MB gacha
+        stagedPath = String(body.storagePath).replace(/^\/+/, '').replace(/\.\./g, '');
+        if (!stagedPath || stagedPath.includes('..')) {
+          res.status(400).json({ ok: false, error: 'storagePath noto\'g\'ri' });
+          return;
+        }
+        filename = body.filename || stagedPath.split('/').pop() || 'fayl';
+        mime = body.mime || mime;
+        buffer = await downloadFromStorage(supabaseUrl, serviceKey, stagedPath);
+        if (buffer.length > MAX_STAGED_BYTES) {
+          await deleteFromStorage(supabaseUrl, serviceKey, stagedPath);
+          stagedPath = null;
+          res.status(400).json({ ok: false, error: 'Fayl juda katta (maksimum 10 MB)' });
+          return;
+        }
+      } else if (body.data && body.filename) {
+        filename = body.filename;
+        mime = body.mime || mime;
+        buffer = Buffer.from(body.data, 'base64');
+        if (buffer.length > MAX_DIRECT_BYTES) {
+          res.status(413).json({
+            ok: false,
+            error: 'Base64 juda katta. Brauzer staging orqali yuklasin (10 MB gacha).'
+          });
+          return;
+        }
+      } else {
+        res.status(400).json({ ok: false, error: 'storagePath yoki (filename+data) kerak' });
+        return;
+      }
+    } else {
+      // multipart — faqat kichik fayllar
+      const raw = await readRawBody(req);
+      if (raw.length > MAX_DIRECT_BYTES + 64 * 1024) {
+        res.status(413).json({
+          ok: false,
+          error: 'To\'g\'ridan-to\'g\'ri yuklash limiti ~3.5 MB. Staging ishlaydi (10 MB).'
+        });
         return;
       }
       const parts = parseMultipart(raw, ct);
@@ -112,40 +198,24 @@ module.exports = async function handler(req, res) {
       filename = filePart.filename || 'fayl';
       mime = filePart.mime || mime;
       buffer = filePart.data;
-    } else {
-      // Eski JSON base64 (kichik fayllar uchun) — bodyParser o'chirilgan
-      const raw = await readRawBody(req);
-      if (raw.length > MAX_BYTES * 1.4 + 1024) {
-        res.status(413).json({ ok: false, error: 'Fayl juda katta (maksimum 3.5 MB). Vercel limitti.' });
-        return;
-      }
-      let body = {};
-      try { body = JSON.parse(raw.toString('utf8') || '{}'); } catch (_) {
-        res.status(400).json({ ok: false, error: 'JSON o\'qilmadi — multipart/form-data yuboring' });
-        return;
-      }
-      filename = body.filename || '';
-      mime = body.mime || mime;
-      if (!filename || !body.data) {
-        res.status(400).json({ ok: false, error: 'filename yoki data yetishmayapti' });
-        return;
-      }
-      buffer = Buffer.from(body.data, 'base64');
     }
 
     if (!filename || !buffer?.length) {
       res.status(400).json({ ok: false, error: 'Fayl bo\'sh' });
       return;
     }
-    if (buffer.length > MAX_BYTES) {
-      res.status(400).json({
-        ok: false,
-        error: 'Fayl juda katta (maksimum 3.5 MB). Kichikroq fayl yuboring.'
-      });
+    if (buffer.length > MAX_STAGED_BYTES) {
+      res.status(400).json({ ok: false, error: 'Fayl juda katta (maksimum 10 MB)' });
       return;
     }
 
     const tgData = await sendToTelegram(token, chatId, filename, mime, buffer);
+
+    if (stagedPath) {
+      await deleteFromStorage(supabaseUrl, serviceKey, stagedPath);
+      stagedPath = null;
+    }
+
     if (!tgData.ok) {
       res.status(400).json({ ok: false, error: 'Telegram xatosi: ' + (tgData.description || 'nomalum') });
       return;
@@ -160,9 +230,14 @@ module.exports = async function handler(req, res) {
     });
   } catch (e) {
     console.error(e);
+    if (stagedPath) {
+      try {
+        await deleteFromStorage(supabaseUrl, serviceKey, stagedPath);
+      } catch (_) {}
+    }
     const msg = String(e.message || e);
     if (/413|entity too large|payload/i.test(msg)) {
-      res.status(413).json({ ok: false, error: 'Fayl juda katta (maksimum 3.5 MB)' });
+      res.status(413).json({ ok: false, error: 'So\'rov juda katta — staging (10 MB) yo\'lini ishlating' });
       return;
     }
     res.status(500).json({ ok: false, error: msg });
