@@ -127,6 +127,11 @@ alter table settings add column if not exists office3d_public boolean default fa
 -- Soft-delete topshiriqlar
 alter table tasks add column if not exists deleted_at timestamptz;
 
+-- Topshiriqqa biriktirilgan fayl (Telegram file_id orqali)
+alter table tasks add column if not exists attachment_file_id text default '';
+alter table tasks add column if not exists attachment_name text default '';
+alter table tasks add column if not exists attachment_size bigint default 0;
+
 -- Bo'lim nomlarini kanoniklashtirish (dublikatlarni yo'qotish)
 update app_users set department = case
   when lower(coalesce(department, '')) ~ '(qabul|hr|recruit)' then 'Ishga qabul qilish bo''limi'

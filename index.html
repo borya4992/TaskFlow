@@ -262,6 +262,17 @@
   .add-row input[type=text]{flex:2;min-width:160px;}
   .add-row select{flex:1;min-width:140px;}
   .add-row input[type=date]{min-width:150px;}
+  .attach-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;}
+  .attach-row label{font-size:12px;color:var(--text-soft);cursor:pointer;}
+  .attach-status{font-size:12px;color:var(--text-faint);}
+  .attach-status.ok{color:var(--success);}
+  .attach-status.busy{color:var(--warning);}
+  .task-attach{
+    display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:12px;
+    color:var(--accent);text-decoration:none;font-weight:600;
+  }
+  .task-attach:hover{text-decoration:underline;}
+  .task-mini .task-attach{margin-top:4px;font-size:11px;}
 
   .section-title{font-size:15px;font-weight:700;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
   .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
@@ -625,7 +636,13 @@
       <input type="datetime-local" id="new-deadline" title="Muddat (sana va soat)">
       <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. Tekshiruv yaratuvchiga boradi. Telegram ID bo'lsa xabar yuboriladi.</p>
+    <div class="attach-row">
+      <label>📎 Fayl biriktirish (ixtiyoriy)
+        <input type="file" id="new-attachment" onchange="onNewAttachmentChange(this)">
+      </label>
+      <span class="attach-status" id="new-attachment-status"></span>
+    </div>
+    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. Tekshiruv yaratuvchiga boradi. Telegram ID bo'lsa xabar yuboriladi. Fayl Telegram orqali saqlanadi (maks. 19 MB).</p>
   </div>
 
   <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
@@ -1662,6 +1679,10 @@ async function deactivateUser(id) {
    STATE
 ========================================================= */
 let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'' };
+/** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
+let draftAttachment = null;
+let editDraftAttachment = null;
+const MAX_ATTACHMENT_BYTES = 19 * 1024 * 1024;
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
@@ -1695,6 +1716,121 @@ function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<
 function priorityClass(p){
   const map = { 'Shoshilinch':'p-shoshilinch', 'Yuqori':'p-yuqori', "O'rta":'p-orta', 'Past':'p-past' };
   return map[p] || 'p-';
+}
+function formatFileSize(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + ' B';
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + ' KB';
+  return (v / (1024 * 1024)).toFixed(1) + ' MB';
+}
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const i = result.indexOf('base64,');
+      resolve(i >= 0 ? result.slice(i + 7) : result);
+    };
+    reader.onerror = () => reject(new Error("Faylni o'qib bo'lmadi"));
+    reader.readAsDataURL(file);
+  });
+}
+function setAttachStatus(el, text, kind) {
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('busy', kind === 'busy');
+  el.classList.toggle('ok', kind === 'ok');
+}
+async function uploadTaskAttachment(file, statusEl) {
+  if (!file) return null;
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    toast('Fayl juda katta (maksimum 19 MB). Kichikroq fayl tanlang.');
+    setAttachStatus(statusEl, '', '');
+    return null;
+  }
+  setAttachStatus(statusEl, 'Yuklanmoqda...', 'busy');
+  try {
+    const data = await readFileAsBase64(file);
+    const res = await fetch('/api/telegram-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        mime: file.type || 'application/octet-stream',
+        data
+      })
+    });
+    let json = {};
+    try { json = await res.json(); } catch (_) {}
+    if (!res.ok || !json.ok || !json.file_id) {
+      throw new Error(json.error || ('HTTP ' + res.status));
+    }
+    const att = {
+      attachment_file_id: json.file_id,
+      attachment_name: json.file_name || file.name,
+      attachment_size: json.file_size || file.size
+    };
+    setAttachStatus(statusEl, '✅ ' + att.attachment_name + ' (' + formatFileSize(att.attachment_size) + ')', 'ok');
+    return att;
+  } catch (e) {
+    console.error(e);
+    setAttachStatus(statusEl, '', '');
+    toast('Fayl yuklash xatosi: ' + (e.message || e));
+    return null;
+  }
+}
+async function onNewAttachmentChange(input) {
+  draftAttachment = null;
+  const status = document.getElementById('new-attachment-status');
+  const file = input?.files?.[0];
+  if (!file) { setAttachStatus(status, '', ''); return; }
+  draftAttachment = await uploadTaskAttachment(file, status);
+  if (!draftAttachment) input.value = '';
+}
+async function onEditAttachmentChange(input) {
+  editDraftAttachment = null;
+  const status = document.getElementById('e-attachment-status');
+  const file = input?.files?.[0];
+  if (!file) { setAttachStatus(status, '', ''); return; }
+  editDraftAttachment = await uploadTaskAttachment(file, status);
+  if (!editDraftAttachment) input.value = '';
+}
+async function onModalAttachmentChange(input) {
+  draftAttachment = null;
+  const status = document.getElementById('m-attachment-status');
+  const file = input?.files?.[0];
+  if (!file) { setAttachStatus(status, '', ''); return; }
+  draftAttachment = await uploadTaskAttachment(file, status);
+  if (!draftAttachment) input.value = '';
+}
+function clearNewAttachmentUi() {
+  draftAttachment = null;
+  const input = document.getElementById('new-attachment');
+  if (input) input.value = '';
+  setAttachStatus(document.getElementById('new-attachment-status'), '', '');
+}
+function attachmentFieldsFromDraft(draft) {
+  if (!draft?.attachment_file_id) return {};
+  return {
+    attachment_file_id: draft.attachment_file_id,
+    attachment_name: draft.attachment_name || '',
+    attachment_size: draft.attachment_size || 0
+  };
+}
+function attachmentLinkHtml(t) {
+  if (!t?.attachment_file_id) return '';
+  const name = t.attachment_name || 'fayl';
+  const size = t.attachment_size ? ' · ' + formatFileSize(t.attachment_size) : '';
+  const fileIdJs = JSON.stringify(String(t.attachment_file_id));
+  const nameJs = JSON.stringify(String(name));
+  return `<a class="task-attach" href="#" onclick="event.preventDefault();event.stopPropagation();openTaskAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>`;
+}
+function openTaskAttachment(fileId, name) {
+  if (!fileId) return;
+  window.open(
+    '/api/telegram-file?file_id=' + encodeURIComponent(fileId) + '&name=' + encodeURIComponent(name || 'fayl'),
+    '_blank'
+  );
 }
 
 /* =========================================================
@@ -1870,11 +2006,13 @@ function taskRowHtml(t, mode) {
   }
   const commentBits = [];
   if (t.comment) commentBits.push('💬 ' + escapeHtml(t.comment));
+  const attach = attachmentLinkHtml(t);
   return `
     <div class="task-row">
       <div class="t-main">
         <div class="t-title">${escapeHtml(t.title)}</div>
         <div class="t-sub">Ijrochi: ${escapeHtml(t.assignee)}${creator ? ' · Yaratuvchi: ' + escapeHtml(creator.display_name) : ''}${commentBits.length ? ' · ' + commentBits.join(' · ') : ''}</div>
+        ${attach}
       </div>
       ${t.priority ? `<span class="pill ${priorityClass(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}
       <span class="pill s-${eff}">${statusLabel(eff)}</span>
@@ -1943,6 +2081,7 @@ function assigneeColumnHtml(title, cls, tasks) {
       return `<div class="task-mini">
         <div class="title">${escapeHtml(t.title)}</div>
         <div class="meta">${t.priority ? escapeHtml(t.priority) + ' · ' : ''}${dl.text}</div>
+        ${attachmentLinkHtml(t)}
       </div>`;
     }).join('')
     : '<div class="empty">Topshiriq yo\'q</div>';
@@ -2078,6 +2217,11 @@ async function addTask() {
   const deadline = fromDatetimeLocal(document.getElementById('new-deadline').value);
   const executor = userById(executorId);
   if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  const statusEl = document.getElementById('new-attachment-status');
+  if (statusEl && statusEl.classList.contains('busy')) {
+    toast('Fayl hali yuklanmoqda — biroz kuting');
+    return;
+  }
   await insertTask({
     assignee_user_id: executorId,
     assignee: executor.display_name,
@@ -2085,12 +2229,14 @@ async function addTask() {
     title, priority, deadline,
     status: 'jarayonda',
     start_date: todayISO(),
-    comment: ''
+    comment: '',
+    ...attachmentFieldsFromDraft(draftAttachment)
   });
   document.getElementById('new-executor').value = '';
   document.getElementById('new-title').value = '';
   document.getElementById('new-priority').value = '';
   document.getElementById('new-deadline').value = '';
+  clearNewAttachmentUi();
   await refreshFromDB();
   await notifyExecutorNewTask(executor, title, deadline);
   toast('Topshiriq yaratildi va ijrochiga yuborildi');
@@ -2101,6 +2247,7 @@ function openCreateTaskForUser(userId) {
   if (!canManageUsers() && !canCreateTasks()) return;
   const executor = userById(userId);
   if (!executor) { toast('Foydalanuvchi topilmadi'); return; }
+  draftAttachment = null;
   const executorOptions = getExecutors().map(u =>
     `<option value="${u.id}" ${u.id === userId ? 'selected' : ''}>${assigneeOptionLabel(u)}</option>`
   ).join('');
@@ -2121,6 +2268,10 @@ function openCreateTaskForUser(userId) {
           </select>
         </div>
         <div class="field"><label>Muddat</label><input type="datetime-local" id="m-deadline"></div>
+        <div class="field"><label>📎 Fayl biriktirish (ixtiyoriy)</label>
+          <input type="file" id="m-attachment" onchange="onModalAttachmentChange(this)">
+          <div class="attach-status" id="m-attachment-status" style="margin-top:6px;"></div>
+        </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
           <button class="btn-blue" onclick="saveCreateTaskModal()">Yaratish va yuborish</button>
@@ -2136,6 +2287,11 @@ async function saveCreateTaskModal() {
   const deadline = fromDatetimeLocal(document.getElementById('m-deadline').value);
   const executor = userById(executorId);
   if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  const statusEl = document.getElementById('m-attachment-status');
+  if (statusEl && statusEl.classList.contains('busy')) {
+    toast('Fayl hali yuklanmoqda — biroz kuting');
+    return;
+  }
   await insertTask({
     assignee_user_id: executorId,
     assignee: executor.display_name,
@@ -2143,8 +2299,10 @@ async function saveCreateTaskModal() {
     title, priority, deadline,
     status: 'jarayonda',
     start_date: todayISO(),
-    comment: ''
+    comment: '',
+    ...attachmentFieldsFromDraft(draftAttachment)
   });
+  draftAttachment = null;
   closeModal();
   await refreshFromDB();
   await notifyExecutorNewTask(executor, title, deadline);
@@ -2347,9 +2505,13 @@ async function renderDeletedTasksPanel() {
 function openEditModal(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t || !canEditTask(t)) return;
+  editDraftAttachment = null;
   const executorOptions = getExecutors().map(u =>
     `<option value="${u.id}" ${u.id===t.assignee_user_id?'selected':''}>${assigneeOptionLabel(u)}</option>`
   ).join('');
+  const existingAttach = t.attachment_file_id
+    ? `<div style="margin-bottom:8px;">Joriy fayl: ${attachmentLinkHtml(t)}</div>`
+    : '';
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal">
@@ -2365,6 +2527,11 @@ function openEditModal(id) {
           </select>
         </div>
         <div class="field"><label>Izoh</label><textarea id="e-comment" rows="3">${escapeHtml(t.comment||'')}</textarea></div>
+        <div class="field"><label>📎 Fayl biriktirish (ixtiyoriy)</label>
+          ${existingAttach}
+          <input type="file" id="e-attachment" onchange="onEditAttachmentChange(this)">
+          <div class="attach-status" id="e-attachment-status" style="margin-top:6px;"></div>
+        </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
           <button class="btn-blue" onclick="saveEdit('${id}')">Saqlash</button>
@@ -2372,19 +2539,29 @@ function openEditModal(id) {
       </div>
     </div>`;
 }
-function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+function closeModal(){
+  document.getElementById('modal-root').innerHTML = '';
+  editDraftAttachment = null;
+}
 async function saveEdit(id) {
   const executorId = document.getElementById('e-executor').value;
   const executor = userById(executorId);
+  const statusEl = document.getElementById('e-attachment-status');
+  if (statusEl && statusEl.classList.contains('busy')) {
+    toast('Fayl hali yuklanmoqda — biroz kuting');
+    return;
+  }
   const patch = {
     assignee_user_id: executorId,
     assignee: executor ? executor.display_name : '',
     title: document.getElementById('e-title').value.trim(),
     deadline: fromDatetimeLocal(document.getElementById('e-deadline').value),
     status: document.getElementById('e-status').value,
-    comment: document.getElementById('e-comment').value.trim()
+    comment: document.getElementById('e-comment').value.trim(),
+    ...attachmentFieldsFromDraft(editDraftAttachment)
   };
   await updateTask(id, patch);
+  editDraftAttachment = null;
   closeModal();
   await refreshFromDB();
   toast('Saqlandi');
