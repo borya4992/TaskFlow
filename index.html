@@ -1682,6 +1682,7 @@ let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_c
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
+let submitDraftAttachment = null;
 const MAX_ATTACHMENT_BYTES = 19 * 1024 * 1024;
 
 function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
@@ -1802,6 +1803,14 @@ async function onModalAttachmentChange(input) {
   if (!file) { setAttachStatus(status, '', ''); return; }
   draftAttachment = await uploadTaskAttachment(file, status);
   if (!draftAttachment) input.value = '';
+}
+async function onSubmitAttachmentChange(input) {
+  submitDraftAttachment = null;
+  const status = document.getElementById('submit-attachment-status');
+  const file = input?.files?.[0];
+  if (!file) { setAttachStatus(status, '', ''); return; }
+  submitDraftAttachment = await uploadTaskAttachment(file, status);
+  if (!submitDraftAttachment) input.value = '';
 }
 function clearNewAttachmentUi() {
   draftAttachment = null;
@@ -2386,6 +2395,10 @@ document.addEventListener('keydown', (e) => {
 async function openSubmitReviewModal(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || task.assignee_user_id !== currentProfile.id) return;
+  submitDraftAttachment = null;
+  const existingAttach = task.attachment_file_id
+    ? `<div style="margin-bottom:8px;">Oldingi fayl: ${attachmentLinkHtml(task)}</div>`
+    : '';
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal">
@@ -2394,6 +2407,13 @@ async function openSubmitReviewModal(id) {
         <div class="field">
           <label>Izoh (bajarilgan ish haqida)</label>
           <textarea id="submit-comment" rows="4" placeholder="Nima qilindi, qayerda ko'rish mumkin..."></textarea>
+        </div>
+        <div class="field">
+          <label>📎 Natija faylini biriktirish (ixtiyoriy)</label>
+          ${existingAttach}
+          <input type="file" id="submit-attachment" onchange="onSubmitAttachmentChange(this)">
+          <div class="attach-status" id="submit-attachment-status" style="margin-top:6px;"></div>
+          <p class="help-text" style="margin:8px 0 0;">Yuklangan fayl yaratuvchi (rahbar) ga ko'rinadi.</p>
         </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
@@ -2408,10 +2428,19 @@ async function submitForReview(id) {
   const commentEl = document.getElementById('submit-comment');
   const comment = (commentEl ? commentEl.value : '').trim();
   if (!comment) { toast('Tekshiruvga yuborishdan oldin izoh yozing'); return; }
-  await updateTask(id, { status: 'tekshiruvda', comment });
+  const statusEl = document.getElementById('submit-attachment-status');
+  if (statusEl && statusEl.classList.contains('busy')) {
+    toast('Fayl hali yuklanmoqda — biroz kuting');
+    return;
+  }
+  const attachPatch = attachmentFieldsFromDraft(submitDraftAttachment);
+  const patch = { status: 'tekshiruvda', comment, ...attachPatch };
+  await updateTask(id, patch);
+  const updated = { ...task, ...patch };
+  submitDraftAttachment = null;
   closeModal();
   await refreshFromDB();
-  await notifyCreatorReview({ ...task, comment });
+  await notifyCreatorReview(updated);
   toast('Tekshiruvga yuborildi — yaratuvchi xabar oladi');
 }
 async function approveTask(id) {
@@ -2542,6 +2571,7 @@ function openEditModal(id) {
 function closeModal(){
   document.getElementById('modal-root').innerHTML = '';
   editDraftAttachment = null;
+  submitDraftAttachment = null;
 }
 async function saveEdit(id) {
   const executorId = document.getElementById('e-executor').value;
@@ -2619,7 +2649,10 @@ async function notifyExecutorNewTask(executor, title, deadline) {
 async function notifyCreatorReview(task) {
   const creator = userById(task.created_by_user_id);
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
-  const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}`;
+  const fileNote = task.attachment_file_id
+    ? `\n📎 Fayl: ${task.attachment_name || 'biriktirilgan'} (saytda oching)`
+    : '';
+  const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
   if (!creator) {
     toast('Yaratuvchi topilmadi — xabar yuborilmadi');
     return;
