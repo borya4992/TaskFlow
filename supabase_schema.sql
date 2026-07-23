@@ -37,6 +37,7 @@ alter table app_users add column if not exists department text default '';
 alter table app_users add column if not exists last_seen timestamptz;
 alter table app_users add column if not exists position_level text default 'xodim';
 alter table app_users add column if not exists gender text default 'erkak';
+alter table app_users add column if not exists birth_date date;
 
 -- Jins constraint
 alter table app_users drop constraint if exists app_users_gender_check;

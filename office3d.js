@@ -157,6 +157,341 @@ function userWorkStatus(user, tasks) {
   };
 }
 
+const MEETING_DURATION_SEC = 18;
+const DEPT_DISPLAY_W = 256;
+const DEPT_DISPLAY_H = 96;
+const KPI_TV_W = 512;
+const KPI_TV_H = 288;
+
+function colorCss(hexInt) {
+  return '#' + ((hexInt >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+}
+
+function tasksOfUser(user, tasks) {
+  return (tasks || []).filter(
+    (t) =>
+      !t.deleted_at &&
+      (t.assignee_user_id === user.id || t.assignee === user.display_name)
+  );
+}
+
+function isTaskOverdue(t, now = new Date()) {
+  if (t.status === 'bajarildi' || t.status === 'tekshiruvda') return false;
+  if (!t.deadline) return false;
+  return new Date(t.deadline) < now;
+}
+
+function isTaskDueToday(t, now = new Date()) {
+  if (t.status === 'bajarildi') return false;
+  if (!t.deadline) return false;
+  const d = new Date(t.deadline);
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function deptTaskStats(deptName, users, tasks) {
+  const members = officeUsers(users).filter(
+    (u) => normalizeOfficeDepartment(u.department) === deptName
+  );
+  let total = 0;
+  let done = 0;
+  let overdue = 0;
+  const now = new Date();
+  members.forEach((u) => {
+    const own = tasksOfUser(u, tasks);
+    total += own.length;
+    done += own.filter((t) => t.status === 'bajarildi').length;
+    overdue += own.filter((t) => isTaskOverdue(t, now)).length;
+  });
+  const pct = total ? Math.round((done / total) * 100) : 100;
+  const overdueRatio = total ? overdue / total : 0;
+  return { total, done, overdue, pct, overdueRatio };
+}
+
+function globalTaskStats(tasks) {
+  const list = (tasks || []).filter((t) => !t.deleted_at);
+  const now = new Date();
+  return {
+    total: list.length,
+    done: list.filter((t) => t.status === 'bajarildi').length,
+    progress: list.filter((t) => t.status === 'jarayonda').length,
+    overdue: list.filter((t) => isTaskOverdue(t, now)).length,
+  };
+}
+
+function isBirthdayToday(user) {
+  const raw = user?.birth_date;
+  if (!raw) return false;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = new Date();
+  return d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+function monthlyTopPerformerId(users, tasks) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const counts = new Map();
+  (tasks || []).forEach((t) => {
+    if (t.deleted_at || t.status !== 'bajarildi') return;
+    const stamp = t.completed_at || t.updated_at || t.created_at;
+    if (!stamp) return;
+    const d = new Date(stamp);
+    if (d.getFullYear() !== y || d.getMonth() !== m) return;
+    const key = t.assignee_user_id || t.assignee;
+    if (!key) return;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  let bestId = null;
+  let bestN = 0;
+  officeUsers(users).forEach((u) => {
+    const n = counts.get(u.id) || counts.get(u.display_name) || 0;
+    if (n > bestN) {
+      bestN = n;
+      bestId = u.id;
+    }
+  });
+  return bestN > 0 ? bestId : null;
+}
+
+function createCanvasPlane(widthPx, heightPx, planeW, planeH) {
+  const canvas = document.createElement('canvas');
+  canvas.width = widthPx;
+  canvas.height = heightPx;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  const material = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), material);
+  return { canvas, ctx, tex, material, mesh };
+}
+
+function drawDeptDoorDisplay(ctx, stats, colors) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const pct = stats.pct;
+  let bg = colors.success;
+  if (pct < 40) bg = colors.danger;
+  else if (pct < 70) bg = colors.warning;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = colorCss(bg);
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(6, 6, w - 12, h - 12);
+  ctx.fillStyle = colorCss(colors.text);
+  ctx.font = 'bold 28px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pct + '%', w / 2, h / 2 - 10);
+  ctx.font = '14px system-ui,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(stats.done + ' / ' + stats.total + ' bajarildi', w / 2, h / 2 + 22);
+}
+
+function drawKpiTvScreen(ctx, stats, colors) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = colorCss(colors.panel);
+  ctx.fillRect(12, 12, w - 24, h - 24);
+  ctx.fillStyle = colorCss(colors.accent);
+  ctx.fillRect(12, 12, w - 24, 6);
+
+  const rows = [
+    { label: 'JAMI', value: stats.total, color: colors.text },
+    { label: 'BAJARILGAN', value: stats.done, color: colors.success },
+    { label: 'JARAYONDA', value: stats.progress, color: colors.accent },
+    { label: "MUDDATI O'TGAN", value: stats.overdue, color: colors.danger },
+  ];
+  const cellW = (w - 48) / 2;
+  const cellH = (h - 56) / 2;
+  rows.forEach((r, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = 24 + col * cellW;
+    const y = 36 + row * cellH;
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(x, y, cellW - 12, cellH - 12);
+    ctx.fillStyle = colorCss(r.color);
+    ctx.font = 'bold 42px system-ui,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(r.value), x + 14, y + 18);
+    ctx.font = '13px system-ui,sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.fillText(r.label, x + 14, y + 70);
+  });
+}
+
+function syncOverdueBeacon(person, show, colors) {
+  let beacon = person.userData.overdueBeacon;
+  if (show) {
+    if (!beacon) {
+      beacon = new THREE.Group();
+      beacon.name = 'overdueBeacon';
+      const danger = colors?.danger ?? 0xf2635c;
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.12, 1.55, 10, 1, true),
+        new THREE.MeshStandardMaterial({
+          color: danger,
+          emissive: danger,
+          emissiveIntensity: 1.1,
+          transparent: true,
+          opacity: 0.55,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          roughness: 0.35,
+          metalness: 0.1,
+        })
+      );
+      shaft.position.y = 2.55;
+      beacon.add(shaft);
+      const tip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.07, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: danger,
+          emissiveIntensity: 1.4,
+          roughness: 0.2,
+        })
+      );
+      tip.position.y = 3.35;
+      beacon.add(tip);
+      person.add(beacon);
+      person.userData.overdueBeacon = beacon;
+    } else {
+      beacon.visible = true;
+      beacon.traverse((c) => {
+        if (c.material?.emissive && colors?.danger != null) {
+          c.material.emissive.setHex(colors.danger);
+          if (c.material.color && c !== beacon.children[1]) c.material.color.setHex(colors.danger);
+        }
+      });
+    }
+  } else if (beacon) {
+    beacon.visible = false;
+  }
+}
+
+function createConfettiGroup() {
+  const g = new THREE.Group();
+  g.name = 'birthdayConfetti';
+  const palette = [0xff5c8a, 0xffd166, 0x06d6a0, 0x4cc9f0, 0xf72585, 0xffb703];
+  for (let i = 0; i < 10; i++) {
+    const s = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035 + Math.random() * 0.025, 6, 5),
+      new THREE.MeshStandardMaterial({
+        color: palette[i % palette.length],
+        emissive: palette[i % palette.length],
+        emissiveIntensity: 0.35,
+        roughness: 0.45,
+      })
+    );
+    s.userData.baseY = 1.85 + Math.random() * 0.35;
+    s.userData.phase = Math.random() * Math.PI * 2;
+    s.userData.radius = 0.18 + Math.random() * 0.22;
+    s.userData.spin = 0.8 + Math.random() * 1.4;
+    s.position.set(0, s.userData.baseY, 0);
+    g.add(s);
+  }
+  return g;
+}
+
+function animateConfetti(group, t) {
+  group.children.forEach((s, i) => {
+    const ph = s.userData.phase + t * s.userData.spin;
+    const lift = (Math.sin(t * 1.3 + ph) + 1) * 0.12;
+    s.position.x = Math.cos(ph) * s.userData.radius;
+    s.position.z = Math.sin(ph * 0.9) * s.userData.radius;
+    s.position.y = s.userData.baseY + lift + (i % 3) * 0.04;
+    s.rotation.y = ph;
+    s.rotation.x = ph * 0.5;
+  });
+}
+
+function createTrophyBadge(colors) {
+  const g = new THREE.Group();
+  g.name = 'monthTrophy';
+  const gold = colors?.warning ?? 0xf2b84b;
+  const cup = new THREE.Mesh(
+    new THREE.SphereGeometry(0.08, 10, 8),
+    new THREE.MeshStandardMaterial({
+      color: gold,
+      emissive: gold,
+      emissiveIntensity: 0.35,
+      metalness: 0.65,
+      roughness: 0.28,
+    })
+  );
+  cup.position.y = 2.15;
+  g.add(cup);
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(0.07, 0.16, 8),
+    new THREE.MeshStandardMaterial({
+      color: gold,
+      emissive: gold,
+      emissiveIntensity: 0.25,
+      metalness: 0.55,
+      roughness: 0.32,
+    })
+  );
+  cone.position.y = 2.0;
+  cone.rotation.x = Math.PI;
+  g.add(cone);
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.06, 0.04, 8),
+    new THREE.MeshStandardMaterial({ color: 0xb8860b, metalness: 0.4, roughness: 0.4 })
+  );
+  base.position.y = 1.9;
+  g.add(base);
+  return g;
+}
+
+function syncBirthdayAndTrophy(person, user, topId, colors) {
+  const showBday = isBirthdayToday(user);
+  let confetti = person.userData.confetti;
+  if (showBday && !confetti) {
+    confetti = createConfettiGroup();
+    person.add(confetti);
+    person.userData.confetti = confetti;
+  } else if (!showBday && confetti) {
+    person.remove(confetti);
+    disposeObject(confetti);
+    person.userData.confetti = null;
+  }
+
+  const showTrophy = !!(topId && user.id === topId);
+  let trophy = person.userData.trophy;
+  if (showTrophy && !trophy) {
+    trophy = createTrophyBadge(colors);
+    person.add(trophy);
+    person.userData.trophy = trophy;
+  } else if (!showTrophy && trophy) {
+    person.remove(trophy);
+    disposeObject(trophy);
+    person.userData.trophy = null;
+  } else if (showTrophy && trophy && colors?.warning != null) {
+    trophy.traverse((c) => {
+      if (c.material?.emissive) {
+        c.material.emissive.setHex(colors.warning);
+        if (c.material.color) c.material.color.setHex(colors.warning);
+      }
+    });
+  }
+}
+
 function disposeObject(obj) {
   obj.traverse((child) => {
     if (child.geometry) child.geometry.dispose();
@@ -587,7 +922,7 @@ function addRestTableSnacks(g) {
   });
 }
 
-function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4) {
+function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4, opts = {}) {
   const g = new THREE.Group();
   g.position.set(cx, 0, cz);
   const wood = mat(0xc4a574, { roughness: 0.62 });
@@ -610,7 +945,7 @@ function createEllipticRestTable(cx, cz, rx = 2.55, rz = 1.4) {
     g.add(leg);
   });
 
-  addRestTableSnacks(g);
+  if (!opts.skipSnacks) addRestTableSnacks(g);
 
   g.userData.isOfficeProp = true;
   g.userData.rx = rx;
@@ -647,7 +982,7 @@ function updateLabelEl(el, user, status, level) {
     `<div class="status status-${status.kind}">${escape(status.label)}</div>`;
 }
 
-function applyStatusVisual(person, status) {
+function applyStatusVisual(person, status, colors) {
   person.userData.statusKind = status.kind;
   if (person.userData.labelEl) {
     updateLabelEl(person.userData.labelEl, person.userData.user, status, person.userData.level);
@@ -656,13 +991,14 @@ function applyStatusVisual(person, status) {
   const shirt = person.userData.shirtM;
   if (shirt) {
     if (status.kind === 'overdue') {
-      shirt.emissive.setHex(0xf2635c);
+      shirt.emissive.setHex(colors?.danger ?? 0xf2635c);
       shirt.emissiveIntensity = 0.25;
     } else {
       shirt.emissive.setHex(0x000000);
       shirt.emissiveIntensity = 0;
     }
   }
+  syncOverdueBeacon(person, status.kind === 'overdue', colors);
 }
 
 function resetLimbPose(person) {
@@ -692,7 +1028,7 @@ function resetLimbPose(person) {
 
 function applySitPose(person, t) {
   const ud = person.userData;
-  const restSit = ud.zone === 'rest' || ud.restSit || (ud.target && ud.target.restSit);
+  const restSit = ud.zone === 'rest' || ud.zone === 'meeting' || ud.restSit || (ud.target && ud.target.restSit);
 
   if (ud.hip) {
     ud.hip.position.y = ud.hipSitY ?? CHAIR_SEAT_Y - 0.02;
@@ -830,6 +1166,14 @@ export const Office3D = {
       restSlots: [],
       restAssign: new Map(),
       workstations: [],
+      deptFloors: new Map(),
+      deptDisplays: new Map(),
+      meetingSlots: [],
+      meeting: null,
+      meetingCycleDone: false,
+      kpiTv: null,
+      cachedUsers: opts.users || [],
+      cachedTasks: opts.tasks || [],
       layoutKey: '',
       raf: 0,
       running: true,
@@ -853,17 +1197,20 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260722h — closer rest seats, snacks, managers always sit');
+      console.info('[Office3D] build 20260723a — dept displays, beacons, meeting, KPI TV, birthday/trophy');
     } catch (_) {}
   },
 
   update(users, tasks) {
     if (!this._state) return;
+    this._state.cachedUsers = users || [];
+    this._state.cachedTasks = tasks || [];
     const key = this._layoutKey(users || []);
     if (key !== this._state.layoutKey) {
       this._buildWorld(users || [], tasks || []);
     } else {
       this._updatePeopleStates(users || [], tasks || []);
+      this._refreshCreativeOverlays(users || [], tasks || []);
     }
   },
 
@@ -873,8 +1220,15 @@ export const Office3D = {
     this._state.scene.background.setHex(this._state.colors.bg);
     if (this._state.scene.fog) this._state.scene.fog.color.setHex(this._state.colors.bg);
     this._state.people.forEach((p) => {
-      applyStatusVisual(p, p.userData.lastStatus || { kind: 'free', label: 'Dam olish' });
+      applyStatusVisual(p, p.userData.lastStatus || { kind: 'free', label: 'Dam olish' }, this._state.colors);
+      syncBirthdayAndTrophy(
+        p,
+        p.userData.user,
+        this._state.topPerformerId,
+        this._state.colors
+      );
     });
+    this._refreshCreativeOverlays(this._state.cachedUsers, this._state.cachedTasks);
   },
 
   close() {
@@ -945,6 +1299,11 @@ export const Office3D = {
     st.restSlots = [];
     st.restAssign = new Map();
     st.workstations = [];
+    st.deptFloors = new Map();
+    st.deptDisplays = new Map();
+    st.meetingSlots = [];
+    st.meeting = null;
+    st.kpiTv = null;
     const toRemove = st.scene.children.filter((c) => c.userData && c.userData.isOfficeProp);
     toRemove.forEach((c) => {
       st.scene.remove(c);
@@ -961,6 +1320,7 @@ export const Office3D = {
     mesh.position.set(x, y, z);
     mesh.receiveShadow = true;
     mesh.userData.isOfficeProp = true;
+    mesh.userData.baseFloorColor = color;
     st.scene.add(mesh);
     return mesh;
   },
@@ -974,6 +1334,7 @@ export const Office3D = {
     mesh.position.set(x, y, z);
     mesh.userData.isOfficeProp = true;
     st.scene.add(mesh);
+    return mesh;
   },
 
   _roomLabel(text, x, z) {
@@ -987,14 +1348,35 @@ export const Office3D = {
     st.scene.add(obj);
   },
 
-  _makeRoom(cx, cz, w, d, label, floorColor) {
+  _makeRoom(cx, cz, w, d, label, floorColor, deptName = null) {
     const st = this._state;
     const colors = st.colors;
-    this._floor(w, d, 0.02, floorColor, cx, cz);
+    const floor = this._floor(w, d, 0.02, floorColor, cx, cz);
     this._wall(w, 1.2, 0.12, cx, 0.65, cz - d / 2, colors.border);
     this._wall(0.12, 1.2, d, cx - w / 2, 0.65, cz, colors.border);
     this._wall(0.12, 1.2, d, cx + w / 2, 0.65, cz, colors.border);
     this._roomLabel(label, cx, cz - d / 2 + 0.4);
+
+    if (deptName) {
+      floor.userData.deptName = deptName;
+      st.deptFloors.set(deptName, floor);
+      const panel = createCanvasPlane(DEPT_DISPLAY_W, DEPT_DISPLAY_H, 1.7, 0.64);
+      drawDeptDoorDisplay(panel.ctx, { pct: 100, done: 0, total: 0 }, colors);
+      panel.tex.needsUpdate = true;
+      const bezel = new THREE.Mesh(
+        new THREE.BoxGeometry(1.85, 0.78, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.55, metalness: 0.2 })
+      );
+      const group = new THREE.Group();
+      group.userData.isOfficeProp = true;
+      group.position.set(cx, 1.55, cz - d / 2 + 0.08);
+      bezel.position.z = -0.02;
+      panel.mesh.position.z = 0.045;
+      group.add(bezel);
+      group.add(panel.mesh);
+      st.scene.add(group);
+      st.deptDisplays.set(deptName, { group, ...panel });
+    }
   },
 
   _addWorkstationAt(x, z, rotY, platformY = 0) {
@@ -1076,6 +1458,9 @@ export const Office3D = {
     this._clearPeopleAndRooms();
     const team = officeUsers(users);
     st.layoutKey = this._layoutKey(users);
+    st.cachedUsers = users || [];
+    st.cachedTasks = tasks || [];
+    st.meetingCycleDone = false;
     const colors = st.colors;
 
     this._floor(42, 42, 0, colors.panel, 0, 0);
@@ -1109,7 +1494,7 @@ export const Office3D = {
       { name: "Kompensatsiya bo'limi", cx: 10, cz: 2.5, floor: 0x1a2233 },
     ];
     workRooms.forEach((r) => {
-      this._makeRoom(r.cx, r.cz, roomW, roomD, r.name, r.floor);
+      this._makeRoom(r.cx, r.cz, roomW, roomD, r.name, r.floor, r.name);
     });
 
     // —— Dam olish: elliptic stol + stullar (stolga qaragan) ——
@@ -1152,6 +1537,42 @@ export const Office3D = {
       });
     }
 
+    // —— Kunlik operativka (kichik konferensiya stoli) ——
+    const meetCx = restCx + 5.8;
+    const meetCz = restCz - 0.2;
+    const meetRx = 1.35;
+    const meetRz = 0.85;
+    const meetTable = createEllipticRestTable(meetCx, meetCz, meetRx, meetRz, { skipSnacks: true });
+    st.scene.add(meetTable);
+    this._roomLabel('Operativka', meetCx, meetCz - 1.6);
+    st.meetingSlots = [];
+    const meetSeats = 8;
+    const meetSeatRx = meetRx + 0.42;
+    const meetSeatRz = meetRz + 0.38;
+    for (let i = 0; i < meetSeats; i++) {
+      const a = (i / meetSeats) * Math.PI * 2 + Math.PI / meetSeats;
+      const sx = meetCx + Math.cos(a) * meetSeatRx;
+      const sz = meetCz + Math.sin(a) * meetSeatRz;
+      const faceYaw = Math.atan2(meetCx - sx, meetCz - sz);
+      const chair = createRestChair(faceYaw);
+      chair.position.set(sx, 0, sz);
+      st.scene.add(chair);
+      const sit = chair.userData.sitLocal.clone();
+      sit.applyAxisAngle(new THREE.Vector3(0, 1, 0), faceYaw);
+      st.meetingSlots.push({
+        x: sx + sit.x,
+        y: 0.04,
+        z: sz + sit.z,
+        rotY: faceYaw,
+        seated: true,
+        restSit: true,
+        zone: 'meeting',
+      });
+    }
+
+    // —— Devordagi KPI TV ——
+    this._createKpiTv();
+
     OFFICE_WORK_DEPARTMENTS.forEach((deptName, idx) => {
       const r = workRooms[idx];
       const inDept = team.filter(
@@ -1189,14 +1610,24 @@ export const Office3D = {
       };
     });
 
+    st.topPerformerId = monthlyTopPerformerId(users, tasks);
+
     team.forEach((u) => {
       const status = userWorkStatus(u, tasks);
       const pose = this._resolvePose(u, status);
       this._placePerson(u, pose, tasks);
     });
+
+    this._refreshCreativeOverlays(users, tasks);
+    this._startDailyMeeting(users, tasks);
   },
 
   _resolvePose(user, status) {
+    const st = this._state;
+    if (st.meeting?.active && st.meeting.participantIds.has(user.id)) {
+      const slot = st.meeting.slotsByUser.get(user.id);
+      if (slot) return { ...slot, seated: true, restSit: true, zone: 'meeting' };
+    }
     return this._targetPose(user, status);
   },
 
@@ -1237,7 +1668,8 @@ export const Office3D = {
     person.add(label);
     person.userData.labelEl = labelEl;
 
-    applyStatusVisual(person, status);
+    applyStatusVisual(person, status, st.colors);
+    syncBirthdayAndTrophy(person, user, st.topPerformerId, st.colors);
     resetLimbPose(person);
     st.scene.add(person);
     st.people.set(user.id, person);
@@ -1278,6 +1710,7 @@ export const Office3D = {
     const st = this._state;
     const team = officeUsers(users);
     const seen = new Set();
+    st.topPerformerId = monthlyTopPerformerId(users, tasks);
 
     team.forEach((u) => {
       seen.add(u.id);
@@ -1301,7 +1734,8 @@ export const Office3D = {
 
       person.userData.user = u;
       person.userData.lastStatus = status;
-      applyStatusVisual(person, status);
+      applyStatusVisual(person, status, st.colors);
+      syncBirthdayAndTrophy(person, u, st.topPerformerId, st.colors);
       this._setWalkTarget(person, pose);
     });
 
@@ -1314,6 +1748,118 @@ export const Office3D = {
       st.clickables = st.clickables.filter((c) => c !== p);
       st.restAssign.delete(id);
     });
+  },
+
+  _createKpiTv() {
+    const st = this._state;
+    const colors = st.colors;
+    const panel = createCanvasPlane(KPI_TV_W, KPI_TV_H, 3.9, 2.15);
+    drawKpiTvScreen(panel.ctx, globalTaskStats(st.cachedTasks), colors);
+    panel.tex.needsUpdate = true;
+
+    const group = new THREE.Group();
+    group.userData.isOfficeProp = true;
+    group.position.set(0, 2.35, -5.35);
+
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(4.35, 2.55, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.45, metalness: 0.35 })
+    );
+    frame.position.z = -0.02;
+    group.add(frame);
+
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.9, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.6, metalness: 0.25 })
+    );
+    stand.position.set(0, -1.55, -0.05);
+    group.add(stand);
+
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.08, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.55, metalness: 0.2 })
+    );
+    base.position.set(0, -2.02, 0);
+    group.add(base);
+
+    panel.mesh.position.z = 0.09;
+    group.add(panel.mesh);
+    st.scene.add(group);
+    st.kpiTv = { group, ...panel };
+  },
+
+  _refreshCreativeOverlays(users, tasks) {
+    const st = this._state;
+    if (!st) return;
+    const colors = st.colors;
+
+    OFFICE_WORK_DEPARTMENTS.forEach((deptName) => {
+      const stats = deptTaskStats(deptName, users, tasks);
+      const display = st.deptDisplays.get(deptName);
+      if (display) {
+        drawDeptDoorDisplay(display.ctx, stats, colors);
+        display.tex.needsUpdate = true;
+      }
+      const floor = st.deptFloors.get(deptName);
+      if (floor?.material?.color) {
+        const base = new THREE.Color(floor.userData.baseFloorColor ?? 0x1a2233);
+        const amount = Math.min(0.55, stats.overdueRatio * 0.9 + (stats.overdueRatio === 0 ? 0.12 : 0));
+        // sog'liq yaxshi → yashil nozik; kechikish ko'p → qizil
+        const mixToward = stats.overdueRatio > 0.15 ? colors.danger : colors.success;
+        const mixed = base.clone().lerp(new THREE.Color(mixToward), Math.max(0.08, amount * 0.65));
+        floor.material.color.copy(mixed);
+      }
+    });
+
+    if (st.kpiTv) {
+      drawKpiTvScreen(st.kpiTv.ctx, globalTaskStats(tasks), colors);
+      st.kpiTv.tex.needsUpdate = true;
+    }
+  },
+
+  _startDailyMeeting(users, tasks) {
+    const st = this._state;
+    if (!st || st.meetingCycleDone) return;
+    st.meetingCycleDone = true;
+
+    const now = new Date();
+    const participants = officeUsers(users).filter((u) =>
+      tasksOfUser(u, tasks).some((t) => isTaskDueToday(t, now))
+    );
+    if (!participants.length || !st.meetingSlots.length) {
+      st.meeting = null;
+      return;
+    }
+
+    const slotsByUser = new Map();
+    const participantIds = new Set();
+    participants.forEach((u, i) => {
+      const slot = st.meetingSlots[i % st.meetingSlots.length];
+      slotsByUser.set(u.id, { ...slot });
+      participantIds.add(u.id);
+    });
+
+    st.meeting = {
+      active: true,
+      endsAt: st.clock.elapsedTime + MEETING_DURATION_SEC,
+      participantIds,
+      slotsByUser,
+    };
+
+    participants.forEach((u) => {
+      const person = st.people.get(u.id);
+      const slot = slotsByUser.get(u.id);
+      if (person && slot) {
+        this._setWalkTarget(person, { ...slot, seated: true, restSit: true, zone: 'meeting' });
+      }
+    });
+  },
+
+  _endDailyMeeting() {
+    const st = this._state;
+    if (!st?.meeting?.active) return;
+    st.meeting.active = false;
+    this._updatePeopleStates(st.cachedUsers || [], st.cachedTasks || []);
   },
 
   _bindEvents() {
@@ -1400,6 +1946,10 @@ export const Office3D = {
     const dt = Math.min(st.clock.getDelta(), 0.05);
     const t = st.clock.elapsedTime;
 
+    if (st.meeting?.active && t >= st.meeting.endsAt) {
+      this._endDailyMeeting();
+    }
+
     st.people.forEach((p) => {
       const tgt = p.userData.target;
       if (p.userData.walking && tgt) {
@@ -1434,6 +1984,15 @@ export const Office3D = {
         applyIdlePose(p, t);
         if (tgt) p.position.y = tgt.y;
       }
+
+      const beacon = p.userData.overdueBeacon;
+      if (beacon && beacon.visible) {
+        beacon.rotation.y += dt * 1.15;
+        const tip = beacon.children[1];
+        if (tip) tip.position.y = 3.35 + Math.sin(t * 3.2) * 0.04;
+      }
+      if (p.userData.confetti) animateConfetti(p.userData.confetti, t);
+      if (p.userData.trophy) p.userData.trophy.rotation.y = t * 0.7;
     });
 
     st.controls.update();
