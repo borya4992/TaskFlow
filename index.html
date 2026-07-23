@@ -2305,10 +2305,38 @@ function assigneeColumnHtml(title, cls, tasks) {
 function normalizePersonName(s) {
   return String(s || '')
     .normalize('NFC')
-    .replace(/[\u2018\u2019\u02BC\u02BB\u0060\u00B4]/g, "'")
+    .replace(/[\u2018\u2019\u02BC\u02BB\u0060\u00B4']/g, '') // Mo'minov ≡ Mominov
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+function canonicalAssigneeLabel(raw) {
+  const key = normalizePersonName(raw);
+  if (!key) return String(raw || '').trim();
+  const user = state.appUsers.find(u => normalizePersonName(u.display_name) === key);
+  if (user?.display_name) return user.display_name;
+  return String(raw || '').replace(/[\u2018\u2019\u02BC\u02BB\u0060\u00B4']/g, '').replace(/\s+/g, ' ').trim();
+}
+function assigneesMatch(a, b) {
+  return normalizePersonName(a) === normalizePersonName(b);
+}
+async function reconcileAssigneeNameDuplicates() {
+  if (!state.tasks?.length || !state.appUsers?.length) return 0;
+  let fixed = 0;
+  for (const t of state.tasks) {
+    if (t.deleted_at || !t.assignee) continue;
+    let user = t.assignee_user_id ? userById(t.assignee_user_id) : null;
+    if (!user) {
+      user = state.appUsers.find(u => normalizePersonName(u.display_name) === normalizePersonName(t.assignee));
+    }
+    if (!user?.display_name) continue;
+    if (t.assignee === user.display_name && t.assignee_user_id === user.id) continue;
+    await updateTask(t.id, { assignee: user.display_name, assignee_user_id: user.id });
+    t.assignee = user.display_name;
+    t.assignee_user_id = user.id;
+    fixed += 1;
+  }
+  return fixed;
 }
 function openAssigneeTasksModal(name) {
   const key = normalizePersonName(name);
@@ -2316,7 +2344,7 @@ function openAssigneeTasksModal(name) {
     .filter(t => !t.deleted_at && normalizePersonName(t.assignee) === key)
     .slice()
     .sort((a,b) => new Date(a.deadline || '2999-01-01') - new Date(b.deadline || '2999-01-01'));
-  const titleName = own[0]?.assignee || name;
+  const titleName = canonicalAssigneeLabel(name) || own[0]?.assignee || name;
   const by = {
     jarayonda: own.filter(t => effectiveStatus(t) === 'jarayonda'),
     tekshiruvda: own.filter(t => effectiveStatus(t) === 'tekshiruvda'),
