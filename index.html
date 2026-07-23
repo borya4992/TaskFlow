@@ -262,6 +262,27 @@
   .add-row input[type=text]{flex:2;min-width:160px;}
   .add-row select{flex:1;min-width:140px;}
   .add-row input[type=date]{min-width:150px;}
+  .assignee-multi{margin-bottom:12px;}
+  .assignee-multi-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;
+  }
+  .assignee-multi-head label{font-size:12.5px;color:var(--text-soft);font-weight:600;}
+  .assignee-multi-head .count{font-size:11.5px;color:var(--text-faint);}
+  .assignee-check-list{
+    display:flex;flex-wrap:wrap;gap:8px;max-height:140px;overflow:auto;
+    padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);
+  }
+  .assignee-check{
+    display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;
+    border:1px solid var(--border);background:var(--panel);cursor:pointer;font-size:12.5px;color:var(--text-soft);
+    user-select:none;max-width:100%;
+  }
+  .assignee-check:hover{border-color:var(--accent);color:var(--text);}
+  .assignee-check:has(input:checked){
+    border-color:var(--accent);background:var(--accent-tint);color:var(--text);
+  }
+  .assignee-check input{accent-color:var(--accent);margin:0;flex-shrink:0;}
+  .assignee-check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .attach-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;}
   .attach-row label{font-size:12px;color:var(--text-soft);cursor:pointer;}
   .attach-status{font-size:12px;color:var(--text-faint);}
@@ -630,8 +651,14 @@
 
   <div class="panel hidden" id="create-task-panel">
     <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
+    <div class="assignee-multi">
+      <div class="assignee-multi-head">
+        <label>Bajaruvchilar (bir yoki bir nechta)</label>
+        <span class="count" id="new-executor-count">0 tanlangan</span>
+      </div>
+      <div class="assignee-check-list" id="new-executor-list"></div>
+    </div>
     <div class="add-row">
-      <select id="new-executor"><option value="">Bajaruvchini tanlang…</option></select>
       <input type="text" id="new-title" placeholder="Topshiriq matni">
       <select id="new-priority">
         <option value="">Ustuvorlik yo'q</option>
@@ -649,7 +676,7 @@
       </label>
       <span class="attach-status" id="new-attachment-status"></span>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Har kim topshiriq yaratishi mumkin. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
+    <p class="help-text" style="margin:8px 0 0;">Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
   </div>
 
   <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
@@ -1668,14 +1695,37 @@ async function saveUserEdit(id) {
   toast('Profil yangilandi');
 }
 
-function renderExecutorSelect() {
-  const sel = document.getElementById('new-executor');
-  if (!sel) return;
-  const cur = sel.value;
+function getSelectedAssigneeIds(listId) {
+  return Array.from(document.querySelectorAll('#' + listId + ' input[type=checkbox]:checked'))
+    .map(el => el.value)
+    .filter(Boolean);
+}
+function updateAssigneeCount(listId, countId) {
+  const el = document.getElementById(countId);
+  if (!el) return;
+  const n = getSelectedAssigneeIds(listId).length;
+  el.textContent = n + ' tanlangan';
+}
+function renderAssigneeCheckList(listId, countId, preselectedIds) {
+  const box = document.getElementById(listId);
+  if (!box) return;
+  const prev = new Set(
+    (preselectedIds && preselectedIds.length)
+      ? preselectedIds
+      : getSelectedAssigneeIds(listId)
+  );
   const executors = getExecutors();
-  sel.innerHTML = '<option value="">Bajaruvchini tanlang…</option>' +
-    executors.map(u => `<option value="${u.id}">${assigneeOptionLabel(u)}</option>`).join('');
-  sel.value = cur;
+  box.innerHTML = executors.map(u => `
+    <label class="assignee-check">
+      <input type="checkbox" value="${u.id}" ${prev.has(u.id) ? 'checked' : ''}
+        onchange="updateAssigneeCount('${listId}','${countId}')">
+      <span>${escapeHtml(assigneeOptionLabel(u))}</span>
+    </label>
+  `).join('') || '<span class="help-text" style="margin:0;">Bajaruvchi topilmadi</span>';
+  updateAssigneeCount(listId, countId);
+}
+function renderExecutorSelect() {
+  renderAssigneeCheckList('new-executor-list', 'new-executor-count');
 }
 
 async function addAppUser() {
@@ -2462,39 +2512,55 @@ async function refreshFromDB() {
   if (canManageUsers()) renderDeletedTasksPanel();
   toast("Ma'lumotlar yangilandi");
 }
+async function createTasksForAssignees(executorIds, { title, priority, deadline }) {
+  const attach = attachmentFieldsFromDraft(draftAttachment);
+  const created = [];
+  for (const executorId of executorIds) {
+    const executor = userById(executorId);
+    if (!executor) continue;
+    await insertTask({
+      assignee_user_id: executorId,
+      assignee: executor.display_name,
+      created_by_user_id: currentProfile.id,
+      reviewer_user_id: currentProfile.id,
+      title, priority, deadline,
+      status: 'jarayonda',
+      start_date: todayISO(),
+      comment: '',
+      ...attach
+    });
+    created.push(executor);
+  }
+  for (const executor of created) {
+    await notifyExecutorNewTask(executor, title, deadline);
+  }
+  return created;
+}
 async function addTask() {
-  const executorId = document.getElementById('new-executor').value;
+  const executorIds = getSelectedAssigneeIds('new-executor-list');
   const title = document.getElementById('new-title').value.trim();
   const priority = document.getElementById('new-priority').value;
   const deadlineRaw = document.getElementById('new-deadline').value;
   const deadline = fromDatetimeLocal(deadlineRaw);
-  const executor = userById(executorId);
-  if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  if (!executorIds.length || !title) { toast('Kamida bitta ijrochi va topshiriq matnini kiriting'); return; }
   if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
   const statusEl = document.getElementById('new-attachment-status');
   if (statusEl && statusEl.classList.contains('busy')) {
     toast('Fayl hali yuklanmoqda — biroz kuting');
     return;
   }
-  await insertTask({
-    assignee_user_id: executorId,
-    assignee: executor.display_name,
-    created_by_user_id: currentProfile.id,
-    reviewer_user_id: currentProfile.id,
-    title, priority, deadline,
-    status: 'jarayonda',
-    start_date: todayISO(),
-    comment: '',
-    ...attachmentFieldsFromDraft(draftAttachment)
-  });
-  document.getElementById('new-executor').value = '';
+  const created = await createTasksForAssignees(executorIds, { title, priority, deadline });
+  if (!created.length) { toast('Ijrochi topilmadi'); return; }
   document.getElementById('new-title').value = '';
   document.getElementById('new-priority').value = '';
   document.getElementById('new-deadline').value = '';
+  document.querySelectorAll('#new-executor-list input[type=checkbox]').forEach(el => { el.checked = false; });
+  updateAssigneeCount('new-executor-list', 'new-executor-count');
   clearNewAttachmentUi();
   await refreshFromDB();
-  await notifyExecutorNewTask(executor, title, deadline);
-  toast('Topshiriq yaratildi va ijrochiga yuborildi');
+  toast(created.length === 1
+    ? 'Topshiriq yaratildi va ijrochiga yuborildi'
+    : created.length + ' ta topshiriq yaratildi va ijrochilarga yuborildi');
 }
 
 /** 3D Ofisdan: bajaruvchi oldindan tanlangan holda yangi topshiriq formasi */
@@ -2503,15 +2569,18 @@ function openCreateTaskForUser(userId) {
   const executor = userById(userId);
   if (!executor) { toast('Foydalanuvchi topilmadi'); return; }
   draftAttachment = null;
-  const executorOptions = getExecutors().map(u =>
-    `<option value="${u.id}" ${u.id === userId ? 'selected' : ''}>${assigneeOptionLabel(u)}</option>`
-  ).join('');
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h3>Yangi topshiriq</h3>
-        <p class="hint">Bajaruvchi: <b>${escapeHtml(executor.display_name)}</b>${executor.department ? ' · ' + escapeHtml(executor.department) : ''}</p>
-        <div class="field"><label>Bajaruvchi</label><select id="m-executor">${executorOptions}</select></div>
+        <p class="hint">Bir nechta bajaruvchi tanlash mumkin. Har biriga alohida topshiriq yaratiladi.</p>
+        <div class="assignee-multi">
+          <div class="assignee-multi-head">
+            <label>Bajaruvchilar</label>
+            <span class="count" id="m-executor-count">0 tanlangan</span>
+          </div>
+          <div class="assignee-check-list" id="m-executor-list"></div>
+        </div>
         <div class="field"><label>Topshiriq matni</label><input type="text" id="m-title" placeholder="Nima qilish kerak?" autofocus></div>
         <div class="field"><label>Ustuvorlik</label>
           <select id="m-priority">
@@ -2533,38 +2602,30 @@ function openCreateTaskForUser(userId) {
         </div>
       </div>
     </div>`;
+  renderAssigneeCheckList('m-executor-list', 'm-executor-count', [userId]);
 }
 
 async function saveCreateTaskModal() {
-  const executorId = document.getElementById('m-executor').value;
+  const executorIds = getSelectedAssigneeIds('m-executor-list');
   const title = document.getElementById('m-title').value.trim();
   const priority = document.getElementById('m-priority').value;
   const deadlineRaw = document.getElementById('m-deadline').value;
   const deadline = fromDatetimeLocal(deadlineRaw);
-  const executor = userById(executorId);
-  if (!executor || !title) { toast('Ijrochi va topshiriq matnini kiriting'); return; }
+  if (!executorIds.length || !title) { toast('Kamida bitta ijrochi va topshiriq matnini kiriting'); return; }
   if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
   const statusEl = document.getElementById('m-attachment-status');
   if (statusEl && statusEl.classList.contains('busy')) {
     toast('Fayl hali yuklanmoqda — biroz kuting');
     return;
   }
-  await insertTask({
-    assignee_user_id: executorId,
-    assignee: executor.display_name,
-    created_by_user_id: currentProfile.id,
-    reviewer_user_id: currentProfile.id,
-    title, priority, deadline,
-    status: 'jarayonda',
-    start_date: todayISO(),
-    comment: '',
-    ...attachmentFieldsFromDraft(draftAttachment)
-  });
+  const created = await createTasksForAssignees(executorIds, { title, priority, deadline });
+  if (!created.length) { toast('Ijrochi topilmadi'); return; }
   draftAttachment = null;
   closeModal();
   await refreshFromDB();
-  await notifyExecutorNewTask(executor, title, deadline);
-  toast('Topshiriq yaratildi va ijrochiga yuborildi');
+  toast(created.length === 1
+    ? 'Topshiriq yaratildi va ijrochiga yuborildi'
+    : created.length + ' ta topshiriq yaratildi va ijrochilarga yuborildi');
 }
 
 /* =========================================================
