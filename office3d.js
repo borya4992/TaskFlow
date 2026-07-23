@@ -158,6 +158,9 @@ function userWorkStatus(user, tasks) {
 }
 
 const MEETING_DURATION_SEC = 18;
+const LUNCH_TZ = 'Asia/Tashkent';
+const LUNCH_HOUR_START = 13; // 13:00 inclusive
+const LUNCH_HOUR_END = 14;   // 14:00 exclusive
 const DEPT_DISPLAY_W = 256;
 const DEPT_DISPLAY_H = 96;
 const KPI_TV_W = 512;
@@ -165,6 +168,29 @@ const KPI_TV_H = 288;
 
 function colorCss(hexInt) {
   return '#' + ((hexInt >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+}
+
+/** Toshkent (Asia/Tashkent) soat/daqiqa */
+function getTashkentTimeParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: LUNCH_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value);
+  return {
+    hour: Number.isFinite(hour) ? hour : now.getUTCHours() + 5,
+    minute: Number.isFinite(minute) ? minute : now.getUTCMinutes(),
+  };
+}
+
+/** 13:00–14:00 Toshkent — tushlik */
+function isLunchBreakNow(now = new Date()) {
+  const { hour } = getTashkentTimeParts(now);
+  return hour >= LUNCH_HOUR_START && hour < LUNCH_HOUR_END;
 }
 
 function tasksOfUser(user, tasks) {
@@ -1171,6 +1197,8 @@ export const Office3D = {
       meetingSlots: [],
       meeting: null,
       meetingCycleDone: false,
+      lunchActive: false,
+      lunchAssign: new Map(),
       kpiTv: null,
       cachedUsers: opts.users || [],
       cachedTasks: opts.tasks || [],
@@ -1303,6 +1331,8 @@ export const Office3D = {
     st.deptDisplays = new Map();
     st.meetingSlots = [];
     st.meeting = null;
+    st.lunchActive = false;
+    st.lunchAssign = new Map();
     st.kpiTv = null;
     const toRemove = st.scene.children.filter((c) => c.userData && c.userData.isOfficeProp);
     toRemove.forEach((c) => {
@@ -1619,16 +1649,77 @@ export const Office3D = {
     });
 
     this._refreshCreativeOverlays(users, tasks);
-    this._startDailyMeeting(users, tasks);
+    st.lunchActive = isLunchBreakNow();
+    st.lunchAssign = new Map();
+    if (st.lunchActive) {
+      // Tushlik paytida joylarni qayta hisoblash (rahbarlar ham)
+      team.forEach((u) => {
+        const person = st.people.get(u.id);
+        if (!person) return;
+        const pose = this._lunchRestPose(u);
+        this._setWalkTarget(person, pose);
+      });
+    } else {
+      this._startDailyMeeting(users, tasks);
+    }
   },
 
   _resolvePose(user, status) {
     const st = this._state;
+    // Tushlik (13:00–14:00 Toshkent) — hammasi dam olish xonasida
+    if (isLunchBreakNow()) {
+      return this._lunchRestPose(user);
+    }
     if (st.meeting?.active && st.meeting.participantIds.has(user.id)) {
       const slot = st.meeting.slotsByUser.get(user.id);
       if (slot) return { ...slot, seated: true, restSit: true, zone: 'meeting' };
     }
     return this._targetPose(user, status);
+  },
+
+  /** Tushlik: barcha (rahbarlar ham) dam olish stollariga */
+  _lunchRestPose(user) {
+    const st = this._state;
+    if (!st.lunchAssign) st.lunchAssign = new Map();
+    let idx = st.lunchAssign.get(user.id);
+    if (idx == null) {
+      idx = st.lunchAssign.size;
+      st.lunchAssign.set(user.id, idx);
+    }
+    const slots = st.restSlots || [];
+    if (idx < slots.length) {
+      return { ...slots[idx], seated: true, restSit: true, zone: 'rest', lunch: true };
+    }
+    // Stul yetmasa — stol atrofida turish
+    const a = ((idx - slots.length) / Math.max(6, idx - slots.length + 1)) * Math.PI * 2;
+    const cx = 0;
+    const cz = 12;
+    const r = 3.9;
+    const x = cx + Math.cos(a) * r;
+    const z = cz + Math.sin(a) * r;
+    return {
+      x,
+      y: 0.04,
+      z,
+      rotY: Math.atan2(cx - x, cz - z),
+      seated: false,
+      restSit: false,
+      zone: 'rest',
+      lunch: true,
+    };
+  },
+
+  _syncLunchBreak() {
+    const st = this._state;
+    if (!st) return;
+    const lunch = isLunchBreakNow();
+    if (lunch === !!st.lunchActive) return;
+    st.lunchActive = lunch;
+    st.lunchAssign = new Map();
+    if (lunch && st.meeting?.active) {
+      st.meeting.active = false;
+    }
+    this._updatePeopleStates(st.cachedUsers || [], st.cachedTasks || []);
   },
 
   _placePerson(user, pose, tasks) {
@@ -1820,6 +1911,7 @@ export const Office3D = {
   _startDailyMeeting(users, tasks) {
     const st = this._state;
     if (!st || st.meetingCycleDone) return;
+    if (isLunchBreakNow()) return; // tushlik ustuvor
     st.meetingCycleDone = true;
 
     const now = new Date();
@@ -1948,6 +2040,11 @@ export const Office3D = {
 
     if (st.meeting?.active && t >= st.meeting.endsAt) {
       this._endDailyMeeting();
+    }
+    // Har ~2 soniyada tushlik oynasini tekshirish (13:00–14:00 Toshkent)
+    if ((st._lunchCheckAt || 0) <= t) {
+      st._lunchCheckAt = t + 2;
+      this._syncLunchBreak();
     }
 
     st.people.forEach((p) => {
