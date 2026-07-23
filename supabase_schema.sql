@@ -158,6 +158,20 @@ where role <> 'admin' or department is distinct from '';
 update app_users set department = ''
 where role = 'admin';
 
+-- Apostrofli dublikat ismlarni tozalash (Masalan: Mo'minov → Mominov profiliga bog'lash)
+update tasks t
+set assignee = u.display_name,
+    assignee_user_id = u.id
+from app_users u
+where t.deleted_at is null
+  and u.is_active is distinct from false
+  and (
+    t.assignee_user_id = u.id
+    or lower(regexp_replace(coalesce(t.assignee, ''), '[''ʼʻ`´]', '', 'g'))
+       = lower(regexp_replace(coalesce(u.display_name, ''), '[''ʼʻ`´]', '', 'g'))
+  )
+  and t.assignee is distinct from u.display_name;
+
 -- ============================================================
 -- 4) YORDAMCHI FUNKSIYALAR
 -- ============================================================

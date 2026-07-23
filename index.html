@@ -1278,7 +1278,7 @@ function visibleTasks() {
   let tasks = state.tasks.filter(t => !t.deleted_at);
   // Ijrochi filtri: bo'sh = barcha ijrochilar; tanlangan ism = faqat shu
   if (state.filterAssignee) {
-    tasks = tasks.filter(t => t.assignee === state.filterAssignee);
+    tasks = tasks.filter(t => assigneesMatch(t.assignee, state.filterAssignee));
   }
   if (state.filterDepartment) {
     const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.filterDepartment);
@@ -1417,6 +1417,7 @@ async function enterApp() {
   state.settings = await fetchSettings();
   state.appUsers = await fetchTeamUsers();
   state.tasks = await fetchTasks();
+  await reconcileAssigneeNameDuplicates();
   showApp();
   document.getElementById('tg-token').value = state.settings.telegram_token || '';
   document.getElementById('tg-chat').value = state.settings.telegram_chat_id || '';
@@ -2135,7 +2136,7 @@ function deadlineInfo(t) {
 }
 function matchesFilters(t) {
   if (state.filterPriority && t.priority !== state.filterPriority) return false;
-  if (state.filterAssignee && t.assignee !== state.filterAssignee) return false;
+  if (state.filterAssignee && !assigneesMatch(t.assignee, state.filterAssignee)) return false;
   if (state.filterStatus && effectiveStatus(t) !== state.filterStatus) return false;
   if (state.search) {
     const s = state.search.toLowerCase();
@@ -2146,12 +2147,15 @@ function matchesFilters(t) {
   return true;
 }
 function distinctAssignees() {
-  // Filtr ro'yxati — barcha ijrochilar (hozirgi filtdan mustaqil)
-  const names = Array.from(new Set(state.tasks.filter(t => !t.deleted_at).map(t => t.assignee).filter(Boolean)));
-  if (currentProfile?.display_name && !names.includes(currentProfile.display_name)) {
-    names.push(currentProfile.display_name);
+  const map = new Map();
+  state.tasks.filter(t => !t.deleted_at && t.assignee).forEach(t => {
+    const label = canonicalAssigneeLabel(t.assignee);
+    map.set(normalizePersonName(label), label);
+  });
+  if (currentProfile?.display_name) {
+    map.set(normalizePersonName(currentProfile.display_name), currentProfile.display_name);
   }
-  return names.sort((a, b) => a.localeCompare(b, 'uz'));
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'uz'));
 }
 function renderAssigneeOptions() {
   const names = distinctAssignees();
@@ -2245,20 +2249,33 @@ function renderKpis() {
 }
 function renderExecCards() {
   const tasks = visibleTasks();
-  const names = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean))).sort();
+  // Bir xil odam (apostrof farqi) — bitta kartochka
+  const byKey = new Map();
+  tasks.forEach(t => {
+    if (!t.assignee) return;
+    const key = normalizePersonName(t.assignee);
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(t);
+  });
+  const labels = Array.from(byKey.keys())
+    .map(key => {
+      const sample = byKey.get(key)[0]?.assignee;
+      return canonicalAssigneeLabel(sample);
+    })
+    .sort((a, b) => a.localeCompare(b, 'uz'));
   const grid = document.getElementById('exec-grid');
-  if (!names.length) { grid.innerHTML = '<div class="empty-msg">Hali topshiriq yo\'q</div>'; return; }
-  grid.innerHTML = names.map(name => {
-    const own = tasks.filter(t => t.assignee === name);
+  if (!labels.length) { grid.innerHTML = '<div class="empty-msg">Hali topshiriq yo\'q</div>'; return; }
+  grid.innerHTML = labels.map(name => {
+    const key = normalizePersonName(name);
+    const own = byKey.get(key) || tasks.filter(t => assigneesMatch(t.assignee, name));
     const total = own.length;
     const done = own.filter(t => effectiveStatus(t) === 'bajarildi').length;
     const review = own.filter(t => effectiveStatus(t) === 'tekshiruvda').length;
     const overdue = own.filter(t => effectiveStatus(t) === 'muddati_otgan').length;
     const progress = own.filter(t => effectiveStatus(t) === 'jarayonda').length;
-    const pct = total ? Math.round((done/total)*100) : 0;
-    const user = state.appUsers.find(u => u.display_name === name);
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const user = state.appUsers.find(u => assigneesMatch(u.display_name, name));
     const dept = user?.department ? `<span class="dept-tag">${escapeHtml(user.department)}</span>` : '';
-    // Apostrof/maxsus belgilar uchun onclick emas — data + encodeURIComponent
     return `
       <div class="exec-card" role="button" tabindex="0" data-assignee="${encodeURIComponent(name)}">
         <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}${dept}</div>
@@ -2408,6 +2425,7 @@ function onSmartFilterDepartment(v){
 async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
+  await reconcileAssigneeNameDuplicates();
   fillDepartmentSelects();
   renderAll();
   if (window.Office3D && Office3D.isOpen()) {
