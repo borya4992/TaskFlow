@@ -1909,7 +1909,22 @@ function findDepartmentHead(user) {
     normalizeDepartment(u.department) === dept
   ) || null;
 }
+function isTopManagementUser(u) {
+  if (!u) return false;
+  if (u.role === 'director' || u.role === 'deputy_director') return true;
+  const lv = positionLevelOf(u);
+  return lv === 'direktor' || lv === 'orinbosar';
+}
 function resolveReviewerOnSubmit(task, executor) {
+  // Direktor / o'rinbosar o'ziga yaratgan topshiriq — tekshiruv ham o'ziga
+  if (
+    executor &&
+    isTopManagementUser(executor) &&
+    task.created_by_user_id === executor.id &&
+    (task.assignee_user_id === executor.id || !task.assignee_user_id)
+  ) {
+    return executor.id;
+  }
   const head = findDepartmentHead(executor);
   if (head && head.id !== executor.id) return head.id;
   if (executor?.role === 'dept_head' && task.created_by_user_id) return task.created_by_user_id;
@@ -3271,11 +3286,14 @@ async function createTasksForAssignees(executorIds, { title, priority, deadline 
   for (const executorId of executorIds) {
     const executor = userById(executorId);
     if (!executor) continue;
+    const selfOwned =
+      isTopManagementUser(currentProfile) &&
+      executorId === currentProfile.id;
     await insertTask({
       assignee_user_id: executorId,
       assignee: executor.display_name,
       created_by_user_id: currentProfile.id,
-      reviewer_user_id: currentProfile.id,
+      reviewer_user_id: selfOwned ? executorId : currentProfile.id,
       title, priority, deadline,
       status: 'jarayonda',
       start_date: todayISO(),
@@ -3511,15 +3529,29 @@ async function submitForReview(id) {
   submitDraftAttachment = null;
   closeModal();
   await refreshFromDB();
-  await notifyCreatorReview(updated);
-  toast('Tekshiruvga yuborildi — rahbar/yaratuvchi xabar oladi');
+  // O'ziga tekshiruv — o'zini notify qilish shart emas
+  if (reviewerId && reviewerId !== currentProfile.id) {
+    await notifyCreatorReview(updated);
+  }
+  toast(
+    reviewerId === currentProfile.id
+      ? 'Tekshiruvga yuborildi — o‘zingiz tasdiqlashingiz mumkin'
+      : 'Tekshiruvga yuborildi — rahbar/yaratuvchi xabar oladi'
+  );
 }
 async function approveTask(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || !canReviewTask(task)) return;
 
   // Ierarxiya: rahbar tasdiqlasa, keyingi bosqich — asl yaratuvchi
+  // Lekin direktor/o'rinbosar o'z topshirig'ida yakuniy yopadi (escalate yo'q)
+  const selfTopMgmt =
+    isTopManagementUser(currentProfile) &&
+    task.assignee_user_id === currentProfile.id &&
+    task.created_by_user_id === currentProfile.id;
+
   const needsEscalate =
+    !selfTopMgmt &&
     task.created_by_user_id &&
     task.reviewer_user_id &&
     task.reviewer_user_id === currentProfile.id &&
