@@ -319,6 +319,31 @@
   .exec-bar-fill{height:100%;background:var(--success);border-radius:20px;}
 
   .task-list{display:flex;flex-direction:column;gap:8px;}
+  .tasks-toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    margin:0 0 12px;
+  }
+  .task-folders{display:flex;gap:6px;flex-wrap:wrap;}
+  .task-folder-btn{
+    display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--border);color:var(--text-soft);
+    font-size:12.5px;font-weight:650;cursor:pointer;transition:border-color .12s,color .12s,background .12s;
+  }
+  .task-folder-btn:hover{color:var(--text);border-color:var(--accent);}
+  .task-folder-btn.active{
+    background:var(--accent-tint);border-color:var(--accent);color:var(--text);
+  }
+  .task-folder-btn .count{
+    font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;
+    background:var(--panel-2);color:var(--text-faint);min-width:1.5em;text-align:center;
+  }
+  .task-folder-btn.active .count{background:var(--accent);color:var(--on-accent);}
+  .task-sort-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .task-sort-wrap label{font-size:12px;color:var(--text-faint);font-weight:600;}
+  .task-sort-wrap select{
+    min-width:170px;padding:8px 10px;font-size:12.5px;
+  }
+  .task-folder-meta{font-size:11.5px;color:var(--text-faint);margin:0 0 10px;}
   .task-row{
     display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);
     border-radius:10px;padding:11px 14px;flex-wrap:wrap;
@@ -696,6 +721,32 @@
   <div class="exec-grid" id="exec-grid"></div>
 
   <div class="section-title" id="tasks-section-title">📋 <span data-i18n="sections.tasks">Topshiriqlar</span></div>
+  <div class="tasks-toolbar" id="tasks-toolbar">
+    <div class="task-folders" role="tablist">
+      <button type="button" class="task-folder-btn active" id="folder-active-btn" role="tab" aria-selected="true" onclick="setTaskFolder('active')">
+        <span data-i18n="tasks.folderActive">Faol</span>
+        <span class="count" id="folder-active-count">0</span>
+      </button>
+      <button type="button" class="task-folder-btn" id="folder-archive-btn" role="tab" aria-selected="false" onclick="setTaskFolder('archive')">
+        <span data-i18n="tasks.folderArchive">📦 Arxiv</span>
+        <span class="count" id="folder-archive-count">0</span>
+      </button>
+    </div>
+    <div class="task-sort-wrap">
+      <label for="task-sort" data-i18n="tasks.sortLabel">Saralash</label>
+      <select id="task-sort" onchange="onTaskSortChange(this.value)">
+        <option value="deadline_asc" data-i18n="tasks.sortDeadlineAsc">Muddat ↑ (yaqin)</option>
+        <option value="deadline_desc" data-i18n="tasks.sortDeadlineDesc">Muddat ↓ (uzoq)</option>
+        <option value="created_desc" data-i18n="tasks.sortCreatedDesc">Yaratilgan ↓ (yangi)</option>
+        <option value="created_asc" data-i18n="tasks.sortCreatedAsc">Yaratilgan ↑ (eski)</option>
+        <option value="priority_desc" data-i18n="tasks.sortPriorityDesc">Ustuvorlik ↓</option>
+        <option value="status" data-i18n="tasks.sortStatus">Holat bo'yicha</option>
+        <option value="assignee" data-i18n="tasks.sortAssignee">Ijrochi (A–Z)</option>
+        <option value="title" data-i18n="tasks.sortTitle">Nom (A–Z)</option>
+      </select>
+    </div>
+  </div>
+  <p class="task-folder-meta" id="tasks-folder-meta"></p>
   <div class="task-list" id="task-list"></div>
   </div>
 
@@ -944,6 +995,22 @@ const I18N = {
     'sections.review': 'Sizga tasdiqlash uchun kelganlar',
     'sections.executors': "Ijrochilar bo'yicha",
     'sections.tasks': 'Topshiriqlar',
+    'tasks.folderActive': 'Faol',
+    'tasks.folderArchive': '📦 Arxiv',
+    'tasks.sortLabel': 'Saralash',
+    'tasks.sortDeadlineAsc': 'Muddat ↑ (yaqin)',
+    'tasks.sortDeadlineDesc': 'Muddat ↓ (uzoq)',
+    'tasks.sortCreatedDesc': 'Yaratilgan ↓ (yangi)',
+    'tasks.sortCreatedAsc': 'Yaratilgan ↑ (eski)',
+    'tasks.sortPriorityDesc': 'Ustuvorlik ↓',
+    'tasks.sortStatus': "Holat bo'yicha",
+    'tasks.sortAssignee': 'Ijrochi (A–Z)',
+    'tasks.sortTitle': 'Nom (A–Z)',
+    'tasks.metaActive': 'Faol topshiriqlar — bajarilmaganlar shu yerda',
+    'tasks.metaArchive': 'Arxiv — bajarilgan topshiriqlar',
+    'tasks.emptyActive': 'Faol topshiriq yo‘q',
+    'tasks.emptyArchive': 'Arxiv bo‘sh',
+    'tasks.empty': 'Topshiriq topilmadi',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': "Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.",
     'smart.activeExec': 'Eng faol ijrochilar (bajarilgan topshiriqlar)',
@@ -1070,6 +1137,22 @@ const I18N = {
     'sections.review': 'Ожидают вашего подтверждения',
     'sections.executors': 'По исполнителям',
     'sections.tasks': 'Задачи',
+    'tasks.folderActive': 'Активные',
+    'tasks.folderArchive': '📦 Архив',
+    'tasks.sortLabel': 'Сортировка',
+    'tasks.sortDeadlineAsc': 'Срок ↑ (ближайшие)',
+    'tasks.sortDeadlineDesc': 'Срок ↓ (дальние)',
+    'tasks.sortCreatedDesc': 'Создано ↓ (новые)',
+    'tasks.sortCreatedAsc': 'Создано ↑ (старые)',
+    'tasks.sortPriorityDesc': 'Приоритет ↓',
+    'tasks.sortStatus': 'По статусу',
+    'tasks.sortAssignee': 'Исполнитель (А–Я)',
+    'tasks.sortTitle': 'Название (А–Я)',
+    'tasks.metaActive': 'Активные задачи — незавершённые здесь',
+    'tasks.metaArchive': 'Архив — выполненные задачи',
+    'tasks.emptyActive': 'Нет активных задач',
+    'tasks.emptyArchive': 'Архив пуст',
+    'tasks.empty': 'Задачи не найдены',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': 'Анализ качества и выполнения задач на живых данных.',
     'smart.activeExec': 'Самые активные исполнители (выполненные)',
@@ -1196,6 +1279,22 @@ const I18N = {
     'sections.review': 'Awaiting your approval',
     'sections.executors': 'By executors',
     'sections.tasks': 'Tasks',
+    'tasks.folderActive': 'Active',
+    'tasks.folderArchive': '📦 Archive',
+    'tasks.sortLabel': 'Sort',
+    'tasks.sortDeadlineAsc': 'Deadline ↑ (soonest)',
+    'tasks.sortDeadlineDesc': 'Deadline ↓ (latest)',
+    'tasks.sortCreatedDesc': 'Created ↓ (newest)',
+    'tasks.sortCreatedAsc': 'Created ↑ (oldest)',
+    'tasks.sortPriorityDesc': 'Priority ↓',
+    'tasks.sortStatus': 'By status',
+    'tasks.sortAssignee': 'Assignee (A–Z)',
+    'tasks.sortTitle': 'Title (A–Z)',
+    'tasks.metaActive': 'Active tasks — unfinished items are here',
+    'tasks.metaArchive': 'Archive — completed tasks',
+    'tasks.emptyActive': 'No active tasks',
+    'tasks.emptyArchive': 'Archive is empty',
+    'tasks.empty': 'No tasks found',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': 'Live analytics of task quality and completion.',
     'smart.activeExec': 'Most active executors (completed)',
@@ -2337,7 +2436,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', taskFolder:'active', taskSort:'deadline_asc' };
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
@@ -2989,16 +3088,120 @@ function renderReviewList() {
   }
   list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
 }
+function isArchivedTask(task) {
+  return effectiveStatus(task) === 'bajarildi' || task.status === 'bajarildi';
+}
+function prioritySortRank(p) {
+  return ({ Shoshilinch: 0, Yuqori: 1, "O'rta": 2, Past: 3 }[p] ?? 9);
+}
+function statusSortRank(eff) {
+  return ({ muddati_otgan: 0, jarayonda: 1, tekshiruvda: 2, bajarildi: 3 }[eff] ?? 9);
+}
+function sortTasksList(tasks, sortKey) {
+  const key = sortKey || state.taskSort || 'deadline_asc';
+  const arr = tasks.slice();
+  const timeOr = (v, fallback) => {
+    const d = v ? new Date(v) : null;
+    return d && !isNaN(d.getTime()) ? d.getTime() : fallback;
+  };
+  arr.sort((a, b) => {
+    switch (key) {
+      case 'deadline_desc':
+        return timeOr(b.deadline, 0) - timeOr(a.deadline, 0);
+      case 'created_desc':
+        return timeOr(b.created_at, 0) - timeOr(a.created_at, 0);
+      case 'created_asc':
+        return timeOr(a.created_at, Number.MAX_SAFE_INTEGER) - timeOr(b.created_at, Number.MAX_SAFE_INTEGER);
+      case 'priority_desc': {
+        const d = prioritySortRank(a.priority) - prioritySortRank(b.priority);
+        if (d) return d;
+        return timeOr(a.deadline, Number.MAX_SAFE_INTEGER) - timeOr(b.deadline, Number.MAX_SAFE_INTEGER);
+      }
+      case 'status': {
+        const d = statusSortRank(effectiveStatus(a)) - statusSortRank(effectiveStatus(b));
+        if (d) return d;
+        return timeOr(a.deadline, Number.MAX_SAFE_INTEGER) - timeOr(b.deadline, Number.MAX_SAFE_INTEGER);
+      }
+      case 'assignee':
+        return String(a.assignee || '').localeCompare(String(b.assignee || ''), 'uz');
+      case 'title':
+        return String(a.title || '').localeCompare(String(b.title || ''), 'uz');
+      case 'deadline_asc':
+      default:
+        return timeOr(a.deadline, Number.MAX_SAFE_INTEGER) - timeOr(b.deadline, Number.MAX_SAFE_INTEGER);
+    }
+  });
+  return arr;
+}
+function syncTaskFolderUi(activeCount, archiveCount) {
+  const activeBtn = document.getElementById('folder-active-btn');
+  const archiveBtn = document.getElementById('folder-archive-btn');
+  const activeCnt = document.getElementById('folder-active-count');
+  const archiveCnt = document.getElementById('folder-archive-count');
+  const meta = document.getElementById('tasks-folder-meta');
+  const sortSel = document.getElementById('task-sort');
+  const folder = state.taskFolder === 'archive' ? 'archive' : 'active';
+  if (activeBtn) {
+    activeBtn.classList.toggle('active', folder === 'active');
+    activeBtn.setAttribute('aria-selected', folder === 'active' ? 'true' : 'false');
+  }
+  if (archiveBtn) {
+    archiveBtn.classList.toggle('active', folder === 'archive');
+    archiveBtn.setAttribute('aria-selected', folder === 'archive' ? 'true' : 'false');
+  }
+  if (activeCnt) activeCnt.textContent = String(activeCount);
+  if (archiveCnt) archiveCnt.textContent = String(archiveCount);
+  if (meta) meta.textContent = folder === 'archive' ? t('tasks.metaArchive') : t('tasks.metaActive');
+  if (sortSel && sortSel.value !== state.taskSort) sortSel.value = state.taskSort || 'deadline_asc';
+}
+function setTaskFolder(folder) {
+  state.taskFolder = folder === 'archive' ? 'archive' : 'active';
+  // KPI status bilan moslash: arxiv ↔ bajarildi
+  if (state.taskFolder === 'archive' && state.filterStatus && state.filterStatus !== 'bajarildi') {
+    state.filterStatus = '';
+    renderKpis();
+  }
+  if (state.taskFolder === 'active' && state.filterStatus === 'bajarildi') {
+    state.filterStatus = '';
+    renderKpis();
+  }
+  renderTaskList();
+}
+function onTaskSortChange(v) {
+  state.taskSort = v || 'deadline_asc';
+  try { localStorage.setItem('task_sort', state.taskSort); } catch (e) {}
+  renderTaskList();
+}
 function renderTaskList() {
   const list = document.getElementById('task-list');
+  if (!list) return;
   let filtered = visibleTasks().filter(matchesFilters);
   // Oddiy rejimda o'zingiz tasdiqlaydiganlar alohida blokda
   if (!state.filterStatus) {
     filtered = filtered.filter(t => !(t.status === 'tekshiruvda' && canReviewTask(t)));
   }
-  filtered = filtered.slice().sort((x,y) => new Date(x.deadline||'2999-01-01') - new Date(y.deadline||'2999-01-01'));
-  if (!filtered.length) { list.innerHTML = '<div class="empty-msg">Topshiriq topilmadi</div>'; return; }
-  list.innerHTML = filtered.map(t => taskRowHtml(t, 'main')).join('');
+
+  const active = filtered.filter(t => !isArchivedTask(t));
+  const archive = filtered.filter(t => isArchivedTask(t));
+  syncTaskFolderUi(active.length, archive.length);
+
+  let folderTasks = state.taskFolder === 'archive' ? archive : active;
+  // Agar KPI "Bajarildi" tanlangan bo'lsa — arxivni ko'rsat
+  if (state.filterStatus === 'bajarildi') {
+    state.taskFolder = 'archive';
+    folderTasks = archive;
+    syncTaskFolderUi(active.length, archive.length);
+  }
+
+  folderTasks = sortTasksList(folderTasks, state.taskSort);
+  if (!folderTasks.length) {
+    const emptyKey = state.filterStatus
+      ? 'tasks.empty'
+      : (state.taskFolder === 'archive' ? 'tasks.emptyArchive' : 'tasks.emptyActive');
+    list.innerHTML = '<div class="empty-msg">' + escapeHtml(t(emptyKey)) + '</div>';
+    return;
+  }
+  list.innerHTML = folderTasks.map(t => taskRowHtml(t, 'main')).join('');
 }
 function renderAll() {
   fillDepartmentSelects();
@@ -3014,6 +3217,8 @@ function renderAll() {
 }
 function filterByStatus(status) {
   state.filterStatus = status || '';
+  if (status === 'bajarildi') state.taskFolder = 'archive';
+  else if (status) state.taskFolder = 'active';
   switchAppView('monitoring');
   renderKpis();
   renderReviewList();
@@ -4111,6 +4316,12 @@ async function installPwa() {
 async function init() {
   initThemeSystem();
   initLangSystem();
+  try {
+    const savedSort = localStorage.getItem('task_sort');
+    if (savedSort) state.taskSort = savedSort;
+  } catch (e) {}
+  const sortSel = document.getElementById('task-sort');
+  if (sortSel) sortSel.value = state.taskSort || 'deadline_asc';
   setupPwaInstall();
   setupExecCardClicks();
   initSupabase();
