@@ -15,11 +15,15 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <script>
-/* Flash oldini olish — localStorage'dan temani darhol qo'llash */
+/* Flash oldini olish — localStorage'dan tema va tilni darhol qo'llash */
 (function () {
   try {
     var t = localStorage.getItem('app_theme') || 'midnight';
     document.documentElement.setAttribute('data-theme', t);
+    var lang = localStorage.getItem('app_lang') || 'uz';
+    if (lang !== 'uz' && lang !== 'ru' && lang !== 'en') lang = 'uz';
+    document.documentElement.setAttribute('lang', lang === 'uz' ? 'uz' : lang);
+    document.documentElement.setAttribute('data-lang', lang);
   } catch (e) {}
 })();
 </script>
@@ -383,24 +387,26 @@
   .modal-head h3{margin:0;font-size:15px;flex:1;min-width:0;line-height:1.35;}
   .modal-head .btn-ghost{flex-shrink:0;min-height:40px;padding:8px 12px;}
 
-  /* Theme picker */
-  .theme-wrap{position:relative;}
-  .theme-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:7px 12px;font-size:12px;border-radius:8px;}
-  .theme-btn:hover{color:var(--text);}
-  .theme-menu{
+  /* Theme / Language picker */
+  .theme-wrap,.lang-wrap{position:relative;}
+  .theme-btn,.lang-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:7px 12px;font-size:12px;border-radius:8px;}
+  .theme-btn:hover,.lang-btn:hover{color:var(--text);}
+  .theme-menu,.lang-menu{
     display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:120;
-    min-width:220px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    min-width:180px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:6px;box-shadow:var(--shadow);
   }
-  .theme-menu.open{display:block;}
-  .theme-option{
+  .theme-menu{min-width:220px;}
+  .theme-menu.open,.lang-menu.open{display:block;}
+  .theme-option,.lang-option{
     display:flex;align-items:center;gap:10px;width:100%;text-align:left;
     background:transparent;color:var(--text);padding:9px 10px;border-radius:8px;font-size:12.5px;font-weight:600;
   }
-  .theme-option:hover{background:var(--panel-2);}
-  .theme-option.active{background:var(--accent-tint);outline:1px solid var(--accent);}
+  .theme-option:hover,.lang-option:hover{background:var(--panel-2);}
+  .theme-option.active,.lang-option.active{background:var(--accent-tint);outline:1px solid var(--accent);}
   .theme-swatches{display:flex;gap:4px;margin-left:auto;}
   .theme-swatch{width:12px;height:12px;border-radius:50%;border:1px solid var(--border);flex-shrink:0;}
+  .lang-flag{font-size:14px;line-height:1;}
   .assignee-board{
     display:grid;
     grid-template-columns:repeat(4,minmax(210px,1fr));
@@ -576,20 +582,20 @@
   <div class="auth-card">
     <h1><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> TaskFlow</h1>
     <p class="credit-line" style="margin:8px 0 0;font-size:11.5px;font-weight:600;color:#f97316;text-align:center;">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
-    <p class="auth-sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
+    <p class="auth-sub" data-i18n="auth.sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
     <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')">Parol</button>
-      <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')">Telegram</button>
+      <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')" data-i18n="auth.tabPassword">Parol</button>
+      <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')" data-i18n="auth.tabTelegram">Telegram</button>
     </div>
     <div id="auth-panel-password">
-      <div class="auth-field"><label>Email</label><input type="email" id="login-email" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
-      <div class="auth-field"><label>Parol</label><input type="password" id="login-password" placeholder="Parol" autocomplete="current-password"></div>
-      <button class="auth-btn" onclick="loginWithPassword()">Kirish</button>
-      <p class="auth-hint" style="margin-top:10px;">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
+      <div class="auth-field"><label data-i18n="auth.email">Email</label><input type="email" id="login-email" data-i18n-placeholder="auth.emailPh" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
+      <div class="auth-field"><label data-i18n="auth.password">Parol</label><input type="password" id="login-password" data-i18n-placeholder="auth.passwordPh" placeholder="Parol" autocomplete="current-password"></div>
+      <button class="auth-btn" onclick="loginWithPassword()" data-i18n="auth.login">Kirish</button>
+      <p class="auth-hint" style="margin-top:10px;" data-i18n-html="auth.hintPassword">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
     </div>
     <div id="auth-panel-telegram" class="hidden">
       <div class="auth-telegram-wrap" id="telegram-login-container"></div>
-      <p class="auth-hint">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
+      <p class="auth-hint" data-i18n="auth.hintTelegram">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
     </div>
     <p class="auth-hint" id="auth-message"></p>
   </div>
@@ -600,129 +606,141 @@
 
   <header>
     <div class="titles">
-      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> Topshiriqlar monitoringi</h1>
+      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span data-i18n="app.title">Topshiriqlar monitoringi</span></h1>
       <p class="credit-line">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
     </div>
     <div class="user-bar">
-      <span class="user-chip" id="user-chip" title="Profilni ochish" onclick="openMyProfileModal()"></span>
-      <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;">Ilovani o'rnatish</button>
+      <span class="user-chip" id="user-chip" data-i18n-title="app.openProfile" title="Profilni ochish" onclick="openMyProfileModal()"></span>
+      <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;" data-i18n="app.install">Ilovani o'rnatish</button>
       <div class="theme-wrap">
-        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 Tema</button>
+        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 <span data-i18n="app.theme">Tema</span></button>
         <div class="theme-menu" id="theme-menu" role="menu"></div>
       </div>
-      <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;">Chiqish</button>
+      <div class="lang-wrap">
+        <button type="button" class="lang-btn" id="lang-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleLangMenu(event)">🌐 <span id="lang-btn-label">Oʻzbek</span></button>
+        <div class="lang-menu" id="lang-menu" role="menu"></div>
+      </div>
+      <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;" data-i18n="app.logout">Chiqish</button>
     </div>
     <div class="kpi-row">
-      <div class="kpi active" data-status="" onclick="filterByStatus('')" title="Barcha topshiriqlar"><b id="kpi-total">0</b><span>Jami</span></div>
-      <div class="kpi k-progress" data-status="jarayonda" onclick="filterByStatus('jarayonda')" title="Jarayondagi topshiriqlar"><b id="kpi-progress">0</b><span>Jarayonda</span></div>
-      <div class="kpi k-review" data-status="tekshiruvda" onclick="filterByStatus('tekshiruvda')" title="Tekshiruvdagi topshiriqlar"><b id="kpi-review">0</b><span>Tekshiruvda</span></div>
-      <div class="kpi k-done" data-status="bajarildi" onclick="filterByStatus('bajarildi')" title="Bajarilgan topshiriqlar"><b id="kpi-done">0</b><span>Bajarildi</span></div>
-      <div class="kpi k-overdue" data-status="muddati_otgan" onclick="filterByStatus('muddati_otgan')" title="Muddati o'tgan topshiriqlar"><b id="kpi-overdue">0</b><span>Kechikkan</span></div>
+      <div class="kpi active" data-status="" onclick="filterByStatus('')" data-i18n-title="kpi.totalTitle" title="Barcha topshiriqlar"><b id="kpi-total">0</b><span data-i18n="kpi.total">Jami</span></div>
+      <div class="kpi k-progress" data-status="jarayonda" onclick="filterByStatus('jarayonda')" data-i18n-title="kpi.progressTitle" title="Jarayondagi topshiriqlar"><b id="kpi-progress">0</b><span data-i18n="kpi.progress">Jarayonda</span></div>
+      <div class="kpi k-review" data-status="tekshiruvda" onclick="filterByStatus('tekshiruvda')" data-i18n-title="kpi.reviewTitle" title="Tekshiruvdagi topshiriqlar"><b id="kpi-review">0</b><span data-i18n="kpi.review">Tekshiruvda</span></div>
+      <div class="kpi k-done" data-status="bajarildi" onclick="filterByStatus('bajarildi')" data-i18n-title="kpi.doneTitle" title="Bajarilgan topshiriqlar"><b id="kpi-done">0</b><span data-i18n="kpi.done">Bajarildi</span></div>
+      <div class="kpi k-overdue" data-status="muddati_otgan" onclick="filterByStatus('muddati_otgan')" data-i18n-title="kpi.overdueTitle" title="Muddati o'tgan topshiriqlar"><b id="kpi-overdue">0</b><span data-i18n="kpi.overdue">Kechikkan</span></div>
     </div>
   </header>
 
   <div class="online-bar" id="online-bar">
-    <span class="online-label">🟢 Onlayn:</span>
+    <span class="online-label" data-i18n="app.online">🟢 Onlayn:</span>
     <span id="online-list" class="online-empty">—</span>
   </div>
 
   <div class="app-nav" id="app-nav">
-    <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')">Monitoring</button>
-    <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')">SMART</button>
-    <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D()">🧑‍💼 3D Ofis</button>
-    <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')">Boshqaruv</button>
+    <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')" data-i18n="nav.monitoring">Monitoring</button>
+    <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')" data-i18n="nav.smart">SMART</button>
+    <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D()" data-i18n="nav.office">🧑‍💼 3D Ofis</button>
+    <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')" data-i18n="nav.admin">Boshqaruv</button>
   </div>
 
   <!-- MONITORING -->
   <div id="view-monitoring" class="view-pane active">
   <div class="toolbar">
-    <input type="text" id="search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
-    <select id="filter-department" onchange="onFilterDepartment(this.value)"><option value="">Barcha bo'limlar</option></select>
-    <select id="filter-assignee" onchange="onFilterAssignee(this.value)"><option value="">Barcha mas'ul shaxslar</option></select>
+    <input type="text" id="search" data-i18n-placeholder="filter.search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
+    <select id="filter-department" onchange="onFilterDepartment(this.value)"><option value="" data-i18n="filter.allDepts">Barcha bo'limlar</option></select>
+    <select id="filter-assignee" onchange="onFilterAssignee(this.value)"><option value="" data-i18n="filter.allAssignees">Barcha mas'ul shaxslar</option></select>
     <select id="filter-priority" onchange="onFilterPriority(this.value)">
-      <option value="">Barcha ustuvorliklar</option>
-      <option value="Shoshilinch">Shoshilinch</option>
-      <option value="Yuqori">Yuqori</option>
-      <option value="O'rta">O'rta</option>
-      <option value="Past">Past</option>
+      <option value="" data-i18n="filter.allPriorities">Barcha ustuvorliklar</option>
+      <option value="Shoshilinch" data-i18n="priority.urgent">Shoshilinch</option>
+      <option value="Yuqori" data-i18n="priority.high">Yuqori</option>
+      <option value="O'rta" data-i18n="priority.medium">O'rta</option>
+      <option value="Past" data-i18n="priority.low">Past</option>
     </select>
-    <button class="btn-blue" onclick="refreshFromDB()">🔄 Yangilash</button>
+    <button class="btn-blue" onclick="refreshFromDB()" data-i18n="filter.refresh">🔄 Yangilash</button>
   </div>
 
   <div class="panel hidden" id="create-task-panel">
-    <h2><span class="dot" style="background:var(--purple)"></span> Yangi topshiriq yaratish</h2>
+    <h2><span class="dot" style="background:var(--purple)"></span> <span data-i18n="create.title">Yangi topshiriq yaratish</span></h2>
     <div class="assignee-multi">
       <div class="assignee-multi-head">
-        <label>Bajaruvchilar (bir yoki bir nechta)</label>
+        <label data-i18n="create.assignees">Bajaruvchilar (bir yoki bir nechta)</label>
         <span class="count" id="new-executor-count">0 tanlangan</span>
       </div>
       <div class="assignee-check-list" id="new-executor-list"></div>
     </div>
     <div class="add-row">
-      <input type="text" id="new-title" placeholder="Topshiriq matni">
+      <input type="text" id="new-title" data-i18n-placeholder="create.taskPh" placeholder="Topshiriq matni">
       <select id="new-priority">
-        <option value="">Ustuvorlik yo'q</option>
-        <option value="Shoshilinch">Shoshilinch</option>
-        <option value="Yuqori">Yuqori</option>
-        <option value="O'rta">O'rta</option>
-        <option value="Past">Past</option>
+        <option value="" data-i18n="priority.none">Ustuvorlik yo'q</option>
+        <option value="Shoshilinch" data-i18n="priority.urgent">Shoshilinch</option>
+        <option value="Yuqori" data-i18n="priority.high">Yuqori</option>
+        <option value="O'rta" data-i18n="priority.medium">O'rta</option>
+        <option value="Past" data-i18n="priority.low">Past</option>
       </select>
-      <input type="datetime-local" id="new-deadline" title="Muddat (majburiy)" required>
-      <button class="btn-blue" onclick="addTask()">Yaratish va yuborish</button>
+      <input type="datetime-local" id="new-deadline" data-i18n-title="create.deadlineTitle" title="Muddat (majburiy)" required>
+      <button class="btn-blue" onclick="addTask()" data-i18n="create.submit">Yaratish va yuborish</button>
     </div>
     <div class="attach-row">
-      <label>📎 Fayl biriktirish (ixtiyoriy)
+      <label><span data-i18n="create.attach">📎 Fayl biriktirish (ixtiyoriy)</span>
         <input type="file" id="new-attachment" onchange="onNewAttachmentChange(this)">
       </label>
       <span class="attach-status" id="new-attachment-status"></span>
     </div>
-    <p class="help-text" style="margin:8px 0 0;">Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
+    <p class="help-text" style="margin:8px 0 0;" data-i18n-html="create.help">Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
   </div>
 
-  <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> Sizga tasdiqlash uchun kelganlar</div>
+  <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> <span data-i18n="sections.review">Sizga tasdiqlash uchun kelganlar</span></div>
   <div class="task-list" id="review-list"></div>
 
-  <div class="section-title" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> Ijrochilar bo'yicha</div>
+  <div class="section-title" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> <span data-i18n="sections.executors">Ijrochilar bo'yicha</span></div>
   <div class="exec-grid" id="exec-grid"></div>
 
-  <div class="section-title" id="tasks-section-title">📋 Topshiriqlar</div>
+  <div class="section-title" id="tasks-section-title">📋 <span data-i18n="sections.tasks">Topshiriqlar</span></div>
   <div class="task-list" id="task-list"></div>
   </div>
 
   <!-- SMART ANALYTICS -->
   <div id="view-smart" class="view-pane">
     <div class="panel">
-      <h2><span class="dot" style="background:var(--green)"></span> SMART Task Monitoring</h2>
-      <p class="help-text" style="margin-top:0;">Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.</p>
+      <h2><span class="dot" style="background:var(--green)"></span> <span data-i18n="smart.title">SMART Task Monitoring</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="smart.sub">Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.</p>
       <div class="toolbar" style="margin-bottom:12px;">
-        <select id="smart-filter-department" onchange="onSmartFilterDepartment(this.value)"><option value="">Barcha bo'limlar</option></select>
+        <select id="smart-filter-department" onchange="onSmartFilterDepartment(this.value)"><option value="" data-i18n="filter.allDepts">Barcha bo'limlar</option></select>
       </div>
       <div class="smart-stats" id="smart-stats"></div>
     </div>
     <div class="smart-charts">
       <div class="panel">
-        <h2><span class="dot" style="background:var(--accent)"></span> Eng faol ijrochilar (bajarilgan topshiriqlar)</h2>
+        <h2><span class="dot" style="background:var(--accent)"></span> <span data-i18n="smart.activeExec">Eng faol ijrochilar (bajarilgan topshiriqlar)</span></h2>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
-        <h2><span class="dot" style="background:var(--amber)"></span> Holat taqsimoti</h2>
+        <h2><span class="dot" style="background:var(--amber)"></span> <span data-i18n="smart.statusDist">Holat taqsimoti</span></h2>
         <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
       </div>
     </div>
     <div class="panel">
-      <h2><span class="dot" style="background:var(--accent2)"></span> Bo'limlar kesimida topshiriqlar</h2>
+      <h2><span class="dot" style="background:var(--accent2)"></span> <span data-i18n="smart.byDept">Bo'limlar kesimida topshiriqlar</span></h2>
       <div class="chart-wrap" style="height:260px;"><canvas id="chart-dept"></canvas></div>
     </div>
     <div class="panel">
-      <h2><span class="dot" style="background:var(--success)"></span> Kunlik topshiriqlar trendi (so'nggi 30 kun)</h2>
-      <p class="help-text" style="margin-top:0;">Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.</p>
+      <h2><span class="dot" style="background:var(--success)"></span> <span data-i18n="smart.trend">Kunlik topshiriqlar trendi (so'nggi 30 kun)</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.</p>
       <div class="chart-wrap" style="height:220px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel">
-      <h2><span class="dot" style="background:var(--purple)"></span> Ijrochi kesimida monitoring</h2>
+      <h2><span class="dot" style="background:var(--purple)"></span> <span data-i18n="smart.byExec">Ijrochi kesimida monitoring</span></h2>
       <table class="users-table">
         <thead>
-          <tr><th>Bajaruvchi</th><th>Jami</th><th>Jarayonda</th><th>Tekshiruv</th><th>Bajarildi</th><th>Kechikkan</th><th>SMART risk</th></tr>
+          <tr>
+            <th data-i18n="smart.colExec">Bajaruvchi</th>
+            <th data-i18n="kpi.total">Jami</th>
+            <th data-i18n="kpi.progress">Jarayonda</th>
+            <th data-i18n="kpi.review">Tekshiruv</th>
+            <th data-i18n="kpi.done">Bajarildi</th>
+            <th data-i18n="kpi.overdue">Kechikkan</th>
+            <th data-i18n="smart.risk">SMART risk</th>
+          </tr>
         </thead>
         <tbody id="smart-assignee-tbody"></tbody>
       </table>
@@ -733,83 +751,97 @@
   <!-- BOSHQARUV (admin) -->
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
-    <h2><span class="dot" style="background:var(--amber)"></span> Foydalanuvchilarni boshqarish <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.</p>
+    <h2><span class="dot" style="background:var(--amber)"></span> <span data-i18n="admin.usersTitle">Foydalanuvchilarni boshqarish</span> <span class="admin-badge">ADMIN</span></h2>
+    <p class="help-text" style="margin-top:0;" data-i18n-html="admin.usersHelp"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.</p>
     <div class="user-form">
-      <div class="auth-field"><label>Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
-      <div class="auth-field"><label>Rol</label>
+      <div class="auth-field"><label data-i18n="admin.name">Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
+      <div class="auth-field"><label data-i18n="admin.role">Rol</label>
         <select id="u-role">
-          <option value="executor">Ijrochi</option>
-          <option value="dept_head">Bo'lim boshlig'i</option>
-          <option value="deputy_director">Direktor o'rinbosari</option>
-          <option value="director">Direktor</option>
-          <option value="admin">Admin</option>
+          <option value="executor" data-i18n="role.executor">Ijrochi</option>
+          <option value="dept_head" data-i18n="role.dept_head">Bo'lim boshlig'i</option>
+          <option value="deputy_director" data-i18n="role.deputy_director">Direktor o'rinbosari</option>
+          <option value="director" data-i18n="role.director">Direktor</option>
+          <option value="admin" data-i18n="role.admin">Admin</option>
         </select>
       </div>
-      <div class="auth-field"><label>Bo'lim</label>
+      <div class="auth-field"><label data-i18n="admin.department">Bo'lim</label>
         <select id="u-department">
-          <option value="Xodimlar bo'limi">Xodimlar bo'limi</option>
-          <option value="Ishga qabul qilish bo'limi">Ishga qabul qilish bo'limi</option>
-          <option value="Kompensatsiya bo'limi">Kompensatsiya bo'limi</option>
+          <option value="Xodimlar bo'limi" data-i18n="dept.staff">Xodimlar bo'limi</option>
+          <option value="Ishga qabul qilish bo'limi" data-i18n="dept.recruit">Ishga qabul qilish bo'limi</option>
+          <option value="Kompensatsiya bo'limi" data-i18n="dept.comp">Kompensatsiya bo'limi</option>
         </select>
       </div>
-      <div class="auth-field"><label>Jins</label>
+      <div class="auth-field"><label data-i18n="admin.gender">Jins</label>
         <select id="u-gender">
-          <option value="erkak">Erkak</option>
-          <option value="ayol">Ayol</option>
+          <option value="erkak" data-i18n="gender.male">Erkak</option>
+          <option value="ayol" data-i18n="gender.female">Ayol</option>
         </select>
       </div>
-      <div class="auth-field"><label>Lavozim darajasi</label>
+      <div class="auth-field"><label data-i18n="admin.level">Lavozim darajasi</label>
         <select id="u-position-level">
-          <option value="xodim">Xodim</option>
-          <option value="bolim_boshligi">Bo'lim boshlig'i</option>
-          <option value="orinbosar">Direktor o'rinbosari</option>
-          <option value="direktor">Direktor</option>
+          <option value="xodim" data-i18n="level.xodim">Xodim</option>
+          <option value="bolim_boshligi" data-i18n="level.bolim_boshligi">Bo'lim boshlig'i</option>
+          <option value="orinbosar" data-i18n="level.orinbosar">Direktor o'rinbosari</option>
+          <option value="direktor" data-i18n="level.direktor">Direktor</option>
         </select>
       </div>
-      <div class="auth-field"><label>Email *</label><input type="email" id="u-email" placeholder="email@example.com"></div>
-      <div class="auth-field"><label>Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
-      <div class="auth-field"><label>Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
-      <div class="full"><button class="btn-blue" onclick="addAppUser()">Foydalanuvchi qo'shish</button></div>
+      <div class="auth-field"><label data-i18n="admin.email">Email *</label><input type="email" id="u-email" placeholder="email@example.com"></div>
+      <div class="auth-field"><label data-i18n="admin.phone">Telefon</label><input type="tel" id="u-phone" placeholder="+998901234567"></div>
+      <div class="auth-field"><label data-i18n="admin.telegram">Telegram ID</label><input type="text" id="u-telegram" placeholder="123456789 (@userinfobot dan oling)"></div>
+      <div class="full"><button class="btn-blue" onclick="addAppUser()" data-i18n="admin.addUser">Foydalanuvchi qo'shish</button></div>
     </div>
     <datalist id="department-suggestions"></datalist>
     <table class="users-table">
-      <thead><tr><th>Ism</th><th>Bo'lim</th><th>Email</th><th>Telefon</th><th>Telegram</th><th>Rol</th><th></th></tr></thead>
+      <thead><tr>
+        <th data-i18n="admin.name">Ism</th>
+        <th data-i18n="admin.department">Bo'lim</th>
+        <th>Email</th>
+        <th data-i18n="admin.phone">Telefon</th>
+        <th>Telegram</th>
+        <th data-i18n="admin.role">Rol</th>
+        <th></th>
+      </tr></thead>
       <tbody id="users-tbody"></tbody>
     </table>
   </div>
 
   <div class="panel" id="settings-panel">
-    <h2><span class="dot"></span> Bildirishnomalar sozlamalari</h2>
+    <h2><span class="dot"></span> <span data-i18n="settings.title">Bildirishnomalar sozlamalari</span></h2>
     <div class="notif-row">
-      <button class="btn-ghost" onclick="toggleDesktopNotif()">🖥 Kompyuter bildirishnomasini yoqish</button>
-      <span class="status-chip" id="desktop-status">Holat: <b>o'chiq</b></span>
+      <button class="btn-ghost" onclick="toggleDesktopNotif()" data-i18n="settings.desktop">🖥 Kompyuter bildirishnomasini yoqish</button>
+      <span class="status-chip" id="desktop-status"><span data-i18n="settings.status">Holat</span>: <b data-i18n="settings.off">o'chiq</b></span>
     </div>
     <div class="telegram-row">
-      <input type="text" id="tg-token" placeholder="Telegram Bot Token (masalan: 123456:ABC-DEF...)">
-      <input type="text" id="tg-chat" placeholder="Chat ID (masalan: 123456789)">
-      <input type="text" id="tg-bot-user" placeholder="Bot username (masalan: MyTaskBot)">
-      <button class="btn-blue" onclick="saveAndTestTelegram()">Saqlash va test yuborish</button>
+      <input type="text" id="tg-token" data-i18n-placeholder="settings.tgToken" placeholder="Telegram Bot Token (masalan: 123456:ABC-DEF...)">
+      <input type="text" id="tg-chat" data-i18n-placeholder="settings.tgChat" placeholder="Chat ID (masalan: 123456789)">
+      <input type="text" id="tg-bot-user" data-i18n-placeholder="settings.tgBot" placeholder="Bot username (masalan: MyTaskBot)">
+      <button class="btn-blue" onclick="saveAndTestTelegram()" data-i18n="settings.saveTest">Saqlash va test yuborish</button>
     </div>
-    <div class="help-text">
+    <div class="help-text" data-i18n-html="settings.tgHelp">
       Fayl saqlash uchun ham shu Chat ID ishlatiladi. Bot yaratish: <b>@BotFather</b> → token;
       botga <b>/start</b> yozing; Chat ID ni <b>@userinfobot</b> dan oling (faqat raqam, masalan <b>123456789</b>).
       Keyin <b>Saqlash va test yuborish</b> — muvaffaqiyatli bo'lsa fayl yuklash ham ishlaydi.
     </div>
-    <button class="btn-ghost" onclick="checkDeadlinesNow()">⏰ Hozir muddatlarni tekshirish</button>
-    <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent2)"></span> 3D Ofis</h2>
+    <button class="btn-ghost" onclick="checkDeadlinesNow()" data-i18n="settings.checkDeadlines">⏰ Hozir muddatlarni tekshirish</button>
+    <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent2)"></span> <span data-i18n="settings.officeTitle">3D Ofis</span></h2>
     <div class="notif-row">
-      <button class="btn-ghost" id="btn-office3d-public" onclick="toggleOffice3DPublic()">🌐 3D Ofisni barchaga ko'rsatish</button>
-      <span class="status-chip" id="office3d-public-status">Holat: <b>faqat admin</b></span>
+      <button class="btn-ghost" id="btn-office3d-public" onclick="toggleOffice3DPublic()" data-i18n="settings.officePublic">🌐 3D Ofisni barchaga ko'rsatish</button>
+      <span class="status-chip" id="office3d-public-status"><span data-i18n="settings.status">Holat</span>: <b data-i18n="settings.adminOnly">faqat admin</b></span>
     </div>
-    <p class="help-text" style="margin-top:8px;">Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.</p>
+    <p class="help-text" style="margin-top:8px;" data-i18n="settings.officeHelp">Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.</p>
   </div>
 
   <div class="panel hidden" id="deleted-tasks-panel">
-    <h2><span class="dot" style="background:var(--danger)"></span> O'chirilgan topshiriqlar</h2>
-    <p class="help-text" style="margin-top:0;">Soft-delete: tiklash mumkin.</p>
+    <h2><span class="dot" style="background:var(--danger)"></span> <span data-i18n="deleted.title">O'chirilgan topshiriqlar</span></h2>
+    <p class="help-text" style="margin-top:0;" data-i18n="deleted.help">Soft-delete: tiklash mumkin.</p>
     <table class="users-table">
-      <thead><tr><th>Topshiriq</th><th>Bajaruvchi</th><th>O'chirilgan</th><th>Holat</th><th></th></tr></thead>
+      <thead><tr>
+        <th data-i18n="deleted.colTask">Topshiriq</th>
+        <th data-i18n="smart.colExec">Bajaruvchi</th>
+        <th data-i18n="deleted.colWhen">O'chirilgan</th>
+        <th data-i18n="deleted.colStatus">Holat</th>
+        <th></th>
+      </tr></thead>
       <tbody id="deleted-tasks-tbody"></tbody>
     </table>
   </div>
@@ -824,12 +856,12 @@
 <!-- 3D OFIS (faqat admin) -->
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
   <div class="office3d-topbar">
-    <h2>🧑‍💼 3D Ofis <span class="office3d-hint">· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)</span></h2>
-    <button type="button" class="btn-ghost office3d-close" onclick="closeOffice3D()">✕ Yopish</button>
+    <h2>🧑‍💼 <span data-i18n="office.title">3D Ofis</span> <span class="office3d-hint" data-i18n="office.hint">· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)</span></h2>
+    <button type="button" class="btn-ghost office3d-close" onclick="closeOffice3D()" data-i18n="common.close">✕ Yopish</button>
   </div>
   <div class="office3d-canvas-wrap" id="office3d-canvas"></div>
   <div class="office3d-bottombar">
-    <button type="button" class="btn-ghost" onclick="closeOffice3D()">✕ Yopish</button>
+    <button type="button" class="btn-ghost" onclick="closeOffice3D()" data-i18n="common.close">✕ Yopish</button>
   </div>
 </div>
 
@@ -852,6 +884,521 @@ const LOCAL_KEY_TASKS = 'tm_local_tasks';
 const LOCAL_KEY_SETTINGS = 'tm_local_settings';
 const LOCAL_KEY_PROFILE = 'tm_local_profile';
 const THEME_STORAGE_KEY = 'app_theme';
+const LANG_STORAGE_KEY = 'app_lang';
+const LANGS = [
+  { id: 'uz', label: "Oʻzbek", flag: '🇺🇿' },
+  { id: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { id: 'en', label: 'English', flag: '🇬🇧' },
+];
+
+const I18N = {
+  uz: {
+    'auth.sub': "Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak",
+    'auth.tabPassword': 'Parol',
+    'auth.tabTelegram': 'Telegram',
+    'auth.email': 'Email',
+    'auth.password': 'Parol',
+    'auth.emailPh': 'siz@kompaniya.uz',
+    'auth.passwordPh': 'Parol',
+    'auth.login': 'Kirish',
+    'auth.hintPassword': "Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
+    'auth.hintTelegram': "Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.",
+    'app.title': 'Topshiriqlar monitoringi',
+    'app.openProfile': 'Profilni ochish',
+    'app.install': "Ilovani o'rnatish",
+    'app.theme': 'Tema',
+    'app.logout': 'Chiqish',
+    'app.online': '🟢 Onlayn:',
+    'nav.monitoring': 'Monitoring',
+    'nav.smart': 'SMART',
+    'nav.office': '🧑‍💼 3D Ofis',
+    'nav.admin': 'Boshqaruv',
+    'kpi.total': 'Jami',
+    'kpi.progress': 'Jarayonda',
+    'kpi.review': 'Tekshiruvda',
+    'kpi.done': 'Bajarildi',
+    'kpi.overdue': 'Kechikkan',
+    'kpi.totalTitle': 'Barcha topshiriqlar',
+    'kpi.progressTitle': 'Jarayondagi topshiriqlar',
+    'kpi.reviewTitle': 'Tekshiruvdagi topshiriqlar',
+    'kpi.doneTitle': 'Bajarilgan topshiriqlar',
+    'kpi.overdueTitle': "Muddati o'tgan topshiriqlar",
+    'filter.search': "Qidirish (mas'ul, topshiriq)…",
+    'filter.allDepts': "Barcha bo'limlar",
+    'filter.allAssignees': "Barcha mas'ul shaxslar",
+    'filter.allPriorities': 'Barcha ustuvorliklar',
+    'filter.refresh': '🔄 Yangilash',
+    'priority.none': "Ustuvorlik yo'q",
+    'priority.urgent': 'Shoshilinch',
+    'priority.high': 'Yuqori',
+    'priority.medium': "O'rta",
+    'priority.low': 'Past',
+    'create.title': 'Yangi topshiriq yaratish',
+    'create.assignees': 'Bajaruvchilar (bir yoki bir nechta)',
+    'create.selected': '{n} tanlangan',
+    'create.taskPh': 'Topshiriq matni',
+    'create.deadlineTitle': 'Muddat (majburiy)',
+    'create.submit': 'Yaratish va yuborish',
+    'create.attach': '📎 Fayl biriktirish (ixtiyoriy)',
+    'create.help': "Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).",
+    'sections.review': 'Sizga tasdiqlash uchun kelganlar',
+    'sections.executors': "Ijrochilar bo'yicha",
+    'sections.tasks': 'Topshiriqlar',
+    'smart.title': 'SMART Task Monitoring',
+    'smart.sub': "Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.",
+    'smart.activeExec': 'Eng faol ijrochilar (bajarilgan topshiriqlar)',
+    'smart.statusDist': 'Holat taqsimoti',
+    'smart.byDept': "Bo'limlar kesimida topshiriqlar",
+    'smart.trend': "Kunlik topshiriqlar trendi (so'nggi 30 kun)",
+    'smart.trendHelp': 'Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.',
+    'smart.byExec': 'Ijrochi kesimida monitoring',
+    'smart.colExec': 'Bajaruvchi',
+    'smart.risk': 'SMART risk',
+    'admin.usersTitle': 'Foydalanuvchilarni boshqarish',
+    'admin.usersHelp': "<b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.",
+    'admin.name': 'Ism',
+    'admin.role': 'Rol',
+    'admin.department': "Bo'lim",
+    'admin.gender': 'Jins',
+    'admin.level': 'Lavozim darajasi',
+    'admin.email': 'Email *',
+    'admin.phone': 'Telefon',
+    'admin.telegram': 'Telegram ID',
+    'admin.addUser': "Foydalanuvchi qo'shish",
+    'role.executor': 'Ijrochi',
+    'role.dept_head': "Bo'lim boshlig'i",
+    'role.deputy_director': "Direktor o'rinbosari",
+    'role.director': 'Direktor',
+    'role.admin': 'Admin',
+    'dept.staff': "Xodimlar bo'limi",
+    'dept.recruit': "Ishga qabul qilish bo'limi",
+    'dept.comp': "Kompensatsiya bo'limi",
+    'gender.male': 'Erkak',
+    'gender.female': 'Ayol',
+    'level.xodim': 'Xodim',
+    'level.bolim_boshligi': "Bo'lim boshlig'i",
+    'level.orinbosar': "Direktor o'rinbosari",
+    'level.direktor': 'Direktor',
+    'settings.title': 'Bildirishnomalar sozlamalari',
+    'settings.desktop': '🖥 Kompyuter bildirishnomasini yoqish',
+    'settings.status': 'Holat',
+    'settings.off': "o'chiq",
+    'settings.on': '✅ yoqilgan',
+    'settings.adminOnly': 'faqat admin',
+    'settings.openAll': '✅ barchaga ochiq',
+    'settings.tgToken': 'Telegram Bot Token (masalan: 123456:ABC-DEF...)',
+    'settings.tgChat': 'Chat ID (masalan: 123456789)',
+    'settings.tgBot': 'Bot username (masalan: MyTaskBot)',
+    'settings.saveTest': 'Saqlash va test yuborish',
+    'settings.tgHelp': "Fayl saqlash uchun ham shu Chat ID ishlatiladi. Bot yaratish: <b>@BotFather</b> → token; botga <b>/start</b> yozing; Chat ID ni <b>@userinfobot</b> dan oling (faqat raqam, masalan <b>123456789</b>). Keyin <b>Saqlash va test yuborish</b> — muvaffaqiyatli bo'lsa fayl yuklash ham ishlaydi.",
+    'settings.checkDeadlines': '⏰ Hozir muddatlarni tekshirish',
+    'settings.officeTitle': '3D Ofis',
+    'settings.officePublic': "🌐 3D Ofisni barchaga ko'rsatish",
+    'settings.officePrivate': '🔒 3D Ofisni faqat adminga qoldirish',
+    'settings.officeHelp': "Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.",
+    'deleted.title': "O'chirilgan topshiriqlar",
+    'deleted.help': 'Soft-delete: tiklash mumkin.',
+    'deleted.colTask': 'Topshiriq',
+    'deleted.colWhen': "O'chirilgan",
+    'deleted.colStatus': 'Holat',
+    'office.title': '3D Ofis',
+    'office.hint': "· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)",
+    'common.close': '✕ Yopish',
+    'status.jarayonda': 'Jarayonda',
+    'status.tekshiruvda': 'Tekshiruvda',
+    'status.bajarildi': 'Bajarildi',
+    'status.muddati_otgan': "Muddati o'tgan",
+    'exec.total': 'Jami',
+    'exec.progress': 'Jarayonda',
+    'exec.review': 'Tekshiruv',
+    'exec.done': 'Bajarildi',
+    'toast.refreshed': "Ma'lumotlar yangilandi",
+    'time.hour': 'soat',
+    'time.day': 'kun',
+    'time.passed': "o'tdi",
+    'time.lt1h': '<1 soat',
+  },
+  ru: {
+    'auth.sub': 'Для входа вы должны быть добавлены администратором',
+    'auth.tabPassword': 'Пароль',
+    'auth.tabTelegram': 'Telegram',
+    'auth.email': 'Email',
+    'auth.password': 'Пароль',
+    'auth.emailPh': 'you@company.uz',
+    'auth.passwordPh': 'Пароль',
+    'auth.login': 'Войти',
+    'auth.hintPassword': 'В первый раз: стандартный пароль <b>123456</b>. Затем смените в профиле. Если забыли — сбросит админ.',
+    'auth.hintTelegram': 'Для входа через Telegram админ должен добавить ваш Telegram ID.',
+    'app.title': 'Мониторинг задач',
+    'app.openProfile': 'Открыть профиль',
+    'app.install': 'Установить приложение',
+    'app.theme': 'Тема',
+    'app.logout': 'Выйти',
+    'app.online': '🟢 Онлайн:',
+    'nav.monitoring': 'Мониторинг',
+    'nav.smart': 'SMART',
+    'nav.office': '🧑‍💼 3D Офис',
+    'nav.admin': 'Управление',
+    'kpi.total': 'Всего',
+    'kpi.progress': 'В работе',
+    'kpi.review': 'На проверке',
+    'kpi.done': 'Выполнено',
+    'kpi.overdue': 'Просрочено',
+    'kpi.totalTitle': 'Все задачи',
+    'kpi.progressTitle': 'Задачи в работе',
+    'kpi.reviewTitle': 'Задачи на проверке',
+    'kpi.doneTitle': 'Выполненные задачи',
+    'kpi.overdueTitle': 'Просроченные задачи',
+    'filter.search': 'Поиск (исполнитель, задача)…',
+    'filter.allDepts': 'Все отделы',
+    'filter.allAssignees': 'Все ответственные',
+    'filter.allPriorities': 'Все приоритеты',
+    'filter.refresh': '🔄 Обновить',
+    'priority.none': 'Без приоритета',
+    'priority.urgent': 'Срочно',
+    'priority.high': 'Высокий',
+    'priority.medium': 'Средний',
+    'priority.low': 'Низкий',
+    'create.title': 'Создать задачу',
+    'create.assignees': 'Исполнители (один или несколько)',
+    'create.selected': 'Выбрано: {n}',
+    'create.taskPh': 'Текст задачи',
+    'create.deadlineTitle': 'Срок (обязательно)',
+    'create.submit': 'Создать и отправить',
+    'create.attach': '📎 Прикрепить файл (необязательно)',
+    'create.help': 'Если выбрано несколько исполнителей, для каждого создаётся отдельная задача. <b>Срок обязателен.</b> Проверка идёт создателю / руководителю. Файл хранится через Telegram (макс. 10 МБ).',
+    'sections.review': 'Ожидают вашего подтверждения',
+    'sections.executors': 'По исполнителям',
+    'sections.tasks': 'Задачи',
+    'smart.title': 'SMART Task Monitoring',
+    'smart.sub': 'Анализ качества и выполнения задач на живых данных.',
+    'smart.activeExec': 'Самые активные исполнители (выполненные)',
+    'smart.statusDist': 'Распределение статусов',
+    'smart.byDept': 'Задачи по отделам',
+    'smart.trend': 'Дневной тренд задач (последние 30 дней)',
+    'smart.trendHelp': 'Всего — созданные за день; Выполнено — закрытые в этот день.',
+    'smart.byExec': 'Мониторинг по исполнителям',
+    'smart.colExec': 'Исполнитель',
+    'smart.risk': 'SMART риск',
+    'admin.usersTitle': 'Управление пользователями',
+    'admin.usersHelp': '<b>Email обязателен</b> (для входа по паролю). Первый пароль: <b>123456</b>. Отделы: <b>Отдел кадров</b>, <b>Отдел найма</b>, <b>Отдел компенсаций</b>.',
+    'admin.name': 'Имя',
+    'admin.role': 'Роль',
+    'admin.department': 'Отдел',
+    'admin.gender': 'Пол',
+    'admin.level': 'Уровень должности',
+    'admin.email': 'Email *',
+    'admin.phone': 'Телефон',
+    'admin.telegram': 'Telegram ID',
+    'admin.addUser': 'Добавить пользователя',
+    'role.executor': 'Исполнитель',
+    'role.dept_head': 'Руководитель отдела',
+    'role.deputy_director': 'Заместитель директора',
+    'role.director': 'Директор',
+    'role.admin': 'Админ',
+    'dept.staff': 'Отдел кадров',
+    'dept.recruit': 'Отдел найма',
+    'dept.comp': 'Отдел компенсаций',
+    'gender.male': 'Мужской',
+    'gender.female': 'Женский',
+    'level.xodim': 'Сотрудник',
+    'level.bolim_boshligi': 'Руководитель отдела',
+    'level.orinbosar': 'Заместитель директора',
+    'level.direktor': 'Директор',
+    'settings.title': 'Настройки уведомлений',
+    'settings.desktop': '🖥 Включить уведомления на компьютере',
+    'settings.status': 'Статус',
+    'settings.off': 'выкл',
+    'settings.on': '✅ включено',
+    'settings.adminOnly': 'только админ',
+    'settings.openAll': '✅ открыто всем',
+    'settings.tgToken': 'Telegram Bot Token (например: 123456:ABC-DEF...)',
+    'settings.tgChat': 'Chat ID (например: 123456789)',
+    'settings.tgBot': 'Bot username (например: MyTaskBot)',
+    'settings.saveTest': 'Сохранить и тест',
+    'settings.tgHelp': 'Тот же Chat ID используется для файлов. Создайте бота: <b>@BotFather</b> → token; напишите боту <b>/start</b>; Chat ID возьмите у <b>@userinfobot</b> (только число). Затем <b>Сохранить и тест</b>.',
+    'settings.checkDeadlines': '⏰ Проверить сроки сейчас',
+    'settings.officeTitle': '3D Офис',
+    'settings.officePublic': '🌐 Показать 3D Офис всем',
+    'settings.officePrivate': '🔒 Оставить 3D Офис только админу',
+    'settings.officeHelp': 'Если включено, кнопку 3D Офис видят все. Если выключено — только админ.',
+    'deleted.title': 'Удалённые задачи',
+    'deleted.help': 'Soft-delete: можно восстановить.',
+    'deleted.colTask': 'Задача',
+    'deleted.colWhen': 'Удалено',
+    'deleted.colStatus': 'Статус',
+    'office.title': '3D Офис',
+    'office.hint': '· Управление · Кадры / Найм / Компенсации · Отдых (стол)',
+    'common.close': '✕ Закрыть',
+    'status.jarayonda': 'В работе',
+    'status.tekshiruvda': 'На проверке',
+    'status.bajarildi': 'Выполнено',
+    'status.muddati_otgan': 'Просрочено',
+    'exec.total': 'Всего',
+    'exec.progress': 'В работе',
+    'exec.review': 'Проверка',
+    'exec.done': 'Выполнено',
+    'toast.refreshed': 'Данные обновлены',
+    'time.hour': 'ч',
+    'time.day': 'дн',
+    'time.passed': 'прошло',
+    'time.lt1h': '<1 ч',
+  },
+  en: {
+    'auth.sub': 'You must be added by an admin to sign in',
+    'auth.tabPassword': 'Password',
+    'auth.tabTelegram': 'Telegram',
+    'auth.email': 'Email',
+    'auth.password': 'Password',
+    'auth.emailPh': 'you@company.uz',
+    'auth.passwordPh': 'Password',
+    'auth.login': 'Sign in',
+    'auth.hintPassword': 'First time: default password <b>123456</b>. Change it later in your profile. If forgotten — ask an admin to reset.',
+    'auth.hintTelegram': 'For Telegram login, an admin must add your Telegram ID first.',
+    'app.title': 'Task monitoring',
+    'app.openProfile': 'Open profile',
+    'app.install': 'Install app',
+    'app.theme': 'Theme',
+    'app.logout': 'Sign out',
+    'app.online': '🟢 Online:',
+    'nav.monitoring': 'Monitoring',
+    'nav.smart': 'SMART',
+    'nav.office': '🧑‍💼 3D Office',
+    'nav.admin': 'Admin',
+    'kpi.total': 'Total',
+    'kpi.progress': 'In progress',
+    'kpi.review': 'In review',
+    'kpi.done': 'Done',
+    'kpi.overdue': 'Overdue',
+    'kpi.totalTitle': 'All tasks',
+    'kpi.progressTitle': 'Tasks in progress',
+    'kpi.reviewTitle': 'Tasks in review',
+    'kpi.doneTitle': 'Completed tasks',
+    'kpi.overdueTitle': 'Overdue tasks',
+    'filter.search': 'Search (assignee, task)…',
+    'filter.allDepts': 'All departments',
+    'filter.allAssignees': 'All assignees',
+    'filter.allPriorities': 'All priorities',
+    'filter.refresh': '🔄 Refresh',
+    'priority.none': 'No priority',
+    'priority.urgent': 'Urgent',
+    'priority.high': 'High',
+    'priority.medium': 'Medium',
+    'priority.low': 'Low',
+    'create.title': 'Create a new task',
+    'create.assignees': 'Assignees (one or more)',
+    'create.selected': '{n} selected',
+    'create.taskPh': 'Task text',
+    'create.deadlineTitle': 'Deadline (required)',
+    'create.submit': 'Create and send',
+    'create.attach': '📎 Attach file (optional)',
+    'create.help': 'If multiple assignees are selected, a separate task is created for each. <b>Deadline is required.</b> Review goes to the creator / manager. Files are stored via Telegram (max 10 MB).',
+    'sections.review': 'Awaiting your approval',
+    'sections.executors': 'By executors',
+    'sections.tasks': 'Tasks',
+    'smart.title': 'SMART Task Monitoring',
+    'smart.sub': 'Live analytics of task quality and completion.',
+    'smart.activeExec': 'Most active executors (completed)',
+    'smart.statusDist': 'Status distribution',
+    'smart.byDept': 'Tasks by department',
+    'smart.trend': 'Daily task trend (last 30 days)',
+    'smart.trendHelp': 'Total — created that day; Done — closed that day.',
+    'smart.byExec': 'Monitoring by executor',
+    'smart.colExec': 'Executor',
+    'smart.risk': 'SMART risk',
+    'admin.usersTitle': 'User management',
+    'admin.usersHelp': '<b>Email is required</b> (for password login). First password: <b>123456</b>. Departments: <b>Staff</b>, <b>Recruiting</b>, <b>Compensation</b>.',
+    'admin.name': 'Name',
+    'admin.role': 'Role',
+    'admin.department': 'Department',
+    'admin.gender': 'Gender',
+    'admin.level': 'Position level',
+    'admin.email': 'Email *',
+    'admin.phone': 'Phone',
+    'admin.telegram': 'Telegram ID',
+    'admin.addUser': 'Add user',
+    'role.executor': 'Executor',
+    'role.dept_head': 'Department head',
+    'role.deputy_director': 'Deputy director',
+    'role.director': 'Director',
+    'role.admin': 'Admin',
+    'dept.staff': 'Staff department',
+    'dept.recruit': 'Recruiting department',
+    'dept.comp': 'Compensation department',
+    'gender.male': 'Male',
+    'gender.female': 'Female',
+    'level.xodim': 'Employee',
+    'level.bolim_boshligi': 'Department head',
+    'level.orinbosar': 'Deputy director',
+    'level.direktor': 'Director',
+    'settings.title': 'Notification settings',
+    'settings.desktop': '🖥 Enable desktop notifications',
+    'settings.status': 'Status',
+    'settings.off': 'off',
+    'settings.on': '✅ on',
+    'settings.adminOnly': 'admin only',
+    'settings.openAll': '✅ open to all',
+    'settings.tgToken': 'Telegram Bot Token (e.g. 123456:ABC-DEF...)',
+    'settings.tgChat': 'Chat ID (e.g. 123456789)',
+    'settings.tgBot': 'Bot username (e.g. MyTaskBot)',
+    'settings.saveTest': 'Save and test',
+    'settings.tgHelp': 'The same Chat ID is used for files. Create a bot: <b>@BotFather</b> → token; send <b>/start</b>; get Chat ID from <b>@userinfobot</b> (digits only). Then <b>Save and test</b>.',
+    'settings.checkDeadlines': '⏰ Check deadlines now',
+    'settings.officeTitle': '3D Office',
+    'settings.officePublic': '🌐 Show 3D Office to everyone',
+    'settings.officePrivate': '🔒 Keep 3D Office admin-only',
+    'settings.officeHelp': 'When enabled, all users see the 3D Office button. When disabled — admin only.',
+    'deleted.title': 'Deleted tasks',
+    'deleted.help': 'Soft-delete: can be restored.',
+    'deleted.colTask': 'Task',
+    'deleted.colWhen': 'Deleted',
+    'deleted.colStatus': 'Status',
+    'office.title': '3D Office',
+    'office.hint': '· Management · Staff / Recruiting / Compensation · Break room',
+    'common.close': '✕ Close',
+    'status.jarayonda': 'In progress',
+    'status.tekshiruvda': 'In review',
+    'status.bajarildi': 'Done',
+    'status.muddati_otgan': 'Overdue',
+    'exec.total': 'Total',
+    'exec.progress': 'In progress',
+    'exec.review': 'Review',
+    'exec.done': 'Done',
+    'toast.refreshed': 'Data refreshed',
+    'time.hour': 'h',
+    'time.day': 'd',
+    'time.passed': 'ago',
+    'time.lt1h': '<1 h',
+  },
+};
+
+let currentLang = 'uz';
+
+function t(key, vars) {
+  const dict = I18N[currentLang] || I18N.uz;
+  let s = dict[key] ?? I18N.uz[key] ?? key;
+  if (vars && typeof s === 'string') {
+    Object.keys(vars).forEach((k) => {
+      s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), String(vars[k]));
+    });
+  }
+  return s;
+}
+
+function getSavedLangId() {
+  try {
+    const id = localStorage.getItem(LANG_STORAGE_KEY);
+    if (id && LANGS.some((l) => l.id === id)) return id;
+  } catch (e) {}
+  return 'uz';
+}
+
+function applyStaticI18n() {
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const key = el.getAttribute('data-i18n');
+    if (!key) return;
+    const val = t(key);
+    if (el.tagName === 'OPTION') el.textContent = val;
+    else el.textContent = val;
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-html');
+    if (key) el.innerHTML = t(key);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key) el.setAttribute('placeholder', t(key));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-title');
+    if (key) el.setAttribute('title', t(key));
+  });
+  const langBtnLabel = document.getElementById('lang-btn-label');
+  const cur = LANGS.find((l) => l.id === currentLang);
+  if (langBtnLabel && cur) langBtnLabel.textContent = cur.label;
+  updateAssigneeCount('new-executor-list', 'new-executor-count');
+}
+
+function applyLanguage(langId, persist) {
+  const id = LANGS.some((l) => l.id === langId) ? langId : 'uz';
+  currentLang = id;
+  document.documentElement.setAttribute('lang', id === 'uz' ? 'uz' : id);
+  document.documentElement.setAttribute('data-lang', id);
+  if (persist !== false) {
+    try { localStorage.setItem(LANG_STORAGE_KEY, id); } catch (e) {}
+  }
+  applyStaticI18n();
+  syncLangMenuActive();
+  try {
+    if (typeof fillDepartmentSelects === 'function') fillDepartmentSelects();
+  } catch (e) {}
+  try {
+    if (typeof renderAll === 'function' && document.getElementById('app-wrap') && !document.getElementById('app-wrap').classList.contains('hidden')) {
+      renderAll();
+    }
+  } catch (e) {}
+  try {
+    if (typeof updateDesktopNotifUI === 'function') updateDesktopNotifUI();
+  } catch (e) {}
+  try {
+    if (typeof updateOffice3DPublicUI === 'function') updateOffice3DPublicUI();
+  } catch (e) {}
+}
+
+function renderLangMenu() {
+  const menu = document.getElementById('lang-menu');
+  if (!menu) return;
+  menu.innerHTML = LANGS.map((l) => `
+    <button type="button" class="lang-option${l.id === currentLang ? ' active' : ''}" role="menuitem"
+      data-lang-id="${l.id}" onclick="selectLanguage('${l.id}')">
+      <span class="lang-flag">${l.flag}</span>
+      <span>${escapeHtml(l.label)}</span>
+    </button>
+  `).join('');
+}
+
+function syncLangMenuActive() {
+  const menu = document.getElementById('lang-menu');
+  if (!menu) return;
+  menu.querySelectorAll('.lang-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang-id') === currentLang);
+  });
+}
+
+function toggleLangMenu(event) {
+  if (event) event.stopPropagation();
+  closeThemeMenu();
+  const menu = document.getElementById('lang-menu');
+  const btn = document.getElementById('lang-btn');
+  if (!menu) return;
+  const open = !menu.classList.contains('open');
+  menu.classList.toggle('open', open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function closeLangMenu() {
+  const menu = document.getElementById('lang-menu');
+  const btn = document.getElementById('lang-btn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function selectLanguage(langId) {
+  applyLanguage(langId, true);
+  closeLangMenu();
+}
+
+function initLangSystem() {
+  applyLanguage(getSavedLangId(), false);
+  renderLangMenu();
+  document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.lang-wrap');
+    if (wrap && !wrap.contains(e.target)) closeLangMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeLangMenu();
+  });
+}
 
 /** Yangi tema: shu yerga id + label + swatch ranglarni qo'shing va CSS da [data-theme="id"] yozing */
 const THEMES = [
@@ -941,6 +1488,7 @@ function syncThemeMenuActive() {
 
 function toggleThemeMenu(event) {
   if (event) event.stopPropagation();
+  closeLangMenu();
   const menu = document.getElementById('theme-menu');
   const btn = document.getElementById('theme-btn');
   if (!menu) return;
@@ -1328,7 +1876,7 @@ function refreshDepartmentSuggestions() {
 
 function fillDepartmentSelects() {
   const deps = OFFICE_DEPARTMENTS;
-  const options = '<option value="">Barcha bo\'limlar</option>' +
+  const options = '<option value="">' + escapeHtml(t('filter.allDepts')) + '</option>' +
     deps.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
   ['filter-department', 'smart-filter-department'].forEach(id => {
     const el = document.getElementById(id);
@@ -1704,7 +2252,7 @@ function updateAssigneeCount(listId, countId) {
   const el = document.getElementById(countId);
   if (!el) return;
   const n = getSelectedAssigneeIds(listId).length;
-  el.textContent = n + ' tanlangan';
+  el.textContent = t('create.selected', { n });
 }
 function renderAssigneeCheckList(listId, countId, preselectedIds) {
   const box = document.getElementById(listId);
@@ -2158,31 +2706,31 @@ function effectiveStatus(t) {
 }
 function statusLabel(eff) {
   return {
-    jarayonda: 'Jarayonda',
-    tekshiruvda: 'Tekshiruvda',
-    bajarildi: 'Bajarildi',
-    muddati_otgan: "Muddati o'tgan"
+    jarayonda: t('status.jarayonda'),
+    tekshiruvda: t('status.tekshiruvda'),
+    bajarildi: t('status.bajarildi'),
+    muddati_otgan: t('status.muddati_otgan')
   }[eff] || eff;
 }
-function deadlineInfo(t) {
-  if (t.status === 'bajarildi') return { text: 'Bajarildi', cls: '' };
-  if (t.status === 'tekshiruvda') return { text: 'Tekshiruvda', cls: 'today' };
-  if (!t.deadline) return { text: '—', cls: '' };
+function deadlineInfo(task) {
+  if (task.status === 'bajarildi') return { text: statusLabel('bajarildi'), cls: '' };
+  if (task.status === 'tekshiruvda') return { text: statusLabel('tekshiruvda'), cls: 'today' };
+  if (!task.deadline) return { text: '—', cls: '' };
   const now = new Date();
-  const dl = new Date(t.deadline);
-  if (isNaN(dl.getTime())) return { text: String(t.deadline), cls: '' };
+  const dl = new Date(task.deadline);
+  if (isNaN(dl.getTime())) return { text: String(task.deadline), cls: '' };
   const diffMs = dl - now;
   const absMs = Math.abs(diffMs);
   const hours = Math.floor(absMs / 3600000);
   const days = Math.floor(absMs / 86400000);
-  const stamp = formatDeadlineDisplay(t.deadline);
+  const stamp = formatDeadlineDisplay(task.deadline);
   if (diffMs >= 0) {
-    if (hours < 1) return { text: stamp + ' · <1 soat', cls: 'today' };
-    if (hours < 24) return { text: stamp + ' · ' + hours + ' soat', cls: 'today' };
-    return { text: stamp + ' · ' + days + ' kun', cls: '' };
+    if (hours < 1) return { text: stamp + ' · ' + t('time.lt1h'), cls: 'today' };
+    if (hours < 24) return { text: stamp + ' · ' + hours + ' ' + t('time.hour'), cls: 'today' };
+    return { text: stamp + ' · ' + days + ' ' + t('time.day'), cls: '' };
   }
-  if (hours < 24) return { text: stamp + ' · ' + hours + ' soat o\'tdi', cls: 'overdue' };
-  return { text: stamp + ' · ' + days + ' kun o\'tdi', cls: 'overdue' };
+  if (hours < 24) return { text: stamp + ' · ' + hours + ' ' + t('time.hour') + ' ' + t('time.passed'), cls: 'overdue' };
+  return { text: stamp + ' · ' + days + ' ' + t('time.day') + ' ' + t('time.passed'), cls: 'overdue' };
 }
 function matchesFilters(t) {
   if (state.filterPriority && t.priority !== state.filterPriority) return false;
@@ -2212,7 +2760,7 @@ function renderAssigneeOptions() {
   const filterSel = document.getElementById('filter-assignee');
   if (!filterSel) return;
   const cur = state.filterAssignee || '';
-  filterSel.innerHTML = '<option value="">Barcha ijrochilar</option>' +
+  filterSel.innerHTML = '<option value="">' + escapeHtml(t('filter.allAssignees')) + '</option>' +
     names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   filterSel.value = cur;
 }
@@ -2329,8 +2877,8 @@ function renderExecCards() {
     return `
       <div class="exec-card" role="button" tabindex="0" data-assignee="${encodeURIComponent(name)}">
         <div class="exec-name"><div class="exec-avatar">${initials(name)}</div>${escapeHtml(name)}${dept}</div>
-        <div class="exec-stats"><span>Jami: ${total}</span><span style="color:var(--blue)">Jarayonda: ${progress}</span></div>
-        <div class="exec-stats"><span style="color:var(--amber)">Tekshiruv: ${review}</span><span style="color:var(--green)">Bajarildi: ${done}</span></div>
+        <div class="exec-stats"><span>${escapeHtml(t('exec.total'))}: ${total}</span><span style="color:var(--blue)">${escapeHtml(t('exec.progress'))}: ${progress}</span></div>
+        <div class="exec-stats"><span style="color:var(--amber)">${escapeHtml(t('exec.review'))}: ${review}</span><span style="color:var(--green)">${escapeHtml(t('exec.done'))}: ${done}</span></div>
         <div class="exec-bar"><div class="exec-bar-fill" style="width:${pct}%"></div></div>
       </div>`;
   }).join('');
@@ -2510,7 +3058,7 @@ async function refreshFromDB() {
     Office3D.update(state.appUsers, state.tasks);
   }
   if (canManageUsers()) renderDeletedTasksPanel();
-  toast("Ma'lumotlar yangilandi");
+  toast(t('toast.refreshed'));
 }
 async function createTasksForAssignees(executorIds, { title, priority, deadline }) {
   const attach = attachmentFieldsFromDraft(draftAttachment);
@@ -2649,8 +3197,10 @@ function updateOffice3DPublicUI() {
   const on = !!state.settings?.office3d_public;
   const chip = document.getElementById('office3d-public-status');
   const btn = document.getElementById('btn-office3d-public');
-  if (chip) chip.innerHTML = on ? 'Holat: <b>✅ barchaga ochiq</b>' : 'Holat: <b>faqat admin</b>';
-  if (btn) btn.textContent = on ? '🔒 3D Ofisni faqat adminga qoldirish' : '🌐 3D Ofisni barchaga ko\'rsatish';
+  if (chip) {
+    chip.innerHTML = t('settings.status') + ': <b>' + (on ? t('settings.openAll') : t('settings.adminOnly')) + '</b>';
+  }
+  if (btn) btn.textContent = on ? t('settings.officePrivate') : t('settings.officePublic');
   const nav = document.getElementById('nav-office-btn');
   if (nav) nav.classList.toggle('hidden', !canViewOffice3D());
 }
@@ -2958,14 +3508,21 @@ function toggleDesktopNotif() {
   Notification.requestPermission().then(perm => {
     const chip = document.getElementById('desktop-status');
     if (perm === 'granted') {
-      chip.innerHTML = 'Holat: <b>✅ yoqilgan</b>';
+      chip.innerHTML = t('settings.status') + ': <b>' + t('settings.on') + '</b>';
       chip.classList.remove('off');
-      new Notification('Topshiriqlar monitoringi', { body: 'Bildirishnomalar yoqildi ✅' });
+      new Notification(t('app.title'), { body: t('settings.on') });
     } else {
-      chip.innerHTML = "Holat: <b>o'chiq</b>";
+      chip.innerHTML = t('settings.status') + ': <b>' + t('settings.off') + '</b>';
       chip.classList.add('off');
     }
   });
+}
+function updateDesktopNotifUI() {
+  const chip = document.getElementById('desktop-status');
+  if (!chip) return;
+  const on = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  chip.innerHTML = t('settings.status') + ': <b>' + (on ? t('settings.on') : t('settings.off')) + '</b>';
+  chip.classList.toggle('off', !on);
 }
 async function sendTelegramTo(chat_id, text) {
   const token = state.settings.telegram_token;
@@ -3553,6 +4110,7 @@ async function installPwa() {
 ========================================================= */
 async function init() {
   initThemeSystem();
+  initLangSystem();
   setupPwaInstall();
   setupExecCardClicks();
   initSupabase();
