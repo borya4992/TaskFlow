@@ -4326,7 +4326,18 @@ function setupPwaInstall() {
     toast('TaskFlow ilova sifatida o\'rnatildi');
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('SW:', err));
+    navigator.serviceWorker.register('/sw.js?v=3').then((reg) => {
+      // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      reg.update().catch(() => {});
+    }).catch((err) => console.warn('SW:', err));
+    // Eski keshlar (taskflow-v1/v2) ni tozalash
+    if (window.caches && caches.keys) {
+      caches.keys().then((keys) => {
+        keys.filter((k) => k.startsWith('taskflow-') && k !== 'taskflow-v3')
+          .forEach((k) => caches.delete(k));
+      }).catch(() => {});
+    }
   }
 }
 
@@ -4379,9 +4390,10 @@ async function init() {
 init();
 </script>
 <script type="module">
-  import { Office3D } from './office3d.js?v=20260722h';
+  import { Office3D } from './office3d.js?v=20260724b';
   window.Office3D = Office3D;
-  window.OFFICE3D_BUILD = '20260722f';
+  window.OFFICE3D_BUILD = '20260724b';
+  try { console.info('[Office3D] module loaded', window.OFFICE3D_BUILD); } catch (_) {}
 </script>
 </body>
 </html>

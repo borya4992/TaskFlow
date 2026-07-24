@@ -1225,7 +1225,7 @@ export const Office3D = {
     this._resize();
     this._loop();
     try {
-      console.info('[Office3D] build 20260723a — dept displays, beacons, meeting, KPI TV, birthday/trophy');
+      console.info('[Office3D] build 20260724b — lunch, overlays, network-first cache');
     } catch (_) {}
   },
 

@@ -1,4 +1,4 @@
-﻿const CACHE = 'taskflow-v2';
+﻿const CACHE = 'taskflow-v3';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -15,6 +15,10 @@ self.addEventListener('install', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -22,6 +26,21 @@ self.addEventListener('activate', (event) => {
     ).then(() => self.clients.claim())
   );
 });
+
+function isOpaqueOrOpaqueRedirect(res) {
+  return !res || res.type === 'opaque' || res.type === 'opaqueredirect';
+}
+
+/** JS/CSS/modullar — har doim tarmoqdan (aks holda 3D ofis eski versiyada qotib qoladi) */
+function isNetworkFirstAsset(url) {
+  const p = url.pathname;
+  return (
+    p.endsWith('.js') ||
+    p.endsWith('.mjs') ||
+    p.endsWith('.css') ||
+    p.includes('office3d')
+  );
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -44,11 +63,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (isNetworkFirstAsset(url)) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && !isOpaqueOrOpaqueRedirect(res)) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((res) => {
-        if (!res || res.status !== 200) return res;
+        if (!res || res.status !== 200 || isOpaqueOrOpaqueRedirect(res)) return res;
         const copy = res.clone();
         caches.open(CACHE).then((cache) => cache.put(req, copy));
         return res;
