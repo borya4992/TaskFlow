@@ -1,8 +1,19 @@
-// Auth user yaratish / parolni 123456 ga tiklash (service role).
-// Vercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// TUZATILDI: endi har safar TASODIFIY parol generatsiya qilinadi ("123456" o'rniga).
+// Parol javobda qaytariladi (default_password) — buni adminning o'zi xodimga xavfsiz
+// kanal orqali (masalan shaxsan yoki Telegram orqali) yetkazishi kerak.
 // Client Authorization: Bearer <user access_token> (faqat admin)
+// Vercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-const DEFAULT_PASSWORD = '123456';
+const crypto = require('crypto');
+
+function generateRandomPassword() {
+  // 10 ta belgidan iborat, o'qilishi oson (chalkash bo'lmagan) tasodifiy parol
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pass = '';
+  const bytes = crypto.randomBytes(10);
+  for (let i = 0; i < 10; i++) pass += alphabet[bytes[i] % alphabet.length];
+  return pass;
+}
 
 function headers(serviceKey, extra = {}) {
   return {
@@ -22,7 +33,6 @@ async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
 }
 
 async function isAdminUser(supabaseUrl, serviceKey, me) {
-  // 1) auth_user_id bog'langan bo'lsa
   const byId = await fetch(
     `${supabaseUrl}/rest/v1/app_users?auth_user_id=eq.${me.id}&role=eq.admin&is_active=eq.true&select=id`,
     { headers: headers(serviceKey) }
@@ -30,7 +40,6 @@ async function isAdminUser(supabaseUrl, serviceKey, me) {
   const idRows = await byId.json();
   if (Array.isArray(idRows) && idRows.length > 0) return true;
 
-  // 2) email orqali admin (auth_user_id hali bog'lanmagan bo'lsa ham)
   const email = (me.email || '').toLowerCase();
   if (!email) return false;
   const byEmail = await fetch(
@@ -43,7 +52,6 @@ async function isAdminUser(supabaseUrl, serviceKey, me) {
 
 async function findAuthUserByEmail(supabaseUrl, serviceKey, email) {
   const target = email.toLowerCase();
-  // Bir necha sahifa bo'ylab qidirish
   for (let page = 1; page <= 10; page++) {
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=200`, {
       headers: headers(serviceKey),
@@ -57,8 +65,8 @@ async function findAuthUserByEmail(supabaseUrl, serviceKey, email) {
   return null;
 }
 
-async function setPassword(supabaseUrl, serviceKey, userId, display_name) {
-  const body = { password: DEFAULT_PASSWORD, email_confirm: true };
+async function setPassword(supabaseUrl, serviceKey, userId, display_name, password) {
+  const body = { password, email_confirm: true };
   if (display_name) body.user_metadata = { display_name };
   const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
     method: 'PUT',
@@ -69,13 +77,13 @@ async function setPassword(supabaseUrl, serviceKey, userId, display_name) {
   return { ok: res.ok, data };
 }
 
-async function createAuthUser(supabaseUrl, serviceKey, email, display_name) {
+async function createAuthUser(supabaseUrl, serviceKey, email, display_name, password) {
   const res = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: 'POST',
     headers: headers(serviceKey),
     body: JSON.stringify({
       email,
-      password: DEFAULT_PASSWORD,
+      password,
       email_confirm: true,
       user_metadata: { display_name: display_name || '' },
     }),
@@ -93,33 +101,33 @@ async function linkAppUser(supabaseUrl, serviceKey, email, authUserId) {
 }
 
 async function ensurePasswordUser(supabaseUrl, serviceKey, email, display_name) {
+  const password = generateRandomPassword();
   let user = await findAuthUserByEmail(supabaseUrl, serviceKey, email);
   if (user) {
-    const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name);
+    const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name, password);
     if (!upd.ok) {
       return { ok: false, error: upd.data.msg || upd.data.message || 'Parol o‘rnatilmadi' };
     }
     await linkAppUser(supabaseUrl, serviceKey, email, user.id);
-    return { ok: true, auth_user_id: user.id };
+    return { ok: true, auth_user_id: user.id, password };
   }
 
-  const created = await createAuthUser(supabaseUrl, serviceKey, email, display_name);
+  const created = await createAuthUser(supabaseUrl, serviceKey, email, display_name, password);
   if (created.ok && created.data?.id) {
     await linkAppUser(supabaseUrl, serviceKey, email, created.data.id);
-    return { ok: true, auth_user_id: created.data.id };
+    return { ok: true, auth_user_id: created.data.id, password };
   }
 
-  // Allaqachon mavjud bo'lishi mumkin — qayta qidirib parol qo'yamiz
   const msg = (created.data.msg || created.data.message || '').toLowerCase();
   if (msg.includes('already') || msg.includes('registered') || created.status === 422) {
     user = await findAuthUserByEmail(supabaseUrl, serviceKey, email);
     if (user) {
-      const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name);
+      const upd = await setPassword(supabaseUrl, serviceKey, user.id, display_name, password);
       if (!upd.ok) {
         return { ok: false, error: upd.data.msg || upd.data.message || 'Parol o‘rnatilmadi' };
       }
       await linkAppUser(supabaseUrl, serviceKey, email, user.id);
-      return { ok: true, auth_user_id: user.id };
+      return { ok: true, auth_user_id: user.id, password };
     }
   }
 
@@ -185,7 +193,7 @@ module.exports = async function handler(req, res) {
     res.status(200).json({
       ok: true,
       auth_user_id: result.auth_user_id,
-      default_password: DEFAULT_PASSWORD,
+      default_password: result.password,
       reset: action === 'reset',
     });
   } catch (e) {

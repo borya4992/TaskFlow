@@ -1,8 +1,15 @@
-// task-temp bucket yo'q bo'lsa yaratadi (service role).
-// Brauzer yuklashdan oldin chaqiriladi — "Bucket not found" ni oldini oladi.
+// TUZATILDI: endi faqat login qilgan foydalanuvchi bu endpointni chaqira oladi.
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 const BUCKET = 'task-temp';
+
+async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {
@@ -17,6 +24,19 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // Avtorizatsiya majburiy
+  const authHeader = req.headers.authorization || '';
+  const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!jwt) {
+    res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' });
+    return;
+  }
+  const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
+  if (!me?.id) {
+    res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
+    return;
+  }
+
   const headers = {
     apikey: serviceKey,
     Authorization: `Bearer ${serviceKey}`,
@@ -24,7 +44,6 @@ module.exports = async function handler(req, res) {
   };
 
   try {
-    // Mavjudmi?
     const getRes = await fetch(`${supabaseUrl}/storage/v1/bucket/${BUCKET}`, { headers });
     if (getRes.ok) {
       res.status(200).json({ ok: true, created: false, bucket: BUCKET });
@@ -45,7 +64,6 @@ module.exports = async function handler(req, res) {
 
     if (!createRes.ok) {
       const errText = await createRes.text().catch(() => '');
-      // Conflict = allaqachon bor
       if (createRes.status === 409 || /already|exists|duplicate/i.test(errText)) {
         res.status(200).json({ ok: true, created: false, bucket: BUCKET });
         return;

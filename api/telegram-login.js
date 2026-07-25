@@ -1,8 +1,12 @@
 // Telegram Login Widget orqali kirish — serverda hash tekshiriladi va Supabase sessiyasi yaratiladi.
+// TUZATILDI:
+//   1) auth_date endi tekshiriladi — 24 soatdan eski login ma'lumoti rad etiladi (replay himoyasi).
+//   2) Mavjud auth-userni qidirish endi 200 tadan ko'p foydalanuvchida ham ishlaydi (sahifalab qidiradi).
 // Vercel Environment Variables:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 const crypto = require('crypto');
+const MAX_AUTH_AGE_SECONDS = 24 * 60 * 60; // 1 kun
 
 function verifyTelegramAuth(data, botToken) {
   const checkHash = data.hash;
@@ -16,6 +20,28 @@ function verifyTelegramAuth(data, botToken) {
   const secretKey = crypto.createHash('sha256').update(botToken).digest();
   const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   return hmac === checkHash;
+}
+
+function isAuthDateFresh(data) {
+  const authDate = Number(data.auth_date || 0);
+  if (!authDate) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return (nowSeconds - authDate) <= MAX_AUTH_AGE_SECONDS && (nowSeconds - authDate) >= -60;
+}
+
+async function findAuthUserByEmailPaged(supabaseUrl, serviceKey, email) {
+  const target = email.toLowerCase();
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=200`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
+    const data = await res.json();
+    const users = data.users || [];
+    const found = users.find((u) => (u.email || '').toLowerCase() === target);
+    if (found) return found;
+    if (users.length < 200) break;
+  }
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -36,6 +62,12 @@ module.exports = async function handler(req, res) {
     const telegramId = String(tgData.id || '');
     if (!telegramId) {
       res.status(400).json({ ok: false, error: 'Telegram ma\'lumoti yetishmayapti' });
+      return;
+    }
+
+    // Replay hujumidan himoya: auth_date eskirgan bo'lsa rad etamiz
+    if (!isAuthDateFresh(tgData)) {
+      res.status(403).json({ ok: false, error: 'Login ma\'lumoti eskirgan. Qaytadan urinib ko\'ring.' });
       return;
     }
 
@@ -69,11 +101,8 @@ module.exports = async function handler(req, res) {
 
     let authUserId = null;
 
-    const listRes = await fetch(`${supabaseUrl}/auth/v1/admin/users?per_page=200`, {
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-    });
-    const listData = await listRes.json();
-    const existing = (listData.users || []).find((u) => u.email === email);
+    // TUZATILDI: endi sahifalab qidiradi (200 tadan ko'p foydalanuvchida ham ishlaydi)
+    const existing = await findAuthUserByEmailPaged(supabaseUrl, serviceKey, email);
 
     if (existing) {
       authUserId = existing.id;

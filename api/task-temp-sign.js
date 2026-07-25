@@ -1,8 +1,18 @@
-// task-temp bucketni ta'minlaydi va service-role signed upload URL qaytaradi.
-// Shu bilan brauzer RLS/policy'siz 10 MB gacha yuklay oladi.
+// TUZATILDI: endi faqat login qilgan foydalanuvchi signed upload URL ola oladi.
+// Avval hech qanday tekshiruv yo'q edi — har kim service-role orqali bepul
+// Supabase Storage joyingizga (task-temp bucket) fayl yuklay olardi.
+//
 // Vercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 const BUCKET = 'task-temp';
+
+async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 async function ensureBucket(supabaseUrl, serviceKey) {
   const headers = {
@@ -44,10 +54,24 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    // Avtorizatsiya majburiy
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!jwt) {
+      res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' });
+      return;
+    }
+    const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
+    if (!me?.id) {
+      res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
+      return;
+    }
+
     const body = typeof req.body === 'object' && req.body ? req.body : {};
     const filename = String(body.filename || 'fayl').replace(/[/\\]/g, '_').slice(0, 120);
     const mime = body.mime || 'application/octet-stream';
-    const folder = String(body.folder || 'uploads').replace(/[^\w-]/g, '').slice(0, 80) || 'uploads';
+    // Foydalanuvchi faqat O'Z uid papkasiga yozishi mumkin (RLS siyosati bilan bir xil talab)
+    const folder = me.id;
 
     await ensureBucket(supabaseUrl, serviceKey);
 
@@ -58,14 +82,9 @@ module.exports = async function handler(req, res) {
       'Content-Type': 'application/json'
     };
 
-    // Signed upload URL (service role)
     const signRes = await fetch(
       `${supabaseUrl}/storage/v1/object/upload/sign/${BUCKET}/${storagePath.split('/').map(encodeURIComponent).join('/')}`,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({})
-      }
+      { method: 'POST', headers, body: JSON.stringify({}) }
     );
     const signJson = await signRes.json().catch(() => ({}));
     if (!signRes.ok) {
@@ -83,14 +102,7 @@ module.exports = async function handler(req, res) {
           : `${supabaseUrl}/storage/v1${signJson.url.startsWith('/') ? '' : '/'}${signJson.url}`)
       : `${supabaseUrl}/storage/v1/object/upload/sign/${BUCKET}/${storagePath.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(token)}`;
 
-    res.status(200).json({
-      ok: true,
-      bucket: BUCKET,
-      storagePath,
-      token,
-      signedUrl,
-      mime
-    });
+    res.status(200).json({ ok: true, bucket: BUCKET, storagePath, token, signedUrl, mime });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: e.message });
