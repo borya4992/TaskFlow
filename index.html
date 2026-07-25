@@ -2517,7 +2517,15 @@ function setAttachStatus(el, text, kind) {
 }
 async function ensureTaskTempBucket() {
   try {
-    const res = await fetch('/api/ensure-task-temp', { method: 'POST' });
+    const token = await getAccessToken();
+    if (!token) {
+      toast("Sessiya tugagan — qayta kiring");
+      return false;
+    }
+    const res = await fetch('/api/ensure-task-temp', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+    });
     const json = await res.json().catch(() => ({}));
     return !!(res.ok && json.ok);
   } catch (e) {
@@ -2527,10 +2535,18 @@ async function ensureTaskTempBucket() {
 }
 async function uploadViaSignedStaging(file) {
   const { data: sess } = await sb.auth.getSession();
+  const accessToken = sess?.session?.access_token || null;
+  if (!accessToken) {
+    toast("Sessiya tugagan — qayta kiring");
+    throw new Error("Sessiya yo'q");
+  }
   const folder = sess?.session?.user?.id || currentProfile?.auth_user_id || 'uploads';
   const signRes = await fetch('/api/task-temp-sign', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + accessToken,
+    },
     body: JSON.stringify({
       filename: file.name,
       mime: file.type || 'application/octet-stream',
@@ -3762,12 +3778,20 @@ function updateDesktopNotifUI() {
   chip.classList.toggle('off', !on);
 }
 async function sendTelegramTo(chat_id, text) {
-  const token = state.settings.telegram_token;
-  if (!token || !chat_id) return false;
+  if (!chat_id) return false;
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    toast("Sessiya tugagan — qayta kiring");
+    return false;
+  }
   try {
     const res = await fetch('/api/send-telegram', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, chat_id, text })
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + accessToken,
+      },
+      body: JSON.stringify({ chat_id, text })
     });
     const data = await res.json();
     return !!(data && data.ok);
@@ -3778,7 +3802,7 @@ async function sendTelegramTo(chat_id, text) {
 }
 async function sendTelegram(text) {
   const chat_id = state.settings.telegram_chat_id;
-  if (!state.settings.telegram_token || !chat_id) { toast('Avval Telegram token va Chat ID kiriting'); return false; }
+  if (!chat_id) { toast('Avval Telegram Chat ID kiriting'); return false; }
   const ok = await sendTelegramTo(chat_id, text);
   if (!ok) toast('Telegramga yuborishda xatolik');
   return ok;
