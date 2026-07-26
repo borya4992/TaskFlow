@@ -2126,10 +2126,32 @@ async function signOut() {
   setAuthMessage('');
 }
 
+function applyRealtimeTaskChange(payload) {
+  const { eventType, new: newRow, old: oldRow } = payload;
+  if (eventType === 'INSERT') {
+    if (newRow.deleted_at) return;
+    if (!state.tasks.some(t => t.id === newRow.id)) state.tasks.push(newRow);
+  } else if (eventType === 'UPDATE') {
+    const idx = state.tasks.findIndex(t => t.id === newRow.id);
+    if (newRow.deleted_at) {
+      if (idx > -1) state.tasks.splice(idx, 1);
+    } else if (idx > -1) {
+      state.tasks[idx] = newRow;
+    } else {
+      state.tasks.push(newRow);
+    }
+  } else if (eventType === 'DELETE') {
+    const idx = state.tasks.findIndex(t => t.id === (oldRow && oldRow.id));
+    if (idx > -1) state.tasks.splice(idx, 1);
+  }
+  renderAll();
+  if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
+}
+
 function subscribeRealtime() {
   if (usingLocalFallback || !sb) return;
   sb.channel('tasks-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => { refreshFromDB(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => { applyRealtimeTaskChange(payload); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' }, async () => {
       state.appUsers = await fetchTeamUsers();
       renderOnlineUsers();

@@ -518,9 +518,25 @@ function syncBirthdayAndTrophy(person, user, topId, colors) {
   }
 }
 
+/* PERFORMANCE: xodim figuralarining tana qismlari (bosh, tana, qo'l, oyoq) har bir
+   xodim uchun bir xil shaklda — faqat jins (erkak/ayol) bo'yicha farq qiladi. Har safar
+   yangi geometriya yaratish o'rniga, bir marta yaratib, hamma figuralar orasida qayta
+   ishlatamiz (shared/instanced geometry). Bu xotira va FPS'ni sezilarli yaxshilaydi,
+   ayniqsa ofisda ko'p xodim bo'lganda. */
+const SHARED_GEOM_CACHE = new Map();
+function sharedGeom(key, factory) {
+  let geo = SHARED_GEOM_CACHE.get(key);
+  if (!geo) {
+    geo = factory();
+    SHARED_GEOM_CACHE.set(key, geo);
+  }
+  return geo;
+}
+
 function disposeObject(obj) {
+  const shared = new Set(SHARED_GEOM_CACHE.values());
   obj.traverse((child) => {
-    if (child.geometry) child.geometry.dispose();
+    if (child.geometry && !shared.has(child.geometry)) child.geometry.dispose();
     if (child.material) {
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       mats.forEach((m) => {
@@ -566,24 +582,24 @@ function createPersonMesh(level, gender) {
   headGroup.position.y = HEAD_STAND;
   root.add(headGroup);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(p.headR, 10, 8), skinM);
+  const head = new THREE.Mesh(sharedGeom(`head_${g}`, () => new THREE.SphereGeometry(p.headR, 10, 8)), skinM);
   headGroup.add(head);
 
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.08, segs), skinM);
+  const neck = new THREE.Mesh(sharedGeom('neck', () => new THREE.CylinderGeometry(0.045, 0.05, 0.08, segs)), skinM);
   neck.position.y = -0.14;
   headGroup.add(neck);
 
   if (p.hair === 'ponytail') {
-    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(p.headR * 1.05, 10, 8), hairM);
+    const hairCap = new THREE.Mesh(sharedGeom(`hairPony_${g}`, () => new THREE.SphereGeometry(p.headR * 1.05, 10, 8)), hairM);
     hairCap.position.y = 0.04;
     hairCap.scale.set(1.05, 0.75, 1.05);
     headGroup.add(hairCap);
-    const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.22, 3, 6), hairM);
+    const pony = new THREE.Mesh(sharedGeom('ponyTail', () => new THREE.CapsuleGeometry(0.045, 0.22, 3, 6)), hairM);
     pony.position.set(0, -0.16, -0.14);
     pony.rotation.x = 0.55;
     headGroup.add(pony);
   } else {
-    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(p.headR * 1.08, 10, 8), hairM);
+    const hairCap = new THREE.Mesh(sharedGeom(`hairShort_${g}`, () => new THREE.SphereGeometry(p.headR * 1.08, 10, 8)), hairM);
     hairCap.position.y = 0.06;
     hairCap.scale.set(1.02, 0.55, 1.05);
     headGroup.add(hairCap);
@@ -593,12 +609,12 @@ function createPersonMesh(level, gender) {
   const torsoGroup = new THREE.Group();
   torsoGroup.position.y = TORSO_STAND;
   root.add(torsoGroup);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(p.torsoR, p.torsoLen, 4, segs), shirtM);
+  const torso = new THREE.Mesh(sharedGeom(`torso_${g}`, () => new THREE.CapsuleGeometry(p.torsoR, p.torsoLen, 4, segs)), shirtM);
   torsoGroup.add(torso);
 
   if (p.hasTie && p.tie != null) {
     const tie = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.025, 0.22, 3, 5),
+      sharedGeom('tie', () => new THREE.CapsuleGeometry(0.025, 0.22, 3, 5)),
       mat(p.tie, { roughness: 0.45 })
     );
     tie.position.set(0, 0.02, p.torsoR + 0.02);
@@ -610,7 +626,7 @@ function createPersonMesh(level, gender) {
     const arm = new THREE.Group();
     arm.position.set(side * p.shoulder, ARM_STAND, 0);
     const upper = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.045, p.upperArm * 0.55, 3, segs),
+      sharedGeom(`upperArm_${g}`, () => new THREE.CapsuleGeometry(0.045, p.upperArm * 0.55, 3, segs)),
       shirtM
     );
     upper.position.y = -p.upperArm * 0.35;
@@ -618,12 +634,12 @@ function createPersonMesh(level, gender) {
     const forearm = new THREE.Group();
     forearm.position.y = -p.upperArm * 0.7;
     const foreMesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.04, p.foreArm * 0.5, 3, segs),
+      sharedGeom(`forearm_${g}`, () => new THREE.CapsuleGeometry(0.04, p.foreArm * 0.5, 3, segs)),
       skinM
     );
     foreMesh.position.y = -p.foreArm * 0.32;
     forearm.add(foreMesh);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), skinM);
+    const hand = new THREE.Mesh(sharedGeom('hand', () => new THREE.SphereGeometry(0.035, 6, 5)), skinM);
     hand.position.y = -p.foreArm * 0.62;
     forearm.add(hand);
     arm.add(forearm);
@@ -639,7 +655,7 @@ function createPersonMesh(level, gender) {
   root.add(hip);
 
   const pelvis = new THREE.Mesh(
-    new THREE.CapsuleGeometry(p.torsoR * 0.95, 0.08, 3, segs),
+    sharedGeom(`pelvis_${g}`, () => new THREE.CapsuleGeometry(p.torsoR * 0.95, 0.08, 3, segs)),
     pantsM
   );
   pelvis.rotation.z = Math.PI / 2;
@@ -650,15 +666,15 @@ function createPersonMesh(level, gender) {
     const leg = new THREE.Group();
     leg.position.set(side * 0.1, -0.02, 0);
     // HIP_STAND(0.9) - 0.02 - 0.48 - 0.38 ≈ 0.02
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.28, 3, segs), pantsM);
+    const thigh = new THREE.Mesh(sharedGeom('thigh', () => new THREE.CapsuleGeometry(0.055, 0.28, 3, segs)), pantsM);
     thigh.position.y = -0.24;
     leg.add(thigh);
     const shin = new THREE.Group();
     shin.position.y = -0.48;
-    const shinMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.26, 3, segs), pantsM);
+    const shinMesh = new THREE.Mesh(sharedGeom('shin', () => new THREE.CapsuleGeometry(0.048, 0.26, 3, segs)), pantsM);
     shinMesh.position.y = -0.18;
     shin.add(shinMesh);
-    const shoe = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.12, 3, 6), shoeM);
+    const shoe = new THREE.Mesh(sharedGeom('shoe', () => new THREE.CapsuleGeometry(0.038, 0.12, 3, 6)), shoeM);
     shoe.rotation.z = Math.PI / 2;
     shoe.position.set(0, -0.38, 0.05);
     shin.add(shoe);
@@ -671,14 +687,14 @@ function createPersonMesh(level, gender) {
 
   if (level === 'direktor') {
     const crown = new THREE.Mesh(
-      new THREE.ConeGeometry(0.09, 0.1, 5),
+      sharedGeom('crown', () => new THREE.ConeGeometry(0.09, 0.1, 5)),
       mat(0xf2b84b, { metalness: 0.55, roughness: 0.35 })
     );
     crown.position.y = 0.2;
     headGroup.add(crown);
   } else if (level === 'orinbosar') {
     const badge = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.06),
+      sharedGeom('badge', () => new THREE.OctahedronGeometry(0.06)),
       mat(0xc0c8d4, { metalness: 0.65, roughness: 0.3 })
     );
     badge.position.y = 0.18;
@@ -732,26 +748,26 @@ function addSunglasses(headGroup) {
   const dark = mat(0x0d0d0d, { roughness: 0.35, metalness: 0.45 });
   const lens = mat(0x111111, { roughness: 0.2, metalness: 0.55, transparent: true, opacity: 0.92 });
 
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.038, 0.022), lens);
+  const left = new THREE.Mesh(sharedGeom('sg_lens', () => new THREE.BoxGeometry(0.085, 0.038, 0.022)), lens);
   left.position.set(-0.055, 0.012, 0.115);
   shades.add(left);
-  const right = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.038, 0.022), lens);
+  const right = new THREE.Mesh(sharedGeom('sg_lens', () => new THREE.BoxGeometry(0.085, 0.038, 0.022)), lens);
   right.position.set(0.055, 0.012, 0.115);
   shades.add(right);
 
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.014, 0.018), dark);
+  const bridge = new THREE.Mesh(sharedGeom('sg_bridge', () => new THREE.BoxGeometry(0.028, 0.014, 0.018)), dark);
   bridge.position.set(0, 0.014, 0.112);
   shades.add(bridge);
 
-  const frameTop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.012, 0.016), dark);
+  const frameTop = new THREE.Mesh(sharedGeom('sg_frameTop', () => new THREE.BoxGeometry(0.2, 0.012, 0.016)), dark);
   frameTop.position.set(0, 0.032, 0.11);
   shades.add(frameTop);
 
-  const templeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.012), dark);
+  const templeL = new THREE.Mesh(sharedGeom('sg_temple', () => new THREE.BoxGeometry(0.12, 0.012, 0.012)), dark);
   templeL.position.set(-0.11, 0.014, 0.04);
   templeL.rotation.y = 0.35;
   shades.add(templeL);
-  const templeR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.012), dark);
+  const templeR = new THREE.Mesh(sharedGeom('sg_temple', () => new THREE.BoxGeometry(0.12, 0.012, 0.012)), dark);
   templeR.position.set(0.11, 0.014, 0.04);
   templeR.rotation.y = -0.35;
   shades.add(templeR);
