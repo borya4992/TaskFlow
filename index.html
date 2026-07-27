@@ -1012,8 +1012,8 @@ const I18N = {
     'tasks.emptyArchive': 'Arxiv bo‘sh',
     'tasks.empty': 'Topshiriq topilmadi',
     'smart.title': 'SMART Task Monitoring',
-    'smart.sub': "Jonli ma'lumotlar asosida topshiriqlar sifati va bajarilish tahlili.",
-    'smart.activeExec': 'Eng faol ijrochilar (bajarilgan topshiriqlar)',
+    'smart.sub': "Faqat rahbarlar bergan topshiriqlar (o'ziga yaratilganlar hisoblanmaydi).",
+    'smart.activeExec': 'Eng faol ijrochilar (rahbar bergan, bajarilgan)',
     'smart.statusDist': 'Holat taqsimoti',
     'smart.byDept': "Bo'limlar kesimida topshiriqlar",
     'smart.trend': "Kunlik topshiriqlar trendi (so'nggi 30 kun)",
@@ -1154,8 +1154,8 @@ const I18N = {
     'tasks.emptyArchive': 'Архив пуст',
     'tasks.empty': 'Задачи не найдены',
     'smart.title': 'SMART Task Monitoring',
-    'smart.sub': 'Анализ качества и выполнения задач на живых данных.',
-    'smart.activeExec': 'Самые активные исполнители (выполненные)',
+    'smart.sub': 'Учитываются только задачи от руководителей (самоназначенные не входят).',
+    'smart.activeExec': 'Самые активные исполнители (от руководителей)',
     'smart.statusDist': 'Распределение статусов',
     'smart.byDept': 'Задачи по отделам',
     'smart.trend': 'Дневной тренд задач (последние 30 дней)',
@@ -1296,8 +1296,8 @@ const I18N = {
     'tasks.emptyArchive': 'Archive is empty',
     'tasks.empty': 'No tasks found',
     'smart.title': 'SMART Task Monitoring',
-    'smart.sub': 'Live analytics of task quality and completion.',
-    'smart.activeExec': 'Most active executors (completed)',
+    'smart.sub': 'Only tasks assigned by managers count (self-created tasks are excluded).',
+    'smart.activeExec': 'Most active executors (manager-assigned, done)',
     'smart.statusDist': 'Status distribution',
     'smart.byDept': 'Tasks by department',
     'smart.trend': 'Daily task trend (last 30 days)',
@@ -4011,6 +4011,35 @@ function destroySmartCharts() {
   if (smartCharts.dept) { smartCharts.dept.destroy(); smartCharts.dept = null; }
 }
 
+/** Rahbar: direktor, o'rinbosar, bo'lim boshlig'i, admin */
+function isLeadershipUser(u) {
+  if (!u) return false;
+  const role = String(u.role || '').toLowerCase();
+  if (role === 'director' || role === 'deputy_director' || role === 'dept_head' || role === 'admin') return true;
+  const lv = positionLevelOf(u);
+  return lv === 'direktor' || lv === 'orinbosar' || lv === 'bolim_boshligi';
+}
+
+/** Xodim o'ziga o'zi yaratgan topshiriq */
+function isSelfCreatedTask(t) {
+  if (!t) return false;
+  if (t.created_by_user_id && t.assignee_user_id) {
+    return t.created_by_user_id === t.assignee_user_id;
+  }
+  const creator = userById(t.created_by_user_id);
+  if (creator?.display_name && t.assignee) {
+    return assigneesMatch(creator.display_name, t.assignee);
+  }
+  return false;
+}
+
+/** SMART hisob: faqat rahbar bergan, o'ziga emas */
+function isSmartCountedTask(t) {
+  if (!t || t.deleted_at) return false;
+  if (isSelfCreatedTask(t)) return false;
+  return isLeadershipUser(userById(t.created_by_user_id));
+}
+
 function computeSmartMetrics(tasks) {
   const total = tasks.length || 1;
   const specific = tasks.filter(t => (t.title || '').trim().length >= 12).length;
@@ -4053,8 +4082,8 @@ function smartRiskForAssignee(own) {
 }
 
 function renderSmartAnalytics() {
-  // SMART o'z bo'lim filtriga ega (monitoring filtridan mustaqil)
-  let tasks = state.tasks;
+  // SMART: faqat rahbarlar bergan topshiriqlar (o'ziga yaratilganlar chiqariladi)
+  let tasks = state.tasks.filter(isSmartCountedTask);
   if (state.smartFilterDepartment) {
     const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.smartFilterDepartment);
     const ids = new Set(deptUsers.map(u => u.id));
