@@ -1992,13 +1992,16 @@ function fillDepartmentSelects() {
   const deps = OFFICE_DEPARTMENTS;
   const options = '<option value="">' + escapeHtml(t('filter.allDepts')) + '</option>' +
     deps.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-  ['filter-department', 'smart-filter-department'].forEach(id => {
+  const pairs = [
+    ['filter-department', state.filterDepartment || ''],
+    ['smart-filter-department', state.smartFilterDepartment || ''],
+  ];
+  pairs.forEach(([id, saved]) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const cur = normalizeDepartment(el.value) === el.value ? el.value : '';
-    const prev = el.value;
     el.innerHTML = options;
-    el.value = deps.includes(prev) ? prev : (deps.includes(normalizeDepartment(prev)) ? normalizeDepartment(prev) : '');
+    // Bo'sh = "Barcha bo'limlar" — normalizeDepartment('') ni chaqirmaymiz (u Xodimlar bo'limiga aylanadi)
+    el.value = saved && deps.includes(saved) ? saved : '';
   });
   refreshDepartmentSuggestions();
 }
