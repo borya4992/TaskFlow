@@ -1,7 +1,7 @@
 ﻿{
-  "name": "TaskFlow — Topshiriqlar monitoringi",
-  "short_name": "TaskFlow",
-  "description": "Jamoa topshiriqlarini monitoring qilish ilovasi",
+  "name": "Taskoman — Topshiriqlar monitoringi",
+  "short_name": "Taskoman",
+  "description": "Taskoman — jamoa topshiriqlarini monitoring qilish ilovasi",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

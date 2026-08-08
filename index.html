@@ -3,17 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>TaskFlow — Topshiriqlar monitoringi</title>
-<meta name="description" content="Jamoa topshiriqlarini monitoring qilish ilovasi">
+<title>Taskoman — Topshiriqlar monitoringi</title>
+<meta name="description" content="Taskoman — jamoa topshiriqlarini monitoring qilish ilovasi">
 <meta name="theme-color" content="#0B0F17" id="meta-theme-color">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="TaskFlow">
+<meta name="apple-mobile-web-app-title" content="Taskoman">
+<meta name="application-name" content="Taskoman">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
 /* Flash oldini olish — localStorage'dan tema va tilni darhol qo'llash */
 (function () {
@@ -480,24 +484,176 @@
     .kpi{flex:1;min-width:0;padding:8px 6px;}
   }
 
-  /* auth */
-  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 26px;width:100%;max-width:420px;box-shadow:var(--shadow);}
-  .auth-card h1{margin:0 0 6px;font-size:22px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;}
+  /* auth / TASKOMAN landing */
+  .auth-screen{
+    min-height:100vh;min-height:100dvh;position:relative;overflow-x:hidden;overflow-y:auto;
+    font-family:'Manrope',system-ui,sans-serif;
+    background:
+      radial-gradient(ellipse 90% 70% at 15% 10%, rgba(37,99,255,0.35), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 85% 20%, rgba(56,189,248,0.18), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(30,64,175,0.25), transparent 55%),
+      linear-gradient(165deg, #04070f 0%, #0a1224 42%, #07101f 100%);
+    color:#e8eefc;
+  }
+  .auth-screen::before{
+    content:'';position:absolute;inset:0;pointer-events:none;opacity:.35;
+    background-image:
+      linear-gradient(rgba(96,165,250,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,165,250,.06) 1px, transparent 1px);
+    background-size:48px 48px;
+    mask-image:radial-gradient(ellipse at center, black 20%, transparent 75%);
+  }
+  .landing{
+    position:relative;z-index:1;max-width:1120px;margin:0 auto;
+    padding:36px 24px 48px;padding-top:max(36px, env(safe-area-inset-top));
+  }
+  .landing-hero{
+    min-height:min(78vh, 720px);display:flex;flex-direction:column;justify-content:center;
+    gap:28px;animation:landingIn .7s ease both;
+  }
+  @keyframes landingIn{
+    from{opacity:0;transform:translateY(18px);}
+    to{opacity:1;transform:none;}
+  }
+  .landing-brand{display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
+  .landing-logo-row{display:flex;align-items:center;gap:14px;}
+  .landing-mark{
+    width:56px;height:56px;border-radius:14px;flex-shrink:0;
+    background:linear-gradient(145deg,#9ec5ff 0%,#3b82f6 45%,#1e3a8a 100%);
+    box-shadow:0 0 0 1px rgba(147,197,253,.35), 0 12px 40px rgba(37,99,255,.45), inset 0 1px 0 rgba(255,255,255,.35);
+    display:grid;place-items:center;position:relative;
+  }
+  .landing-mark span{
+    font-family:'Orbitron',sans-serif;font-weight:800;font-size:28px;line-height:1;color:#f8fbff;
+    text-shadow:0 2px 8px rgba(0,20,60,.45);
+  }
+  .landing-mark::after{
+    content:'';position:absolute;right:-6px;top:50%;transform:translateY(-50%);
+    width:10px;height:10px;border-radius:2px;background:#38bdf8;
+    box-shadow:0 0 12px #38bdf8;
+  }
+  .landing-wordmark{
+    font-family:'Orbitron',sans-serif;font-weight:800;font-size:clamp(28px,6vw,44px);
+    letter-spacing:.06em;margin:0;line-height:1.05;
+    background:linear-gradient(180deg,#ffffff 10%,#93c5fd 55%,#60a5fa 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .landing-wordmark .o{
+    display:inline-block;color:#38bdf8;-webkit-text-fill-color:#38bdf8;
+    text-shadow:0 0 18px rgba(56,189,248,.55);
+    filter:drop-shadow(0 0 6px rgba(56,189,248,.5));
+  }
+  .landing-tagline{
+    margin:0;font-size:14px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    color:#7dd3fc;
+  }
+  .landing-pills{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:6px;}
+  .landing-pill{
+    display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#c7d7f5;
+  }
+  .landing-pill i{
+    width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;
+    background:rgba(59,130,246,.15);border:1px solid rgba(96,165,250,.35);color:#93c5fd;
+    box-shadow:0 0 16px rgba(59,130,246,.15);flex-shrink:0;
+  }
+  .landing-pill i svg,.landing-feat-ico svg{width:14px;height:14px;display:block;}
+  .landing-feat-ico{
+    width:40px;height:40px;margin:0 auto 10px;border-radius:12px;display:grid;place-items:center;
+    border:1px solid rgba(96,165,250,.4);color:#7dd3fc;
+    background:rgba(30,58,138,.25);box-shadow:0 0 20px rgba(56,189,248,.12);
+  }
+  .landing-feat-ico svg{width:18px;height:18px;}
+  .landing-ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .landing-btn-primary{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    padding:14px 28px;border-radius:12px;border:none;cursor:pointer;
+    font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:#fff;background:linear-gradient(105deg,#2563eb 0%,#3b82f6 45%,#38bdf8 100%);
+    box-shadow:0 10px 32px rgba(37,99,255,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    transition:transform .12s, filter .12s, box-shadow .12s;
+  }
+  .landing-btn-primary:hover{
+    filter:brightness(1.08);
+    box-shadow:0 14px 40px rgba(56,189,248,.4), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .landing-btn-primary:active{transform:scale(.98);}
+  .landing-btn-ghost{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    padding:14px 24px;border-radius:12px;cursor:pointer;
+    font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:#dbeafe;background:rgba(15,23,42,.45);border:1px solid rgba(148,163,184,.35);
+    backdrop-filter:blur(10px);transition:border-color .12s, background .12s, color .12s;
+  }
+  .landing-btn-ghost:hover{border-color:#60a5fa;color:#fff;background:rgba(30,58,138,.35);}
+  .landing-credit{margin:4px 0 0;font-size:11px;color:#64748b;font-weight:500;}
+  .landing-ribbon{
+    margin-top:48px;padding:22px 18px 18px;border-radius:18px;
+    background:rgba(15,23,42,.55);border:1px solid rgba(96,165,250,.2);
+    backdrop-filter:blur(14px);box-shadow:0 20px 50px rgba(0,0,0,.35);
+  }
+  .landing-ribbon-grid{
+    display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;
+  }
+  .landing-feat{
+    text-align:center;padding:12px 8px;border-radius:12px;
+    transition:background .15s, transform .15s;
+  }
+  .landing-feat:hover{background:rgba(59,130,246,.08);transform:translateY(-2px);}
+  .landing-feat b{
+    display:block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#e2e8f0;
+  }
+  .landing-slogan{
+    margin:18px 0 0;text-align:center;font-size:12px;font-weight:800;letter-spacing:.16em;
+    text-transform:uppercase;color:#7dd3fc;
+  }
+  @media(max-width:900px){
+    .landing-ribbon-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .landing-feat:last-child{grid-column:1/-1;}
+  }
+  @media(max-width:520px){
+    .landing{padding:24px 16px 40px;}
+    .landing-btn-primary,.landing-btn-ghost{width:100%;}
+    .landing-ribbon-grid{grid-template-columns:1fr 1fr;}
+  }
+
+  .login-backdrop{
+    position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+    padding:24px;background:rgba(2,6,18,.72);backdrop-filter:blur(10px);
+  }
+  .login-backdrop.open{display:flex;}
+  .auth-card{
+    background:linear-gradient(165deg, rgba(15,23,42,.92), rgba(8,15,30,.95));
+    border:1px solid rgba(96,165,250,.28);border-radius:18px;padding:28px 26px;width:100%;max-width:420px;
+    box-shadow:0 24px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04) inset;
+    animation:landingIn .35s ease both;position:relative;
+  }
+  .auth-card h1{margin:0 0 6px;font-size:20px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Orbitron',sans-serif;letter-spacing:.04em;}
   .auth-card h1 .brand-logo{
     width:40px;height:40px;object-fit:contain;border-radius:8px;
     flex-shrink:0;background:#0a0a0a;display:block;
   }
-  .auth-sub{text-align:center;color:var(--text-faint);font-size:12.5px;margin:0 0 22px;}
-  .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--panel-2);border-radius:10px;padding:4px;}
-  .auth-tab{flex:1;background:transparent;color:var(--text-soft);padding:8px 4px;font-size:11px;border-radius:8px;}
-  .auth-tab.active{background:var(--accent);color:var(--on-accent);}
+  .auth-close{
+    position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:10px;
+    background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.25);color:#cbd5e1;
+    font-size:16px;cursor:pointer;
+  }
+  .auth-close:hover{color:#fff;border-color:#60a5fa;}
+  .auth-sub{text-align:center;color:#94a3b8;font-size:12.5px;margin:0 0 22px;}
+  .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:rgba(15,23,42,.8);border-radius:10px;padding:4px;border:1px solid rgba(51,65,85,.6);}
+  .auth-tab{flex:1;background:transparent;color:#94a3b8;padding:8px 4px;font-size:11px;border-radius:8px;border:none;cursor:pointer;font-weight:700;}
+  .auth-tab.active{background:linear-gradient(105deg,#2563eb,#38bdf8);color:#fff;}
   .auth-field{margin-bottom:12px;}
-  .auth-field label{display:block;font-size:11px;color:var(--text-faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
-  .auth-field input{width:100%;}
-  .auth-btn{width:100%;background:var(--accent);color:var(--on-accent);padding:11px;margin-top:4px;}
-  .auth-btn:hover{background:var(--accent-dark);}
-  .auth-hint{font-size:11.5px;color:var(--text-faint);margin-top:14px;line-height:1.5;text-align:center;}
+  .auth-field label{display:block;font-size:11px;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+  .auth-field input{width:100%;background:rgba(15,23,42,.85);border:1px solid rgba(71,85,105,.7);color:#e2e8f0;border-radius:10px;padding:10px 12px;}
+  .auth-field input:focus{border-color:#3b82f6;outline:none;box-shadow:0 0 0 3px rgba(59,130,246,.2);}
+  .auth-btn{
+    width:100%;padding:12px;margin-top:4px;border:none;border-radius:10px;cursor:pointer;
+    font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:13px;color:#fff;
+    background:linear-gradient(105deg,#2563eb,#38bdf8);
+    box-shadow:0 8px 24px rgba(37,99,255,.35);
+  }
+  .auth-btn:hover{filter:brightness(1.06);}
+  .auth-hint{font-size:11.5px;color:#64748b;margin-top:14px;line-height:1.5;text-align:center;}
   .auth-telegram-wrap{display:flex;justify-content:center;min-height:48px;align-items:center;}
   .user-bar{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;}
   .user-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-soft);cursor:pointer;transition:border-color .12s,color .12s;}
@@ -604,25 +760,59 @@
 
 <!-- KIRISH EKRANI -->
 <div id="auth-screen" class="auth-screen">
-  <div class="auth-card">
-    <h1><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> TaskFlow</h1>
-    <p class="credit-line" style="margin:8px 0 0;font-size:11.5px;font-weight:600;color:#f97316;text-align:center;">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
-    <p class="auth-sub" data-i18n="auth.sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')" data-i18n="auth.tabPassword">Parol</button>
-      <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')" data-i18n="auth.tabTelegram">Telegram</button>
+  <div class="landing">
+    <section class="landing-hero">
+      <div class="landing-brand">
+        <div class="landing-logo-row">
+          <div class="landing-mark" aria-hidden="true"><span>T</span></div>
+          <h1 class="landing-wordmark">TASK<span class="o">O</span>MAN</h1>
+        </div>
+        <p class="landing-tagline">Plan. Assign. Track. Done.</p>
+      </div>
+      <div class="landing-pills">
+        <span class="landing-pill"><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 13l4 4L19 7"/></svg></i> Tasks under control</span>
+        <span class="landing-pill"><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></i> Projects on track</span>
+        <span class="landing-pill"><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg></i> Nothing gets missed</span>
+      </div>
+      <div class="landing-ctas">
+        <button type="button" class="landing-btn-primary" onclick="openLoginPanel()">TIZIMGA KIRISH →</button>
+        <button type="button" class="landing-btn-ghost" onclick="scrollLandingDetails()">BATAFSIL →</button>
+      </div>
+      <p class="landing-credit">Created by V.O.I.D — Vision Of Intelligent Development · Owner Bobur Babajanov</p>
+    </section>
+    <section class="landing-ribbon" id="landing-details">
+      <div class="landing-ribbon-grid">
+        <div class="landing-feat"><div class="landing-feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></div><b>Aniq nazorat</b></div>
+        <div class="landing-feat"><div class="landing-feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div><b>Samarali yondashuv</b></div>
+        <div class="landing-feat"><div class="landing-feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><b>To'liq nazorat</b></div>
+        <div class="landing-feat"><div class="landing-feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg></div><b>Yaxshi natija</b></div>
+        <div class="landing-feat"><div class="landing-feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div><b>Tez va oson</b></div>
+      </div>
+      <p class="landing-slogan">Barcha topshiriqlar. Bir tizimda.</p>
+    </section>
+  </div>
+
+  <div id="login-backdrop" class="login-backdrop" onclick="if(event.target===this)closeLoginPanel()">
+    <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <button type="button" class="auth-close" onclick="closeLoginPanel()" aria-label="Yopish">✕</button>
+      <h1 id="login-title"><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> TASKOMAN</h1>
+      <p class="auth-sub" data-i18n="auth.sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')" data-i18n="auth.tabPassword">Parol</button>
+        <button class="auth-tab" data-tab="telegram" onclick="switchAuthTab('telegram')" data-i18n="auth.tabTelegram">Telegram</button>
+      </div>
+      <div id="auth-panel-password">
+        <div class="auth-field"><label data-i18n="auth.email">Email</label><input type="email" id="login-email" data-i18n-placeholder="auth.emailPh" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
+        <div class="auth-field"><label data-i18n="auth.password">Parol</label><input type="password" id="login-password" data-i18n-placeholder="auth.passwordPh" placeholder="Parol" autocomplete="current-password"></div>
+        <button class="auth-btn" onclick="loginWithPassword()" data-i18n="auth.login">Kirish</button>
+        <p class="auth-hint" style="margin-top:10px;" data-i18n-html="auth.hintPassword">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
+      </div>
+      <div id="auth-panel-telegram" class="hidden">
+        <div class="auth-telegram-wrap" id="telegram-login-container"></div>
+        <p class="auth-hint" data-i18n="auth.hintTelegram">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
+      </div>
+      <p class="auth-hint" id="auth-message"></p>
     </div>
-    <div id="auth-panel-password">
-      <div class="auth-field"><label data-i18n="auth.email">Email</label><input type="email" id="login-email" data-i18n-placeholder="auth.emailPh" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
-      <div class="auth-field"><label data-i18n="auth.password">Parol</label><input type="password" id="login-password" data-i18n-placeholder="auth.passwordPh" placeholder="Parol" autocomplete="current-password"></div>
-      <button class="auth-btn" onclick="loginWithPassword()" data-i18n="auth.login">Kirish</button>
-      <p class="auth-hint" style="margin-top:10px;" data-i18n-html="auth.hintPassword">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
-    </div>
-    <div id="auth-panel-telegram" class="hidden">
-      <div class="auth-telegram-wrap" id="telegram-login-container"></div>
-      <p class="auth-hint" data-i18n="auth.hintTelegram">Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.</p>
-    </div>
-    <p class="auth-hint" id="auth-message"></p>
   </div>
 </div>
 
@@ -631,7 +821,7 @@
 
   <header>
     <div class="titles">
-      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span data-i18n="app.title">Topshiriqlar monitoringi</span></h1>
+      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span data-i18n="app.title">Taskoman</span></h1>
       <p class="credit-line">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
     </div>
     <div class="user-bar">
@@ -954,7 +1144,7 @@ const I18N = {
     'auth.login': 'Kirish',
     'auth.hintPassword': "Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
     'auth.hintTelegram': "Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.",
-    'app.title': 'Topshiriqlar monitoringi',
+    'app.title': 'Taskoman',
     'app.openProfile': 'Profilni ochish',
     'app.install': "Ilovani o'rnatish",
     'app.theme': 'Tema',
@@ -1096,7 +1286,7 @@ const I18N = {
     'auth.login': 'Войти',
     'auth.hintPassword': 'В первый раз: стандартный пароль <b>123456</b>. Затем смените в профиле. Если забыли — сбросит админ.',
     'auth.hintTelegram': 'Для входа через Telegram админ должен добавить ваш Telegram ID.',
-    'app.title': 'Мониторинг задач',
+    'app.title': 'Taskoman',
     'app.openProfile': 'Открыть профиль',
     'app.install': 'Установить приложение',
     'app.theme': 'Тема',
@@ -1238,7 +1428,7 @@ const I18N = {
     'auth.login': 'Sign in',
     'auth.hintPassword': 'First time: default password <b>123456</b>. Change it later in your profile. If forgotten — ask an admin to reset.',
     'auth.hintTelegram': 'For Telegram login, an admin must add your Telegram ID first.',
-    'app.title': 'Task monitoring',
+    'app.title': 'Taskoman',
     'app.openProfile': 'Open profile',
     'app.install': 'Install app',
     'app.theme': 'Theme',
@@ -1786,9 +1976,30 @@ async function handleTelegramAuth(user) {
   }
 }
 
+function openLoginPanel() {
+  const el = document.getElementById('login-backdrop');
+  if (el) el.classList.add('open');
+  setTimeout(() => document.getElementById('login-email')?.focus(), 80);
+}
+
+function closeLoginPanel() {
+  const el = document.getElementById('login-backdrop');
+  if (el) el.classList.remove('open');
+  setAuthMessage('');
+}
+
+function scrollLandingDetails() {
+  document.getElementById('landing-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLoginPanel();
+});
+
 function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app-wrap').classList.add('hidden');
+  closeLoginPanel();
 }
 
 function roleLabel(role) {
@@ -4401,18 +4612,18 @@ function setupPwaInstall() {
     deferredInstallPrompt = null;
     const btn = document.getElementById('btn-install-app');
     if (btn) btn.classList.add('hidden');
-    toast('TaskFlow ilova sifatida o\'rnatildi');
+    toast('Taskoman ilova sifatida o\'rnatildi');
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=3').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=4').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
     }).catch((err) => console.warn('SW:', err));
-    // Eski keshlar (taskflow-v1/v2) ni tozalash
+    // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') && k !== 'taskflow-v3')
+        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v1')
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

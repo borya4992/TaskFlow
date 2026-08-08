@@ -1,5 +1,5 @@
 /**
- * TaskFlow — 3D Ofis (admin)
+ * Taskoman — 3D Ofis (admin)
  * Low-poly ofis personajlari (erkak/ayol na'muna) + ish stoli + yurish/o'tirish animatsiyasi.
  */
 import * as THREE from 'three';

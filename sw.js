@@ -1,4 +1,4 @@
-﻿const CACHE = 'taskflow-v3';
+﻿const CACHE = 'taskoman-v1';
 const PRECACHE = [
   '/',
   '/index.html',
