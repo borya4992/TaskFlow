@@ -1247,6 +1247,7 @@
         <select id="smart-trend-month" class="smart-month-select" onchange="onSmartTrendMonth(this.value)"></select>
       </div>
       <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Tanlangan oyda 1–31 kun kesimida: yaratilgan va bajarilgan topshiriqlar.</p>
+      <div class="smart-period-total hidden" id="smart-trend-period-total"></div>
       <div class="chart-wrap" style="height:240px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel smart-mvp-history">
@@ -1542,6 +1543,7 @@ const I18N = {
     'smart.periodAll': 'Jami (barcha davrlar)',
     'smart.mvpAllBanner': 'Umumiy g\'olib',
     'smart.trendHelpAll': 'Barcha oylar kesimida: yaratilgan va bajarilgan topshiriqlar.',
+    'smart.trendSum': 'Jami: <b class="pt-created">{created}</b> yaratilgan · <b class="pt-done">{done}</b> bajarilgan',
     'smart.byExec': 'Ijrochi kesimida monitoring',
     'smart.colExec': 'Bajaruvchi',
     'smart.risk': 'SMART risk',
@@ -1707,6 +1709,7 @@ const I18N = {
     'smart.periodAll': 'Итого (все периоды)',
     'smart.mvpAllBanner': 'Общий победитель',
     'smart.trendHelpAll': 'По всем месяцам: созданные и выполненные задачи.',
+    'smart.trendSum': 'Итого: <b class="pt-created">{created}</b> создано · <b class="pt-done">{done}</b> выполнено',
     'smart.byExec': 'Мониторинг по исполнителям',
     'smart.colExec': 'Исполнитель',
     'smart.risk': 'SMART риск',
@@ -1872,6 +1875,7 @@ const I18N = {
     'smart.periodAll': 'Total (all periods)',
     'smart.mvpAllBanner': 'Overall winner',
     'smart.trendHelpAll': 'Across all months: created vs completed tasks.',
+    'smart.trendSum': 'Total: <b class="pt-created">{created}</b> created · <b class="pt-done">{done}</b> done',
     'smart.byExec': 'Monitoring by executor',
     'smart.colExec': 'Executor',
     'smart.risk': 'SMART risk',
@@ -5076,6 +5080,19 @@ function renderSmartAnalytics() {
     trendHelpEl.textContent = isSmartPeriodAll(trendMonth)
       ? t('smart.trendHelpAll')
       : t('smart.trendHelp');
+  }
+
+  const trendSumEl = document.getElementById('smart-trend-period-total');
+  if (trendSumEl) {
+    if (isSmartPeriodAll(trendMonth)) {
+      const createdSum = tasks.filter(t => !!taskCreatedMonthKey(t)).length;
+      const doneSum = tasks.filter(t => !!taskDoneMonthKey(t)).length;
+      trendSumEl.classList.remove('hidden');
+      trendSumEl.innerHTML = t('smart.trendSum', { created: createdSum, done: doneSum });
+    } else {
+      trendSumEl.classList.add('hidden');
+      trendSumEl.innerHTML = '';
+    }
   }
 
   if (typeof Chart === 'undefined') return;
