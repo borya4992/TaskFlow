@@ -238,6 +238,15 @@
     border-radius:10px;border:0;cursor:pointer;
   }
   .app-nav-btn .nav-ico{width:1.25em;text-align:center;flex-shrink:0;opacity:.9;}
+  .app-nav-btn .nav-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .app-nav-btn .nav-badge{
+    margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;
+    font-size:11px;font-weight:800;line-height:1;
+    background:var(--warning);color:#1a1200;
+    display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .app-nav-btn.active .nav-badge{background:var(--on-accent);color:var(--accent);}
+  .app-nav-btn .nav-badge.hidden{display:none !important;}
   .app-nav-btn.active{background:var(--accent);color:var(--on-accent);}
   .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
   .sidebar-foot{padding-top:12px;border-top:1px solid var(--border);margin-top:10px;}
@@ -1025,12 +1034,13 @@
       <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span>
     </div>
     <nav class="sidebar-nav" id="app-nav">
-      <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')"><span class="nav-ico">📊</span><span data-i18n="nav.monitoring">Monitoring</span></button>
-      <button type="button" class="app-nav-btn hidden" id="nav-create-btn" data-view="create" onclick="switchAppView('create')"><span class="nav-ico">➕</span><span data-i18n="nav.create">Topshiriq yaratish</span></button>
-      <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')"><span class="nav-ico">📈</span><span data-i18n="nav.smart">SMART</span></button>
-      <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span data-i18n="nav.projects">Loyihalar</span></button>
-      <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D();closeSidebar()"><span class="nav-ico">🧑‍💼</span><span data-i18n="nav.office">3D Ofis</span></button>
-      <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')"><span class="nav-ico">⚙️</span><span data-i18n="nav.admin">Boshqaruv</span></button>
+      <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')"><span class="nav-ico">📊</span><span class="nav-label" data-i18n="nav.monitoring">Monitoring</span></button>
+      <button type="button" class="app-nav-btn" data-view="incoming" id="nav-incoming-btn" onclick="switchAppView('incoming')"><span class="nav-ico">📥</span><span class="nav-label" data-i18n="nav.incoming">Kiruvchi</span><span class="nav-badge hidden" id="nav-incoming-badge">0</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-create-btn" data-view="create" onclick="switchAppView('create')"><span class="nav-ico">➕</span><span class="nav-label" data-i18n="nav.create">Topshiriq yaratish</span></button>
+      <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')"><span class="nav-ico">📈</span><span class="nav-label" data-i18n="nav.smart">SMART</span></button>
+      <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span class="nav-label" data-i18n="nav.projects">Loyihalar</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D();closeSidebar()"><span class="nav-ico">🧑‍💼</span><span class="nav-label" data-i18n="nav.office">3D Ofis</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')"><span class="nav-ico">⚙️</span><span class="nav-label" data-i18n="nav.admin">Boshqaruv</span></button>
     </nav>
     <div class="sidebar-foot">
       <p class="credit-line">Created by V.O.I.D — Owner Bobur Babajanov</p>
@@ -1102,9 +1112,6 @@
     <button class="btn-blue" onclick="refreshFromDB()" data-i18n="filter.refresh">🔄 Yangilash</button>
   </div>
 
-  <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> <span data-i18n="sections.review">Sizga tasdiqlash uchun kelganlar</span></div>
-  <div class="task-list" id="review-list"></div>
-
   <div class="section-title" id="exec-section-title"><span class="dot" style="background:var(--purple)"></span> <span data-i18n="sections.executors">Ijrochilar bo'yicha</span></div>
   <div class="exec-grid" id="exec-grid"></div>
 
@@ -1136,6 +1143,15 @@
   </div>
   <p class="task-folder-meta" id="tasks-folder-meta"></p>
   <div class="task-list" id="task-list"></div>
+  </div>
+
+  <!-- KIRUVCHI — tasdiqlash uchun kelganlar -->
+  <div id="view-incoming" class="view-pane">
+    <div class="panel">
+      <h2><span class="dot" style="background:var(--warning)"></span> <span data-i18n="incoming.title">Kiruvchi — tasdiqlash</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="incoming.help">Sizga tasdiqlash uchun yuborilgan topshiriqlar shu yerda.</p>
+    </div>
+    <div class="task-list" id="review-list"></div>
   </div>
 
   <!-- TOPSHIRIQ YARATISH -->
@@ -1426,11 +1442,15 @@ const I18N = {
     'app.logout': 'Chiqish',
     'app.online': '🟢 Onlayn:',
     'nav.monitoring': 'Monitoring',
+    'nav.incoming': 'Kiruvchi',
     'nav.create': 'Topshiriq yaratish',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Loyihalar',
     'nav.office': '🧑‍💼 3D Ofis',
     'nav.admin': 'Boshqaruv',
+    'incoming.title': 'Kiruvchi — tasdiqlash',
+    'incoming.help': 'Sizga tasdiqlash uchun yuborilgan topshiriqlar shu yerda.',
+    'incoming.empty': "Sizga tasdiqlash uchun kelgan topshiriq yo'q",
     'kpi.total': 'Jami',
     'kpi.progress': 'Jarayonda',
     'kpi.review': 'Tekshiruvda',
@@ -1582,11 +1602,15 @@ const I18N = {
     'app.logout': 'Выйти',
     'app.online': '🟢 Онлайн:',
     'nav.monitoring': 'Мониторинг',
+    'nav.incoming': 'Входящие',
     'nav.create': 'Создать задачу',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Проекты',
     'nav.office': '🧑‍💼 3D Офис',
     'nav.admin': 'Управление',
+    'incoming.title': 'Входящие — подтверждение',
+    'incoming.help': 'Задачи, отправленные вам на подтверждение, находятся здесь.',
+    'incoming.empty': 'Нет задач, ожидающих вашего подтверждения',
     'kpi.total': 'Всего',
     'kpi.progress': 'В работе',
     'kpi.review': 'На проверке',
@@ -1738,11 +1762,15 @@ const I18N = {
     'app.logout': 'Sign out',
     'app.online': '🟢 Online:',
     'nav.monitoring': 'Monitoring',
+    'nav.incoming': 'Inbox',
     'nav.create': 'Create task',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Projects',
     'nav.office': '🧑‍💼 3D Office',
     'nav.admin': 'Admin',
+    'incoming.title': 'Inbox — approval',
+    'incoming.help': 'Tasks sent to you for approval appear here.',
+    'incoming.empty': 'No tasks awaiting your approval',
     'kpi.total': 'Total',
     'kpi.progress': 'In progress',
     'kpi.review': 'In review',
@@ -2633,8 +2661,6 @@ function showApp() {
   if (createNav) createNav.classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
-  document.getElementById('review-section-title').classList.toggle('hidden', false);
-  document.getElementById('review-list').classList.toggle('hidden', false);
   if (canManageUsers()) {
     renderUsersTable();
     renderDeletedTasksPanel();
@@ -2653,7 +2679,7 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'create', 'smart', 'admin', 'projects'];
+  const allowed = ['monitoring', 'incoming', 'create', 'smart', 'admin', 'projects'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   if (view === 'create' && !canCreateTasks()) view = 'monitoring';
@@ -2671,6 +2697,9 @@ function switchAppView(view) {
     renderDeletedTasksPanel();
     if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
     updateOffice3DPublicUI();
+  }
+  if (view === 'incoming') {
+    renderReviewList();
   }
   if (view === 'create') {
     renderExecutorSelect();
@@ -3758,23 +3787,25 @@ function openAssigneeTasksModal(name) {
       </div>
     </div>`;
 }
+function getIncomingReviewTasks() {
+  return state.tasks
+    .filter(t => !t.deleted_at)
+    .filter(t => t.status === 'tekshiruvda' && canReviewTask(t));
+}
+function updateIncomingBadge() {
+  const badge = document.getElementById('nav-incoming-badge');
+  if (!badge) return;
+  const n = getIncomingReviewTasks().length;
+  badge.textContent = String(n);
+  badge.classList.toggle('hidden', n < 1);
+}
 function renderReviewList() {
   const list = document.getElementById('review-list');
-  const title = document.getElementById('review-section-title');
-  if (!list || !title) return;
-  // Status filter boshqa bo'lsa, alohida tekshiruv blokini yashiramiz
-  if (state.filterStatus && state.filterStatus !== 'tekshiruvda') {
-    list.classList.add('hidden');
-    title.classList.add('hidden');
-    return;
-  }
-  title.classList.remove('hidden');
-  list.classList.remove('hidden');
-  const reviewTasks = visibleTasks()
-    .filter(t => t.status === 'tekshiruvda' && canReviewTask(t))
-    .filter(matchesFilters);
+  if (!list) return;
+  const reviewTasks = getIncomingReviewTasks();
+  updateIncomingBadge();
   if (!reviewTasks.length) {
-    list.innerHTML = '<div class="empty-msg">Sizga tasdiqlash uchun kelgan topshiriq yo\'q</div>';
+    list.innerHTML = `<div class="empty-msg">${escapeHtml(t('incoming.empty'))}</div>`;
     return;
   }
   list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
@@ -3912,11 +3943,15 @@ function filterByStatus(status) {
   state.filterStatus = status || '';
   if (status === 'bajarildi') state.taskFolder = 'archive';
   else if (status) state.taskFolder = 'active';
+  if (status === 'tekshiruvda') {
+    switchAppView('incoming');
+    return;
+  }
   switchAppView('monitoring');
   renderKpis();
   renderReviewList();
   renderTaskList();
-  const target = document.getElementById(state.filterStatus === 'tekshiruvda' ? 'review-list' : 'task-list');
+  const target = document.getElementById('task-list');
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function filterByAssignee(name) {
