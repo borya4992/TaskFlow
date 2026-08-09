@@ -502,3 +502,188 @@ create policy "task_temp_update_own" on storage.objects
     and auth.role() = 'authenticated'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+-- ============================================================
+-- 9) LOYIHALAR (Trello-uslubidagi mustaqil modul)
+-- ============================================================
+
+create table if not exists projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text default '',
+  color text not null default '#3B82F6',
+  icon text not null default '📋',
+  is_personal boolean not null default true,
+  owner_user_id uuid not null references app_users(id) on delete cascade,
+  status text not null default 'active' check (status in ('active', 'archived')),
+  deleted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists project_members (
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null references app_users(id) on delete cascade,
+  role text not null default 'member' check (role in ('owner', 'member')),
+  created_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+create table if not exists project_columns (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  name text not null,
+  position int not null default 0,
+  color text not null default '#64748B',
+  is_done_column boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists project_cards (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  column_id uuid not null references project_columns(id) on delete cascade,
+  title text not null,
+  description text default '',
+  assignee_user_id uuid references app_users(id) on delete set null,
+  priority text default '',
+  deadline timestamptz,
+  position int not null default 0,
+  deleted_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists projects_owner_idx on projects (owner_user_id) where deleted_at is null;
+create index if not exists projects_status_idx on projects (status) where deleted_at is null;
+create index if not exists project_members_user_idx on project_members (user_id);
+create index if not exists project_columns_project_idx on project_columns (project_id, position);
+create index if not exists project_cards_project_idx on project_cards (project_id) where deleted_at is null;
+create index if not exists project_cards_column_idx on project_cards (column_id, position) where deleted_at is null;
+
+create or replace function public.is_project_member(p_project_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin()
+    or exists (
+      select 1 from projects p
+      where p.id = p_project_id
+        and p.owner_user_id = public.my_user_id()
+    )
+    or exists (
+      select 1 from project_members m
+      where m.project_id = p_project_id
+        and m.user_id = public.my_user_id()
+    );
+$$;
+
+create or replace function public.can_manage_project(p_project_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin()
+    or exists (
+      select 1 from projects p
+      where p.id = p_project_id
+        and p.owner_user_id = public.my_user_id()
+    );
+$$;
+
+alter table projects enable row level security;
+alter table project_members enable row level security;
+alter table project_columns enable row level security;
+alter table project_cards enable row level security;
+
+drop policy if exists "projects_select" on projects;
+create policy "projects_select" on projects
+  for select using (
+    auth.role() = 'authenticated'
+    and (
+      public.is_admin()
+      or owner_user_id = public.my_user_id()
+      or exists (
+        select 1 from project_members m
+        where m.project_id = projects.id and m.user_id = public.my_user_id()
+      )
+    )
+  );
+
+drop policy if exists "projects_insert" on projects;
+create policy "projects_insert" on projects
+  for insert with check (
+    auth.role() = 'authenticated'
+    and owner_user_id = public.my_user_id()
+  );
+
+drop policy if exists "projects_update" on projects;
+create policy "projects_update" on projects
+  for update using (public.can_manage_project(id))
+  with check (public.can_manage_project(id));
+
+drop policy if exists "projects_delete" on projects;
+create policy "projects_delete" on projects
+  for delete using (public.can_manage_project(id));
+
+drop policy if exists "project_members_select" on project_members;
+create policy "project_members_select" on project_members
+  for select using (public.is_project_member(project_id));
+
+drop policy if exists "project_members_insert" on project_members;
+create policy "project_members_insert" on project_members
+  for insert with check (public.can_manage_project(project_id));
+
+drop policy if exists "project_members_update" on project_members;
+create policy "project_members_update" on project_members
+  for update using (public.can_manage_project(project_id))
+  with check (public.can_manage_project(project_id));
+
+drop policy if exists "project_members_delete" on project_members;
+create policy "project_members_delete" on project_members
+  for delete using (public.can_manage_project(project_id));
+
+drop policy if exists "project_columns_select" on project_columns;
+create policy "project_columns_select" on project_columns
+  for select using (public.is_project_member(project_id));
+
+drop policy if exists "project_columns_insert" on project_columns;
+create policy "project_columns_insert" on project_columns
+  for insert with check (public.is_project_member(project_id));
+
+drop policy if exists "project_columns_update" on project_columns;
+create policy "project_columns_update" on project_columns
+  for update using (public.is_project_member(project_id))
+  with check (public.is_project_member(project_id));
+
+drop policy if exists "project_columns_delete" on project_columns;
+create policy "project_columns_delete" on project_columns
+  for delete using (public.can_manage_project(project_id));
+
+drop policy if exists "project_cards_select" on project_cards;
+create policy "project_cards_select" on project_cards
+  for select using (public.is_project_member(project_id));
+
+drop policy if exists "project_cards_insert" on project_cards;
+create policy "project_cards_insert" on project_cards
+  for insert with check (public.is_project_member(project_id));
+
+drop policy if exists "project_cards_update" on project_cards;
+create policy "project_cards_update" on project_cards
+  for update using (public.is_project_member(project_id))
+  with check (public.is_project_member(project_id));
+
+drop policy if exists "project_cards_delete" on project_cards;
+create policy "project_cards_delete" on project_cards
+  for delete using (public.is_project_member(project_id));
+
+grant execute on function public.is_project_member(uuid) to authenticated;
+grant execute on function public.can_manage_project(uuid) to authenticated;
+
+do $$ begin alter publication supabase_realtime add table projects; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table project_members; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table project_columns; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table project_cards; exception when duplicate_object then null; end $$;

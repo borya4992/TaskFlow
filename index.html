@@ -33,6 +33,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/projects.js?v=1"></script>
 <style>
   /* =========================================================
      THEME TOKENS — yangi tema qo'shish: [data-theme="..."] bloki
@@ -628,6 +629,83 @@
   @media(max-width:900px){.smart-charts{grid-template-columns:1fr;}}
   .add-row input[type=datetime-local]{min-width:190px;}
 
+  /* Loyihalar (Projects) */
+  .proj-list-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+  .proj-title{margin:0;font-size:18px;font-weight:800;color:var(--text);}
+  .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+  .proj-card{
+    position:relative;background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:14px 14px 12px;cursor:pointer;overflow:hidden;transition:border-color .15s, transform .15s, box-shadow .15s;
+  }
+  .proj-card:hover{border-color:color-mix(in srgb, var(--proj-color, var(--accent)) 55%, var(--border));transform:translateY(-2px);box-shadow:var(--shadow);}
+  .proj-card-bar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--proj-color, var(--accent));}
+  .proj-card-top{display:flex;gap:10px;align-items:flex-start;padding-right:28px;}
+  .proj-card-icon{font-size:28px;line-height:1;}
+  .proj-card h3{margin:0 0 2px;font-size:15px;font-weight:800;}
+  .proj-card-meta{margin:0;font-size:11px;color:var(--text-faint);}
+  .proj-card-desc{margin:10px 0 0;font-size:12px;color:var(--text-soft);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .proj-progress{display:flex;align-items:center;gap:8px;margin-top:12px;}
+  .proj-progress-track{flex:1;height:6px;border-radius:99px;background:var(--panel-2);overflow:hidden;}
+  .proj-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--proj-color, var(--accent)),var(--success));}
+  .proj-progress > span{font-size:11px;font-weight:700;color:var(--text-soft);min-width:32px;text-align:right;}
+  .proj-card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+  .proj-avatars{display:flex;align-items:center;}
+  .proj-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid var(--panel);margin-left:-6px;background:var(--panel-2);flex-shrink:0;}
+  .proj-avatar:first-child{margin-left:0;}
+  .proj-avatar.sm{width:22px;height:22px;font-size:9px;}
+  .proj-avatar-more{margin-left:4px;font-size:11px;color:var(--text-faint);font-weight:700;}
+  .proj-menu{position:absolute;top:8px;right:8px;}
+  .proj-menu-btn{background:transparent;border:0;color:var(--text-soft);font-size:18px;line-height:1;padding:4px 8px;border-radius:8px;cursor:pointer;}
+  .proj-menu-btn:hover{background:var(--panel-2);color:var(--text);}
+  .proj-menu-drop{position:absolute;right:0;top:100%;z-index:5;min-width:150px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:4px;box-shadow:var(--shadow);}
+  .proj-menu-drop button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:8px 10px;border-radius:8px;font-size:12px;cursor:pointer;}
+  .proj-menu-drop button:hover{background:var(--panel-2);}
+  .proj-menu-drop button.danger{color:var(--danger);}
+  .proj-swatches,.proj-icons{display:flex;flex-wrap:wrap;gap:8px;}
+  .proj-swatch,.proj-icon-pick{cursor:pointer;}
+  .proj-swatch input,.proj-icon-pick input{position:absolute;opacity:0;pointer-events:none;}
+  .proj-swatch span{display:block;width:28px;height:28px;border-radius:50%;border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+  .proj-swatch input:checked + span{border-color:var(--text);transform:scale(1.08);}
+  .proj-icon-pick span{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);font-size:18px;}
+  .proj-icon-pick input:checked + span{border-color:var(--accent);background:var(--accent-tint);}
+  .proj-type-row{display:flex;gap:12px;flex-wrap:wrap;}
+  .pk-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .pk-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;}
+  .pk-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start;min-height:420px;}
+  .pk-col{flex:0 0 280px;max-width:280px;background:var(--panel);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;max-height:calc(100vh - 220px);}
+  .pk-col-head{display:flex;align-items:center;gap:6px;padding:10px 10px 8px;border-bottom:1px solid var(--border);position:relative;}
+  .pk-col-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .pk-col-name{flex:1;min-width:0;background:transparent;border:0;color:var(--text);font-weight:700;font-size:13px;padding:4px 2px;border-radius:6px;}
+  .pk-col-name:focus{outline:1px solid var(--accent);background:var(--panel-2);}
+  .pk-col-count{font-size:11px;color:var(--text-faint);font-weight:700;background:var(--panel-2);border-radius:99px;padding:2px 7px;}
+  .pk-col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:60px;}
+  .pk-add-card{margin:0 8px 10px;background:transparent;border:1px dashed var(--border);color:var(--text-soft);border-radius:10px;padding:8px;font-size:12px;cursor:pointer;}
+  .pk-add-card:hover{border-color:var(--accent);color:var(--text);}
+  .pk-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 10px 10px 12px;cursor:grab;position:relative;border-left:3px solid transparent;}
+  .pk-card.p-shoshilinch{border-left-color:var(--danger);}
+  .pk-card.p-yuqori{border-left-color:var(--warning);}
+  .pk-card.p-orta{border-left-color:var(--accent);}
+  .pk-card.p-past{border-left-color:var(--text-faint);}
+  .pk-card.dragging{opacity:.45;}
+  .pk-card-title{font-size:13px;font-weight:650;color:var(--text);line-height:1.35;}
+  .pk-card-meta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .proj-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+  .proj-stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+  .proj-stat b{display:block;font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px;}
+  .proj-stat span{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .proj-progress-layout{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;}
+  .proj-chart-panel{position:relative;}
+  .proj-doughnut-wrap{position:relative;height:300px;}
+  .proj-doughnut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;padding-bottom:28px;}
+  .proj-doughnut-center b{font-size:34px;font-weight:800;color:var(--text);line-height:1;}
+  .proj-doughnut-center span{font-size:12px;color:var(--text-soft);margin-top:4px;}
+  .proj-member-bar{margin-bottom:12px;}
+  .proj-member-bar-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650;margin-bottom:6px;color:var(--text);}
+  @media(max-width:900px){
+    .proj-progress-layout{grid-template-columns:1fr;}
+    .pk-col{flex-basis:240px;max-width:240px;}
+  }
+
   /* 3D Ofis */
   .office3d-overlay{
     position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
@@ -808,6 +886,7 @@
   <div class="app-nav" id="app-nav">
     <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')" data-i18n="nav.monitoring">Monitoring</button>
     <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')" data-i18n="nav.smart">SMART</button>
+    <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')" data-i18n="nav.projects">📋 Loyihalar</button>
     <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D()" data-i18n="nav.office">🧑‍💼 3D Ofis</button>
     <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')" data-i18n="nav.admin">Boshqaruv</button>
   </div>
@@ -1040,6 +1119,25 @@
       <tbody id="deleted-tasks-tbody"></tbody>
     </table>
   </div>
+
+  <div class="panel hidden" id="deleted-projects-panel">
+    <h2><span class="dot" style="background:var(--danger)"></span> <span data-i18n="deleted.projectsTitle">O'chirilgan loyihalar</span></h2>
+    <p class="help-text" style="margin-top:0;" data-i18n="deleted.projectsHelp">Soft-delete: admin tiklashi mumkin.</p>
+    <table class="users-table">
+      <thead><tr>
+        <th data-i18n="projects.name">Loyiha</th>
+        <th data-i18n="projects.type">Tur</th>
+        <th data-i18n="deleted.colWhen">O'chirilgan</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="deleted-projects-tbody"></tbody>
+    </table>
+  </div>
+  </div>
+
+  <!-- LOYIHALAR -->
+  <div id="view-projects" class="view-pane">
+    <div id="projects-root"></div>
   </div>
 
 </div>
@@ -1106,6 +1204,7 @@ const I18N = {
     'app.online': '🟢 Onlayn:',
     'nav.monitoring': 'Monitoring',
     'nav.smart': 'SMART',
+    'nav.projects': '📋 Loyihalar',
     'nav.office': '🧑‍💼 3D Ofis',
     'nav.admin': 'Boshqaruv',
     'kpi.total': 'Jami',
@@ -1209,9 +1308,13 @@ const I18N = {
     'settings.officeHelp': "Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.",
     'deleted.title': "O'chirilgan topshiriqlar",
     'deleted.help': 'Soft-delete: tiklash mumkin.',
+    'deleted.projectsTitle': "O'chirilgan loyihalar",
+    'deleted.projectsHelp': 'Soft-delete: admin tiklashi mumkin.',
     'deleted.colTask': 'Topshiriq',
     'deleted.colWhen': "O'chirilgan",
     'deleted.colStatus': 'Holat',
+    'projects.name': 'Loyiha',
+    'projects.type': 'Tur',
     'office.title': '3D Ofis',
     'office.hint': "· Boshqaruv · Xodimlar / Ishga qabul / Kompensatsiya bo'limlari · Dam olish (stol)",
     'common.close': '✕ Yopish',
@@ -1248,6 +1351,7 @@ const I18N = {
     'app.online': '🟢 Онлайн:',
     'nav.monitoring': 'Мониторинг',
     'nav.smart': 'SMART',
+    'nav.projects': '📋 Проекты',
     'nav.office': '🧑‍💼 3D Офис',
     'nav.admin': 'Управление',
     'kpi.total': 'Всего',
@@ -1351,9 +1455,13 @@ const I18N = {
     'settings.officeHelp': 'Если включено, кнопку 3D Офис видят все. Если выключено — только админ.',
     'deleted.title': 'Удалённые задачи',
     'deleted.help': 'Soft-delete: можно восстановить.',
+    'deleted.projectsTitle': 'Удалённые проекты',
+    'deleted.projectsHelp': 'Soft-delete: админ может восстановить.',
     'deleted.colTask': 'Задача',
     'deleted.colWhen': 'Удалено',
     'deleted.colStatus': 'Статус',
+    'projects.name': 'Проект',
+    'projects.type': 'Тип',
     'office.title': '3D Офис',
     'office.hint': '· Управление · Кадры / Найм / Компенсации · Отдых (стол)',
     'common.close': '✕ Закрыть',
@@ -1390,6 +1498,7 @@ const I18N = {
     'app.online': '🟢 Online:',
     'nav.monitoring': 'Monitoring',
     'nav.smart': 'SMART',
+    'nav.projects': '📋 Projects',
     'nav.office': '🧑‍💼 3D Office',
     'nav.admin': 'Admin',
     'kpi.total': 'Total',
@@ -1493,9 +1602,13 @@ const I18N = {
     'settings.officeHelp': 'When enabled, all users see the 3D Office button. When disabled — admin only.',
     'deleted.title': 'Deleted tasks',
     'deleted.help': 'Soft-delete: can be restored.',
+    'deleted.projectsTitle': 'Deleted projects',
+    'deleted.projectsHelp': 'Soft-delete: admin can restore.',
     'deleted.colTask': 'Task',
     'deleted.colWhen': 'Deleted',
     'deleted.colStatus': 'Status',
+    'projects.name': 'Project',
+    'projects.type': 'Type',
     'office.title': '3D Office',
     'office.hint': '· Management · Staff / Recruiting / Compensation · Break room',
     'common.close': '✕ Close',
@@ -1698,6 +1811,12 @@ function applyTheme(themeId, persist) {
     const smartPane = document.getElementById('view-smart');
     if (smartPane && smartPane.classList.contains('active') && typeof renderSmartAnalytics === 'function') {
       renderSmartAnalytics();
+    }
+  } catch (e) {}
+  try {
+    const projPane = document.getElementById('view-projects');
+    if (projPane && projPane.classList.contains('active') && state.projectView === 'progress' && typeof drawProjectProgressChart === 'function') {
+      drawProjectProgressChart(state.activeProjectId);
     }
   } catch (e) {}
   try {
@@ -2189,6 +2308,7 @@ function showApp() {
   if (canManageUsers()) {
     renderUsersTable();
     renderDeletedTasksPanel();
+    if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
   }
   renderExecutorSelect();
   fillDepartmentSelects();
@@ -2203,7 +2323,7 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'smart', 'admin'];
+  const allowed = ['monitoring', 'smart', 'admin', 'projects'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   document.querySelectorAll('.view-pane').forEach(el => {
@@ -2215,6 +2335,7 @@ function switchAppView(view) {
   if (view === 'admin' && canManageUsers()) {
     renderUsersTable();
     renderDeletedTasksPanel();
+    if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
     updateOffice3DPublicUI();
   }
   if (view === 'smart') {
@@ -2222,6 +2343,11 @@ function switchAppView(view) {
     const smartSel = document.getElementById('smart-filter-department');
     if (smartSel) smartSel.value = state.smartFilterDepartment || '';
     renderSmartAnalytics();
+  }
+  if (view === 'projects') {
+    if (typeof renderProjectsView === 'function') renderProjectsView();
+  } else if (typeof destroyProjectChart === 'function') {
+    destroyProjectChart();
   }
 }
 
@@ -2274,6 +2400,7 @@ async function enterApp() {
   state.settings = await fetchSettings();
   state.appUsers = await fetchTeamUsers();
   state.tasks = await fetchTasks();
+  if (typeof loadAllProjectData === 'function') await loadAllProjectData();
   await reconcileAssigneeNameDuplicates();
   showApp();
   document.getElementById('tg-token').value = state.settings.telegram_token || '';
@@ -2318,15 +2445,16 @@ function applyRealtimeTaskChange(payload) {
 
 function subscribeRealtime() {
   if (usingLocalFallback || !sb) return;
-  sb.channel('tasks-changes')
+  const channel = sb.channel('tasks-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => { applyRealtimeTaskChange(payload); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' }, async () => {
       state.appUsers = await fetchTeamUsers();
       renderOnlineUsers();
       fillDepartmentSelects();
       if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
-    })
-    .subscribe();
+    });
+  if (typeof subscribeProjectRealtime === 'function') subscribeProjectRealtime(channel);
+  channel.subscribe();
 }
 
 /* =========================================================
@@ -3435,6 +3563,8 @@ function renderAll() {
   renderOnlineUsers();
   const smartPane = document.getElementById('view-smart');
   if (smartPane && smartPane.classList.contains('active')) renderSmartAnalytics();
+  const projPane = document.getElementById('view-projects');
+  if (projPane && projPane.classList.contains('active') && typeof renderProjectsView === 'function') renderProjectsView();
 }
 function filterByStatus(status) {
   state.filterStatus = status || '';
@@ -3477,13 +3607,17 @@ function onSmartFilterDepartment(v){
 async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
+  if (typeof loadAllProjectData === 'function') await loadAllProjectData();
   await reconcileAssigneeNameDuplicates();
   fillDepartmentSelects();
   renderAll();
   if (window.Office3D && Office3D.isOpen()) {
     Office3D.update(state.appUsers, state.tasks);
   }
-  if (canManageUsers()) renderDeletedTasksPanel();
+  if (canManageUsers()) {
+    renderDeletedTasksPanel();
+    if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
+  }
   toast(t('toast.refreshed'));
 }
 async function createTasksForAssignees(executorIds, { title, priority, deadline }) {
@@ -4569,7 +4703,7 @@ function setupPwaInstall() {
     toast('Taskoman ilova sifatida o\'rnatildi');
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=13').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=14').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -4577,7 +4711,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v10')
+        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v11')
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }
