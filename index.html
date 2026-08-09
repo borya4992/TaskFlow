@@ -216,10 +216,117 @@
   select option{background:var(--panel);color:var(--text);}
   button{cursor:pointer;border:none;border-radius:8px;font-weight:600;transition:filter .1s, transform .08s;}
   button:active{transform:scale(.97);}
-  .wrap{max-width:1280px;margin:0 auto;padding:22px 26px 60px;}
+  .wrap{max-width:none;margin:0;padding:0;}
+  #app-wrap{min-height:100vh;min-height:100dvh;background:var(--bg);}
 
-  /* header */
-  header{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:20px;}
+  /* App shell — sidebar + topbar */
+  .app-shell{display:flex;min-height:100vh;min-height:100dvh;position:relative;}
+  .app-sidebar{
+    width:248px;flex-shrink:0;display:flex;flex-direction:column;
+    background:var(--panel);border-right:1px solid var(--border);
+    padding:14px 12px;padding-top:max(14px, env(safe-area-inset-top));
+    padding-bottom:max(14px, env(safe-area-inset-bottom));
+    z-index:50;
+  }
+  .sidebar-brand{display:flex;align-items:center;gap:10px;padding:8px 10px 16px;border-bottom:1px solid var(--border);margin-bottom:12px;}
+  .sidebar-brand .brand-logo{width:34px;height:34px;object-fit:contain;border-radius:8px;background:#0a0a0a;flex-shrink:0;}
+  .sidebar-brand .brand-wordmark{font-size:14px;letter-spacing:.1em;}
+  .sidebar-nav{display:flex;flex-direction:column;gap:4px;flex:1;overflow-y:auto;min-height:0;}
+  .app-nav-btn{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:transparent;color:var(--text-soft);padding:11px 12px;font-size:13px;font-weight:650;
+    border-radius:10px;border:0;cursor:pointer;
+  }
+  .app-nav-btn .nav-ico{width:1.25em;text-align:center;flex-shrink:0;opacity:.9;}
+  .app-nav-btn.active{background:var(--accent);color:var(--on-accent);}
+  .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
+  .sidebar-foot{padding-top:12px;border-top:1px solid var(--border);margin-top:10px;}
+  .sidebar-foot .credit-line{margin:0;font-size:10px;line-height:1.35;color:var(--text-faint);padding:0 6px;}
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;}
+  .app-main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;}
+  .app-topbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:10px 16px;padding-top:max(10px, env(safe-area-inset-top));
+    border-bottom:1px solid var(--border);background:color-mix(in srgb, var(--panel) 92%, transparent);
+    position:sticky;top:0;z-index:40;backdrop-filter:blur(10px);
+  }
+  .topbar-menu-btn{
+    display:none;align-items:center;justify-content:center;
+    width:40px;height:40px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0;
+  }
+  .topbar-spacer{flex:1;min-width:8px;}
+  .topbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+  .icon-chip{
+    width:40px;height:40px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text-soft);display:inline-flex;align-items:center;justify-content:center;
+    font-size:16px;cursor:pointer;padding:0;
+  }
+  .icon-chip:hover{color:var(--text);border-color:var(--accent);}
+  .settings-wrap,.profile-wrap{position:relative;}
+  .settings-menu,.profile-menu{
+    display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:130;
+    min-width:220px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:8px;box-shadow:var(--shadow);
+  }
+  .settings-menu.open,.profile-menu.open{display:block;}
+  .settings-menu .menu-section{padding:6px 4px 8px;}
+  .settings-menu .menu-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);padding:4px 8px 8px;}
+  .settings-menu .theme-wrap,.settings-menu .lang-wrap{position:static;display:block;margin-bottom:6px;}
+  .settings-menu .theme-btn,.settings-menu .lang-btn{width:100%;justify-content:flex-start;}
+  .settings-menu .theme-menu,.settings-menu .lang-menu{
+    position:static;display:block;box-shadow:none;border:1px solid var(--border);
+    margin-top:6px;min-width:0;
+  }
+  .settings-menu .theme-menu:not(.open),.settings-menu .lang-menu:not(.open){display:none;}
+  .profile-btn{
+    display:inline-flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border-radius:999px;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer;max-width:220px;
+  }
+  .profile-btn:hover{border-color:var(--accent);}
+  .profile-btn .top-avatar{
+    width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;
+    background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;
+  }
+  .profile-btn .top-avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+  .profile-btn .profile-name{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .profile-menu button{
+    display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);
+    padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .profile-menu button:hover{background:var(--panel-2);}
+  .profile-menu button.danger{color:var(--danger);}
+  .app-content{flex:1;padding:16px 18px 40px;padding-bottom:max(40px, env(safe-area-inset-bottom));overflow:auto;}
+  .view-pane{display:none;}
+  .view-pane.active{display:block;}
+  .create-view{max-width:720px;}
+  .create-view .assignee-check-list{
+    display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;max-height:min(48vh,380px);overflow:auto;
+  }
+  .create-view .assignee-check{width:100%;max-width:none;padding:10px 12px;}
+  .create-view .assignee-check .assignee-av{
+    width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;
+    background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:800;
+  }
+  .create-view .assignee-check .assignee-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+  .create-view .add-row{flex-direction:column;align-items:stretch;}
+  .create-view .add-row > *{width:100%;min-width:0;}
+  .create-view .add-row .btn-blue{width:100%;}
+  @media(max-width:900px){
+    .app-sidebar{
+      position:fixed;left:0;top:0;bottom:0;transform:translateX(-105%);
+      transition:transform .22s ease;box-shadow:var(--shadow);
+    }
+    .app-shell.sidebar-open .app-sidebar{transform:translateX(0);}
+    .app-shell.sidebar-open .sidebar-backdrop{display:block;}
+    .topbar-menu-btn{display:inline-flex;}
+    .profile-btn .profile-name{display:none;}
+    .app-content{padding:12px 12px 32px;}
+  }
+
+  /* header leftovers (kpi in monitoring) */
   header .titles{flex:1;min-width:240px;}
   header h1{margin:0;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
   header h1 .brand-logo{
@@ -248,7 +355,6 @@
     letter-spacing:0.02em;
     color:#f97316;
   }
-  .kpi-row{display:flex;gap:10px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;cursor:pointer;transition:border-color .12s, background .12s;user-select:none;}
   .kpi:hover{border-color:var(--accent);}
   .kpi.active{border-color:var(--accent);background:var(--panel-2);}
@@ -306,6 +412,12 @@
   }
   .assignee-check input{accent-color:var(--accent);margin:0;flex-shrink:0;}
   .assignee-check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .assignee-check .assignee-av{
+    width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;
+    background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:800;
+  }
+  .assignee-check .assignee-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
   .attach-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;}
   .attach-row label{font-size:12px;color:var(--text-soft);cursor:pointer;}
   .attach-status{font-size:12px;color:var(--text-faint);}
@@ -630,12 +742,16 @@
   .user-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .user-form .full{grid-column:1/-1;}
   @media(max-width:600px){.user-form{grid-template-columns:1fr;}}
-  .app-nav{display:flex;gap:6px;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:5px;}
-  .app-nav-btn{flex:1;background:transparent;color:var(--text-soft);padding:10px 12px;font-size:13px;border-radius:9px;}
-  .app-nav-btn.active{background:var(--accent);color:var(--on-accent);}
-  .app-nav-btn:hover:not(.active){color:var(--text);background:var(--panel-2);}
-  .view-pane{display:none;}
-  .view-pane.active{display:block;}
+  .kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:64px;cursor:pointer;transition:border-color .12s, background .12s;user-select:none;}
+  .kpi:hover{border-color:var(--accent);}
+  .kpi.active{border-color:var(--accent);background:var(--panel-2);}
+  .kpi b{display:block;font-size:20px;line-height:1.1;color:var(--text);}
+  .kpi span{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .kpi.k-progress b{color:var(--accent);}
+  .kpi.k-done b{color:var(--success);}
+  .kpi.k-overdue b{color:var(--pink);}
+  .kpi.k-review b{color:var(--warning);}
   .smart-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
   .smart-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
   .smart-charts .panel{margin-bottom:0;}
@@ -902,50 +1018,76 @@
 </div>
 
 <div id="app-wrap" class="hidden">
-<div class="wrap">
+<div class="app-shell" id="app-shell">
+  <aside class="app-sidebar" id="app-sidebar" aria-label="Asosiy navigatsiya">
+    <div class="sidebar-brand">
+      <img class="brand-logo" src="/icons/void-logo.png" width="34" height="34" alt="V.O.I.D">
+      <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span>
+    </div>
+    <nav class="sidebar-nav" id="app-nav">
+      <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')"><span class="nav-ico">📊</span><span data-i18n="nav.monitoring">Monitoring</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-create-btn" data-view="create" onclick="switchAppView('create')"><span class="nav-ico">➕</span><span data-i18n="nav.create">Topshiriq yaratish</span></button>
+      <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')"><span class="nav-ico">📈</span><span data-i18n="nav.smart">SMART</span></button>
+      <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span data-i18n="nav.projects">Loyihalar</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D();closeSidebar()"><span class="nav-ico">🧑‍💼</span><span data-i18n="nav.office">3D Ofis</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')"><span class="nav-ico">⚙️</span><span data-i18n="nav.admin">Boshqaruv</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <p class="credit-line">Created by V.O.I.D — Owner Bobur Babajanov</p>
+      <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="width:100%;margin-top:8px;padding:8px 10px;font-size:12px;" data-i18n="app.install">Ilovani o'rnatish</button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
 
-  <header>
-    <div class="titles">
-      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span></h1>
-      <p class="credit-line">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
-    </div>
-    <div class="user-bar">
-      <span class="user-chip" id="user-chip" data-i18n-title="app.openProfile" title="Profilni ochish" onclick="openMyProfileModal()"></span>
-      <button class="btn-ghost hidden" id="btn-install-app" onclick="installPwa()" style="padding:7px 12px;font-size:12px;" data-i18n="app.install">Ilovani o'rnatish</button>
-      <div class="theme-wrap">
-        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 <span data-i18n="app.theme">Tema</span></button>
-        <div class="theme-menu" id="theme-menu" role="menu"></div>
+  <div class="app-main">
+    <header class="app-topbar">
+      <button type="button" class="topbar-menu-btn" id="topbar-menu-btn" onclick="toggleSidebar()" aria-label="Menyu">☰</button>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions">
+        <div class="settings-wrap">
+          <button type="button" class="icon-chip" id="settings-btn" onclick="toggleSettingsMenu(event)" aria-haspopup="true" aria-expanded="false" title="Sozlamalar">⚙️</button>
+          <div class="settings-menu" id="settings-menu" role="menu">
+            <div class="menu-section">
+              <div class="menu-label" data-i18n="app.settings">Sozlamalar</div>
+              <div class="theme-wrap">
+                <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)">🎨 <span data-i18n="app.theme">Tema</span></button>
+                <div class="theme-menu" id="theme-menu" role="menu"></div>
+              </div>
+              <div class="lang-wrap">
+                <button type="button" class="lang-btn" id="lang-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleLangMenu(event)">🌐 <span id="lang-btn-label">Oʻzbek</span></button>
+                <div class="lang-menu" id="lang-menu" role="menu"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="profile-wrap">
+          <button type="button" class="profile-btn" id="profile-btn" onclick="toggleProfileMenu(event)" aria-haspopup="true" aria-expanded="false">
+            <span class="top-avatar" id="profile-avatar"></span>
+            <span class="profile-name" id="profile-name">—</span>
+          </button>
+          <div class="profile-menu" id="profile-menu" role="menu">
+            <button type="button" onclick="closeProfileMenu();openMyProfileModal()" data-i18n="app.changePassword">🔑 Parolni o'zgartirish</button>
+            <button type="button" class="danger" onclick="closeProfileMenu();signOut()" data-i18n="app.logout">Chiqish</button>
+          </div>
+        </div>
       </div>
-      <div class="lang-wrap">
-        <button type="button" class="lang-btn" id="lang-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleLangMenu(event)">🌐 <span id="lang-btn-label">Oʻzbek</span></button>
-        <div class="lang-menu" id="lang-menu" role="menu"></div>
-      </div>
-      <button class="btn-ghost" onclick="signOut()" style="padding:7px 12px;font-size:12px;" data-i18n="app.logout">Chiqish</button>
-    </div>
-    <div class="kpi-row">
-      <div class="kpi active" data-status="" onclick="filterByStatus('')" data-i18n-title="kpi.totalTitle" title="Barcha topshiriqlar"><b id="kpi-total">0</b><span data-i18n="kpi.total">Jami</span></div>
-      <div class="kpi k-progress" data-status="jarayonda" onclick="filterByStatus('jarayonda')" data-i18n-title="kpi.progressTitle" title="Jarayondagi topshiriqlar"><b id="kpi-progress">0</b><span data-i18n="kpi.progress">Jarayonda</span></div>
-      <div class="kpi k-review" data-status="tekshiruvda" onclick="filterByStatus('tekshiruvda')" data-i18n-title="kpi.reviewTitle" title="Tekshiruvdagi topshiriqlar"><b id="kpi-review">0</b><span data-i18n="kpi.review">Tekshiruvda</span></div>
-      <div class="kpi k-done" data-status="bajarildi" onclick="filterByStatus('bajarildi')" data-i18n-title="kpi.doneTitle" title="Bajarilgan topshiriqlar"><b id="kpi-done">0</b><span data-i18n="kpi.done">Bajarildi</span></div>
-      <div class="kpi k-overdue" data-status="muddati_otgan" onclick="filterByStatus('muddati_otgan')" data-i18n-title="kpi.overdueTitle" title="Muddati o'tgan topshiriqlar"><b id="kpi-overdue">0</b><span data-i18n="kpi.overdue">Kechikkan</span></div>
-    </div>
-  </header>
+    </header>
 
+    <div class="app-content">
   <div class="online-bar" id="online-bar">
     <span class="online-label" data-i18n="app.online">🟢 Onlayn:</span>
     <span id="online-list" class="online-empty">—</span>
   </div>
 
-  <div class="app-nav" id="app-nav">
-    <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')" data-i18n="nav.monitoring">Monitoring</button>
-    <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')" data-i18n="nav.smart">SMART</button>
-    <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')" data-i18n="nav.projects">📋 Loyihalar</button>
-    <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D()" data-i18n="nav.office">🧑‍💼 3D Ofis</button>
-    <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')" data-i18n="nav.admin">Boshqaruv</button>
-  </div>
-
   <!-- MONITORING -->
   <div id="view-monitoring" class="view-pane active">
+  <div class="kpi-row">
+    <div class="kpi active" data-status="" onclick="filterByStatus('')" data-i18n-title="kpi.totalTitle" title="Barcha topshiriqlar"><b id="kpi-total">0</b><span data-i18n="kpi.total">Jami</span></div>
+    <div class="kpi k-progress" data-status="jarayonda" onclick="filterByStatus('jarayonda')" data-i18n-title="kpi.progressTitle" title="Jarayondagi topshiriqlar"><b id="kpi-progress">0</b><span data-i18n="kpi.progress">Jarayonda</span></div>
+    <div class="kpi k-review" data-status="tekshiruvda" onclick="filterByStatus('tekshiruvda')" data-i18n-title="kpi.reviewTitle" title="Tekshiruvdagi topshiriqlar"><b id="kpi-review">0</b><span data-i18n="kpi.review">Tekshiruvda</span></div>
+    <div class="kpi k-done" data-status="bajarildi" onclick="filterByStatus('bajarildi')" data-i18n-title="kpi.doneTitle" title="Bajarilgan topshiriqlar"><b id="kpi-done">0</b><span data-i18n="kpi.done">Bajarildi</span></div>
+    <div class="kpi k-overdue" data-status="muddati_otgan" onclick="filterByStatus('muddati_otgan')" data-i18n-title="kpi.overdueTitle" title="Muddati o'tgan topshiriqlar"><b id="kpi-overdue">0</b><span data-i18n="kpi.overdue">Kechikkan</span></div>
+  </div>
   <div class="toolbar">
     <input type="text" id="search" data-i18n-placeholder="filter.search" placeholder="Qidirish (mas'ul, topshiriq)…" oninput="onSearch(this.value)">
     <select id="filter-department" onchange="onFilterDepartment(this.value)"><option value="" data-i18n="filter.allDepts">Barcha bo'limlar</option></select>
@@ -958,36 +1100,6 @@
       <option value="Past" data-i18n="priority.low">Past</option>
     </select>
     <button class="btn-blue" onclick="refreshFromDB()" data-i18n="filter.refresh">🔄 Yangilash</button>
-  </div>
-
-  <div class="panel hidden" id="create-task-panel">
-    <h2><span class="dot" style="background:var(--purple)"></span> <span data-i18n="create.title">Yangi topshiriq yaratish</span></h2>
-    <div class="assignee-multi">
-      <div class="assignee-multi-head">
-        <label data-i18n="create.assignees">Bajaruvchilar (bir yoki bir nechta)</label>
-        <span class="count" id="new-executor-count">0 tanlangan</span>
-      </div>
-      <div class="assignee-check-list" id="new-executor-list"></div>
-    </div>
-    <div class="add-row">
-      <input type="text" id="new-title" data-i18n-placeholder="create.taskPh" placeholder="Topshiriq matni">
-      <select id="new-priority">
-        <option value="" data-i18n="priority.none">Ustuvorlik yo'q</option>
-        <option value="Shoshilinch" data-i18n="priority.urgent">Shoshilinch</option>
-        <option value="Yuqori" data-i18n="priority.high">Yuqori</option>
-        <option value="O'rta" data-i18n="priority.medium">O'rta</option>
-        <option value="Past" data-i18n="priority.low">Past</option>
-      </select>
-      <input type="datetime-local" id="new-deadline" data-i18n-title="create.deadlineTitle" title="Muddat (majburiy)" required>
-      <button class="btn-blue" onclick="addTask()" data-i18n="create.submit">Yaratish va yuborish</button>
-    </div>
-    <div class="attach-row">
-      <label><span data-i18n="create.attach">📎 Fayl biriktirish (ixtiyoriy)</span>
-        <input type="file" id="new-attachment" onchange="onNewAttachmentChange(this)">
-      </label>
-      <span class="attach-status" id="new-attachment-status"></span>
-    </div>
-    <p class="help-text" style="margin:8px 0 0;" data-i18n-html="create.help">Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
   </div>
 
   <div class="section-title" id="review-section-title"><span class="dot" style="background:var(--amber)"></span> <span data-i18n="sections.review">Sizga tasdiqlash uchun kelganlar</span></div>
@@ -1024,6 +1136,39 @@
   </div>
   <p class="task-folder-meta" id="tasks-folder-meta"></p>
   <div class="task-list" id="task-list"></div>
+  </div>
+
+  <!-- TOPSHIRIQ YARATISH -->
+  <div id="view-create" class="view-pane">
+    <div class="panel create-view" id="create-task-panel">
+      <h2><span class="dot" style="background:var(--purple)"></span> <span data-i18n="create.title">Yangi topshiriq yaratish</span></h2>
+      <div class="assignee-multi">
+        <div class="assignee-multi-head">
+          <label data-i18n="create.assignees">Bajaruvchilar (bir yoki bir nechta)</label>
+          <span class="count" id="new-executor-count">0 tanlangan</span>
+        </div>
+        <div class="assignee-check-list" id="new-executor-list"></div>
+      </div>
+      <div class="add-row">
+        <input type="text" id="new-title" data-i18n-placeholder="create.taskPh" placeholder="Topshiriq matni">
+        <select id="new-priority">
+          <option value="" data-i18n="priority.none">Ustuvorlik yo'q</option>
+          <option value="Shoshilinch" data-i18n="priority.urgent">Shoshilinch</option>
+          <option value="Yuqori" data-i18n="priority.high">Yuqori</option>
+          <option value="O'rta" data-i18n="priority.medium">O'rta</option>
+          <option value="Past" data-i18n="priority.low">Past</option>
+        </select>
+        <input type="datetime-local" id="new-deadline" data-i18n-title="create.deadlineTitle" title="Muddat (majburiy)" required>
+        <button class="btn-blue" onclick="addTask()" data-i18n="create.submit">Yaratish va yuborish</button>
+      </div>
+      <div class="attach-row">
+        <label><span data-i18n="create.attach">📎 Fayl biriktirish (ixtiyoriy)</span>
+          <input type="file" id="new-attachment" onchange="onNewAttachmentChange(this)">
+        </label>
+        <span class="attach-status" id="new-attachment-status"></span>
+      </div>
+      <p class="help-text" style="margin:8px 0 0;" data-i18n-html="create.help">Bir nechta bajaruvchi tanlansa, har biriga alohida topshiriq yaratiladi. <b>Muddat majburiy.</b> Tekshiruv yaratuvchiga / rahbarga boradi. Fayl Telegram orqali saqlanadi (maks. 10 MB).</p>
+    </div>
   </div>
 
   <!-- SMART ANALYTICS -->
@@ -1214,8 +1359,10 @@
     <div id="projects-root"></div>
   </div>
 
-</div>
-</div>
+    </div><!-- /.app-content -->
+  </div><!-- /.app-main -->
+</div><!-- /.app-shell -->
+</div><!-- /#app-wrap -->
 
 <div id="modal-root"></div>
 <div id="toast-root"></div>
@@ -1274,9 +1421,12 @@ const I18N = {
     'app.openProfile': 'Profilni ochish',
     'app.install': "Ilovani o'rnatish",
     'app.theme': 'Tema',
+    'app.settings': 'Sozlamalar',
+    'app.changePassword': "🔑 Parolni o'zgartirish",
     'app.logout': 'Chiqish',
     'app.online': '🟢 Onlayn:',
     'nav.monitoring': 'Monitoring',
+    'nav.create': 'Topshiriq yaratish',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Loyihalar',
     'nav.office': '🧑‍💼 3D Ofis',
@@ -1427,9 +1577,12 @@ const I18N = {
     'app.openProfile': 'Открыть профиль',
     'app.install': 'Установить приложение',
     'app.theme': 'Тема',
+    'app.settings': 'Настройки',
+    'app.changePassword': '🔑 Сменить пароль',
     'app.logout': 'Выйти',
     'app.online': '🟢 Онлайн:',
     'nav.monitoring': 'Мониторинг',
+    'nav.create': 'Создать задачу',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Проекты',
     'nav.office': '🧑‍💼 3D Офис',
@@ -1580,9 +1733,12 @@ const I18N = {
     'app.openProfile': 'Open profile',
     'app.install': 'Install app',
     'app.theme': 'Theme',
+    'app.settings': 'Settings',
+    'app.changePassword': '🔑 Change password',
     'app.logout': 'Sign out',
     'app.online': '🟢 Online:',
     'nav.monitoring': 'Monitoring',
+    'nav.create': 'Create task',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Projects',
     'nav.office': '🧑‍💼 3D Office',
@@ -1816,6 +1972,8 @@ function syncLangMenuActive() {
 function toggleLangMenu(event) {
   if (event) event.stopPropagation();
   closeThemeMenu();
+  const settings = document.getElementById('settings-menu');
+  if (settings && !settings.classList.contains('open')) settings.classList.add('open');
   const menu = document.getElementById('lang-menu');
   const btn = document.getElementById('lang-btn');
   if (!menu) return;
@@ -1943,6 +2101,8 @@ function syncThemeMenuActive() {
 function toggleThemeMenu(event) {
   if (event) event.stopPropagation();
   closeLangMenu();
+  const settings = document.getElementById('settings-menu');
+  if (settings && !settings.classList.contains('open')) settings.classList.add('open');
   const menu = document.getElementById('theme-menu');
   const btn = document.getElementById('theme-btn');
   if (!menu) return;
@@ -2382,17 +2542,95 @@ function fillDepartmentSelects() {
   refreshDepartmentSuggestions();
 }
 
+function renderProfileChip() {
+  const nameEl = document.getElementById('profile-name');
+  const avEl = document.getElementById('profile-avatar');
+  if (!currentProfile) return;
+  if (nameEl) nameEl.textContent = currentProfile.display_name || '—';
+  if (!avEl) return;
+  if (currentProfile.avatar_url) {
+    avEl.innerHTML = `<img src="${escapeHtml(currentProfile.avatar_url)}" alt="">`;
+  } else {
+    avEl.textContent = initials(currentProfile.display_name);
+  }
+}
+
+function toggleSidebar() {
+  const shell = document.getElementById('app-shell');
+  if (!shell) return;
+  shell.classList.toggle('sidebar-open');
+}
+
+function closeSidebar() {
+  const shell = document.getElementById('app-shell');
+  if (shell) shell.classList.remove('sidebar-open');
+}
+
+function closeSettingsMenu() {
+  const menu = document.getElementById('settings-menu');
+  const btn = document.getElementById('settings-btn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  closeThemeMenu();
+  closeLangMenu();
+}
+
+function toggleSettingsMenu(event) {
+  if (event) event.stopPropagation();
+  closeProfileMenu();
+  const menu = document.getElementById('settings-menu');
+  const btn = document.getElementById('settings-btn');
+  if (!menu) return;
+  const open = !menu.classList.contains('open');
+  if (open) {
+    menu.classList.add('open');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  } else {
+    closeSettingsMenu();
+  }
+}
+
+function closeProfileMenu() {
+  const menu = document.getElementById('profile-menu');
+  const btn = document.getElementById('profile-btn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleProfileMenu(event) {
+  if (event) event.stopPropagation();
+  closeSettingsMenu();
+  const menu = document.getElementById('profile-menu');
+  const btn = document.getElementById('profile-btn');
+  if (!menu) return;
+  const open = !menu.classList.contains('open');
+  menu.classList.toggle('open', open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function initAppChromeMenus() {
+  document.addEventListener('click', (e) => {
+    const settingsWrap = document.querySelector('.settings-wrap');
+    const profileWrap = document.querySelector('.profile-wrap');
+    if (settingsWrap && !settingsWrap.contains(e.target)) closeSettingsMenu();
+    if (profileWrap && !profileWrap.contains(e.target)) closeProfileMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    closeSettingsMenu();
+    closeProfileMenu();
+    closeSidebar();
+  });
+}
+
 function showApp() {
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app-wrap').classList.remove('hidden');
-  const chip = document.getElementById('user-chip');
-  if (chip && currentProfile) {
-    const dept = currentProfile.department ? ` <span class="dept-tag">· ${escapeHtml(currentProfile.department)}</span>` : '';
-    chip.innerHTML = '<b>' + escapeHtml(currentProfile.display_name) + '</b>' + roleBadge(currentProfile.role) + dept;
-  }
+  renderProfileChip();
   document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
   document.getElementById('nav-office-btn').classList.toggle('hidden', !canViewOffice3D());
-  document.getElementById('create-task-panel').classList.toggle('hidden', !canCreateTasks());
+  const createNav = document.getElementById('nav-create-btn');
+  if (createNav) createNav.classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
   document.getElementById('exec-grid').classList.toggle('hidden', false);
   document.getElementById('review-section-title').classList.toggle('hidden', false);
@@ -2415,20 +2653,27 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'smart', 'admin', 'projects'];
+  const allowed = ['monitoring', 'create', 'smart', 'admin', 'projects'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
+  if (view === 'create' && !canCreateTasks()) view = 'monitoring';
   document.querySelectorAll('.view-pane').forEach(el => {
     el.classList.toggle('active', el.id === 'view-' + view);
   });
   document.querySelectorAll('.app-nav-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
+  closeSidebar();
+  closeSettingsMenu();
+  closeProfileMenu();
   if (view === 'admin' && canManageUsers()) {
     renderUsersTable();
     renderDeletedTasksPanel();
     if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
     updateOffice3DPublicUI();
+  }
+  if (view === 'create') {
+    renderExecutorSelect();
   }
   if (view === 'smart') {
     fillDepartmentSelects();
@@ -2787,13 +3032,18 @@ function renderAssigneeCheckList(listId, countId, preselectedIds) {
       : getSelectedAssigneeIds(listId)
   );
   const executors = getExecutors();
-  box.innerHTML = executors.map(u => `
+  box.innerHTML = executors.map(u => {
+    const av = u.avatar_url
+      ? `<span class="assignee-av"><img src="${escapeHtml(u.avatar_url)}" alt=""></span>`
+      : `<span class="assignee-av">${escapeHtml(initials(u.display_name))}</span>`;
+    return `
     <label class="assignee-check">
       <input type="checkbox" value="${u.id}" ${prev.has(u.id) ? 'checked' : ''}
         onchange="updateAssigneeCount('${listId}','${countId}')">
-      <span>${escapeHtml(assigneeOptionLabel(u))}</span>
-    </label>
-  `).join('') || '<span class="help-text" style="margin:0;">Bajaruvchi topilmadi</span>';
+      ${av}
+      <span>${assigneeOptionLabel(u)}</span>
+    </label>`;
+  }).join('') || '<span class="help-text" style="margin:0;">Bajaruvchi topilmadi</span>';
   updateAssigneeCount(listId, countId);
 }
 function renderExecutorSelect() {
@@ -3769,58 +4019,29 @@ async function addTask() {
   updateAssigneeCount('new-executor-list', 'new-executor-count');
   clearNewAttachmentUi();
   await refreshFromDB();
+  switchAppView('monitoring');
   toast(created.length === 1
     ? 'Topshiriq yaratildi va ijrochiga yuborildi'
     : created.length + ' ta topshiriq yaratildi va ijrochilarga yuborildi');
 }
 
-/** 3D Ofisdan: bajaruvchi oldindan tanlangan holda yangi topshiriq formasi */
+/** 3D Ofisdan: bajaruvchi oldindan tanlangan holda yaratish oynasi */
 function openCreateTaskForUser(userId) {
   if (!canManageUsers() && !canCreateTasks()) return;
   const executor = userById(userId);
   if (!executor) { toast('Foydalanuvchi topilmadi'); return; }
-  draftAttachment = null;
-  document.getElementById('modal-root').innerHTML = `
-    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
-      <div class="modal">
-        <h3>Yangi topshiriq</h3>
-        <p class="hint">Bir nechta bajaruvchi tanlash mumkin. Har biriga alohida topshiriq yaratiladi.</p>
-        <div class="assignee-multi">
-          <div class="assignee-multi-head">
-            <label>Bajaruvchilar</label>
-            <span class="count" id="m-executor-count">0 tanlangan</span>
-          </div>
-          <div class="assignee-check-list" id="m-executor-list"></div>
-        </div>
-        <div class="field"><label>Topshiriq matni</label><input type="text" id="m-title" placeholder="Nima qilish kerak?" autofocus></div>
-        <div class="field"><label>Ustuvorlik</label>
-          <select id="m-priority">
-            <option value="">Ustuvorlik yo'q</option>
-            <option value="Shoshilinch">Shoshilinch</option>
-            <option value="Yuqori">Yuqori</option>
-            <option value="O'rta">O'rta</option>
-            <option value="Past">Past</option>
-          </select>
-        </div>
-        <div class="field"><label>Muddat (majburiy)</label><input type="datetime-local" id="m-deadline" required></div>
-        <div class="field"><label>📎 Fayl biriktirish (ixtiyoriy)</label>
-          <input type="file" id="m-attachment" onchange="onModalAttachmentChange(this)">
-          <div class="attach-status" id="m-attachment-status" style="margin-top:6px;"></div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
-          <button class="btn-blue" onclick="saveCreateTaskModal()">Yaratish va yuborish</button>
-        </div>
-      </div>
-    </div>`;
-  renderAssigneeCheckList('m-executor-list', 'm-executor-count', [userId]);
+  if (typeof closeOffice3D === 'function') closeOffice3D();
+  switchAppView('create');
+  renderAssigneeCheckList('new-executor-list', 'new-executor-count', [userId]);
+  const titleEl = document.getElementById('new-title');
+  if (titleEl) titleEl.focus();
 }
 
 async function saveCreateTaskModal() {
   const executorIds = getSelectedAssigneeIds('m-executor-list');
-  const title = document.getElementById('m-title').value.trim();
-  const priority = document.getElementById('m-priority').value;
-  const deadlineRaw = document.getElementById('m-deadline').value;
+  const title = document.getElementById('m-title')?.value.trim();
+  const priority = document.getElementById('m-priority')?.value;
+  const deadlineRaw = document.getElementById('m-deadline')?.value;
   const deadline = fromDatetimeLocal(deadlineRaw);
   if (!executorIds.length || !title) { toast('Kamida bitta ijrochi va topshiriq matnini kiriting'); return; }
   if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
@@ -4980,7 +5201,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v13')
+        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v14')
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }
@@ -5005,6 +5226,7 @@ async function installPwa() {
 async function init() {
   initThemeSystem();
   initLangSystem();
+  initAppChromeMenus();
   try {
     const savedSort = localStorage.getItem('task_sort');
     if (savedSort) state.taskSort = savedSort;
