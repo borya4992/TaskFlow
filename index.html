@@ -1230,15 +1230,18 @@
           <select id="smart-active-month" class="smart-month-select" onchange="onSmartActiveMonth(this.value)"></select>
         </div>
         <div id="smart-mvp-banner" class="smart-mvp-banner hidden"></div>
+        <div class="smart-period-total" id="smart-active-period-total"></div>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
         <h2><span class="dot" style="background:var(--amber)"></span> <span data-i18n="smart.statusDist">Holat taqsimoti</span></h2>
+        <div class="smart-period-total" id="smart-status-period-total"></div>
         <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
       </div>
     </div>
     <div class="panel">
       <h2><span class="dot" style="background:var(--accent2)"></span> <span data-i18n="smart.byDept">Bo'limlar kesimida topshiriqlar</span></h2>
+      <div class="smart-period-total" id="smart-dept-period-total"></div>
       <div class="chart-wrap" style="height:260px;"><canvas id="chart-dept"></canvas></div>
     </div>
     <div class="panel">
@@ -1247,7 +1250,7 @@
         <select id="smart-trend-month" class="smart-month-select" onchange="onSmartTrendMonth(this.value)"></select>
       </div>
       <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Tanlangan oyda 1–31 kun kesimida: yaratilgan va bajarilgan topshiriqlar.</p>
-      <div class="smart-period-total hidden" id="smart-trend-period-total"></div>
+      <div class="smart-period-total" id="smart-trend-period-total"></div>
       <div class="chart-wrap" style="height:240px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel smart-mvp-history">
@@ -4967,6 +4970,27 @@ function taskDoneDayKey(t) {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
 
+function smartCreatedDoneCounts(tasks, periodKey) {
+  const list = tasks || [];
+  if (isSmartPeriodAll(periodKey)) {
+    return {
+      created: list.filter(t => !!taskCreatedMonthKey(t)).length,
+      done: list.filter(t => !!taskDoneMonthKey(t)).length,
+    };
+  }
+  return {
+    created: list.filter(t => taskCreatedMonthKey(t) === periodKey).length,
+    done: list.filter(t => taskDoneMonthKey(t) === periodKey).length,
+  };
+}
+
+function setSmartPeriodTotal(elId, created, done) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML = t('smart.trendSum', { created, done });
+}
+
 function renderSmartMvpBanner(mvp, monthKey) {
   const el = document.getElementById('smart-mvp-banner');
   if (!el) return;
@@ -5082,18 +5106,15 @@ function renderSmartAnalytics() {
       : t('smart.trendHelp');
   }
 
-  const trendSumEl = document.getElementById('smart-trend-period-total');
-  if (trendSumEl) {
-    if (isSmartPeriodAll(trendMonth)) {
-      const createdSum = tasks.filter(t => !!taskCreatedMonthKey(t)).length;
-      const doneSum = tasks.filter(t => !!taskDoneMonthKey(t)).length;
-      trendSumEl.classList.remove('hidden');
-      trendSumEl.innerHTML = t('smart.trendSum', { created: createdSum, done: doneSum });
-    } else {
-      trendSumEl.classList.add('hidden');
-      trendSumEl.innerHTML = '';
-    }
-  }
+  const activeCounts = smartCreatedDoneCounts(tasks, activeMonth);
+  setSmartPeriodTotal('smart-active-period-total', activeCounts.created, activeCounts.done);
+
+  const allCounts = smartCreatedDoneCounts(tasks, SMART_PERIOD_ALL);
+  setSmartPeriodTotal('smart-status-period-total', allCounts.created, allCounts.done);
+  setSmartPeriodTotal('smart-dept-period-total', allCounts.created, allCounts.done);
+
+  const trendCounts = smartCreatedDoneCounts(tasks, trendMonth);
+  setSmartPeriodTotal('smart-trend-period-total', trendCounts.created, trendCounts.done);
 
   if (typeof Chart === 'undefined') return;
   destroySmartCharts();
