@@ -626,6 +626,27 @@
   .smart-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
   .smart-charts .panel{margin-bottom:0;}
   .chart-wrap{position:relative;height:280px;}
+  .smart-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .smart-panel-head h2{margin:0;}
+  .smart-month-select{min-width:160px;max-width:220px;}
+  .smart-mvp-banner{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    margin:0 0 12px;padding:12px 14px;border-radius:12px;
+    background:linear-gradient(135deg, color-mix(in srgb, var(--warning) 22%, var(--panel)), var(--panel));
+    border:1px solid color-mix(in srgb, var(--warning) 55%, var(--border));
+    box-shadow:0 6px 18px rgba(0,0,0,.22);
+  }
+  .smart-mvp-banner.hidden{display:none;}
+  .smart-mvp-badge{
+    flex-shrink:0;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+    font-size:22px;background:color-mix(in srgb, var(--warning) 35%, var(--panel-2));
+    border:1px solid color-mix(in srgb, var(--warning) 60%, transparent);
+  }
+  .smart-mvp-banner strong{color:var(--warning);font-size:15px;}
+  .smart-mvp-banner .smart-mvp-meta{font-size:12px;color:var(--text-soft);}
+  .smart-mvp-history{margin-top:4px;}
+  .smart-mvp-history tr.mvp-current td{background:color-mix(in srgb, var(--warning) 12%, transparent);}
+  .smart-mvp-crown{color:var(--warning);font-weight:800;}
   @media(max-width:900px){.smart-charts{grid-template-columns:1fr;}}
   .add-row input[type=datetime-local]{min-width:190px;}
 
@@ -1003,7 +1024,11 @@
     </div>
     <div class="smart-charts">
       <div class="panel">
-        <h2><span class="dot" style="background:var(--accent)"></span> <span data-i18n="smart.activeExec">Eng faol ijrochilar (bajarilgan topshiriqlar)</span></h2>
+        <div class="smart-panel-head">
+          <h2><span class="dot" style="background:var(--accent)"></span> <span data-i18n="smart.activeExec">Eng faol xodim (oylik)</span></h2>
+          <select id="smart-active-month" class="smart-month-select" onchange="onSmartActiveMonth(this.value)"></select>
+        </div>
+        <div id="smart-mvp-banner" class="smart-mvp-banner hidden"></div>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
@@ -1016,9 +1041,23 @@
       <div class="chart-wrap" style="height:260px;"><canvas id="chart-dept"></canvas></div>
     </div>
     <div class="panel">
-      <h2><span class="dot" style="background:var(--success)"></span> <span data-i18n="smart.trend">Kunlik topshiriqlar trendi (so'nggi 30 kun)</span></h2>
-      <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.</p>
-      <div class="chart-wrap" style="height:220px;"><canvas id="chart-trend"></canvas></div>
+      <h2><span class="dot" style="background:var(--success)"></span> <span data-i18n="smart.trend">Oylik topshiriqlar trendi</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Har oy kesimida: yaratilgan va bajarilgan topshiriqlar. Davr har oyning 1-sanasida yangilanadi.</p>
+      <div class="chart-wrap" style="height:240px;"><canvas id="chart-trend"></canvas></div>
+    </div>
+    <div class="panel smart-mvp-history">
+      <h2><span class="dot" style="background:var(--warning)"></span> <span data-i18n="smart.mvpHistory">Eng faol xodimlar tarixi (oylar kesimida)</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="smart.mvpHistoryHelp">Har oyda eng ko'p bajarilgan (rahbar bergan) topshiriqlar bo'yicha g'olib.</p>
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th data-i18n="smart.colMonth">Oy</th>
+            <th data-i18n="smart.colMvp">Eng faol xodim</th>
+            <th data-i18n="kpi.done">Bajarildi</th>
+          </tr>
+        </thead>
+        <tbody id="smart-mvp-history-tbody"></tbody>
+      </table>
     </div>
     <div class="panel">
       <h2><span class="dot" style="background:var(--purple)"></span> <span data-i18n="smart.byExec">Ijrochi kesimida monitoring</span></h2>
@@ -1274,11 +1313,17 @@ const I18N = {
     'tasks.empty': 'Topshiriq topilmadi',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': "Faqat rahbarlar bergan topshiriqlar (o'ziga yaratilganlar hisoblanmaydi).",
-    'smart.activeExec': 'Eng faol ijrochilar (rahbar bergan, bajarilgan)',
+    'smart.activeExec': 'Eng faol xodim (oylik, taqdirlash)',
     'smart.statusDist': 'Holat taqsimoti',
     'smart.byDept': "Bo'limlar kesimida topshiriqlar",
-    'smart.trend': "Kunlik topshiriqlar trendi (so'nggi 30 kun)",
-    'smart.trendHelp': 'Jami — kunlik yaratilgan; Bajarilgan — shu kunda yopilgan topshiriqlar.',
+    'smart.trend': 'Oylik topshiriqlar trendi',
+    'smart.trendHelp': "Har oy kesimida: yaratilgan va bajarilgan topshiriqlar. Davr har oyning 1-sanasida yangilanadi.",
+    'smart.mvpHistory': 'Eng faol xodimlar tarixi (oylar kesimida)',
+    'smart.mvpHistoryHelp': "Har oyda eng ko'p bajarilgan (rahbar bergan) topshiriqlar bo'yicha g'olib.",
+    'smart.colMonth': 'Oy',
+    'smart.colMvp': 'Eng faol xodim',
+    'smart.mvpBanner': 'Oy g\'olibi',
+    'smart.mvpNone': 'Bu oyda bajarilgan topshiriq yo\'q',
     'smart.byExec': 'Ijrochi kesimida monitoring',
     'smart.colExec': 'Bajaruvchi',
     'smart.risk': 'SMART risk',
@@ -1421,11 +1466,17 @@ const I18N = {
     'tasks.empty': 'Задачи не найдены',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': 'Учитываются только задачи от руководителей (самоназначенные не входят).',
-    'smart.activeExec': 'Самые активные исполнители (от руководителей)',
+    'smart.activeExec': 'Самый активный сотрудник (месяц, награда)',
     'smart.statusDist': 'Распределение статусов',
     'smart.byDept': 'Задачи по отделам',
-    'smart.trend': 'Дневной тренд задач (последние 30 дней)',
-    'smart.trendHelp': 'Всего — созданные за день; Выполнено — закрытые в этот день.',
+    'smart.trend': 'Месячный тренд задач',
+    'smart.trendHelp': 'По месяцам: созданные и выполненные. Период обновляется 1-го числа каждого месяца.',
+    'smart.mvpHistory': 'История самых активных (по месяцам)',
+    'smart.mvpHistoryHelp': 'Победитель месяца — больше всего выполненных задач от руководителей.',
+    'smart.colMonth': 'Месяц',
+    'smart.colMvp': 'Самый активный',
+    'smart.mvpBanner': 'Победитель месяца',
+    'smart.mvpNone': 'В этом месяце нет выполненных задач',
     'smart.byExec': 'Мониторинг по исполнителям',
     'smart.colExec': 'Исполнитель',
     'smart.risk': 'SMART риск',
@@ -1568,11 +1619,17 @@ const I18N = {
     'tasks.empty': 'No tasks found',
     'smart.title': 'SMART Task Monitoring',
     'smart.sub': 'Only tasks assigned by managers count (self-created tasks are excluded).',
-    'smart.activeExec': 'Most active executors (manager-assigned, done)',
+    'smart.activeExec': 'Most active employee (monthly award)',
     'smart.statusDist': 'Status distribution',
     'smart.byDept': 'Tasks by department',
-    'smart.trend': 'Daily task trend (last 30 days)',
-    'smart.trendHelp': 'Total — created that day; Done — closed that day.',
+    'smart.trend': 'Monthly task trend',
+    'smart.trendHelp': 'By month: created vs completed. The period rolls over on the 1st of each month.',
+    'smart.mvpHistory': 'Most active employees history (by month)',
+    'smart.mvpHistoryHelp': 'Monthly winner — most completed manager-assigned tasks.',
+    'smart.colMonth': 'Month',
+    'smart.colMvp': 'Most active',
+    'smart.mvpBanner': 'Month winner',
+    'smart.mvpNone': 'No completed tasks this month',
     'smart.byExec': 'Monitoring by executor',
     'smart.colExec': 'Executor',
     'smart.risk': 'SMART risk',
@@ -2787,7 +2844,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', taskFolder:'active', taskSort:'deadline_asc' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', taskFolder:'active', taskSort:'deadline_asc' };
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
@@ -3618,6 +3675,10 @@ function onSmartFilterDepartment(v){
   state.smartFilterDepartment = v || '';
   renderSmartAnalytics();
 }
+function onSmartActiveMonth(v){
+  state.smartActiveMonth = v || currentMonthKey();
+  renderSmartAnalytics();
+}
 
 /* =========================================================
    ACTIONS
@@ -4398,6 +4459,133 @@ function smartRiskForAssignee(own) {
   return 'Past';
 }
 
+const SMART_MONTH_NAMES_UZ = ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+const SMART_MONTH_NAMES_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const SMART_MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function currentMonthKey(d) {
+  const x = d ? new Date(d) : new Date();
+  if (isNaN(x.getTime())) return currentMonthKey();
+  return x.getFullYear() + '-' + pad2(x.getMonth() + 1);
+}
+
+function monthKeyLabel(key) {
+  const m = String(key || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return key || '—';
+  const y = m[1];
+  const mi = Math.max(0, Math.min(11, parseInt(m[2], 10) - 1));
+  const lang = (typeof getAppLang === 'function' ? getAppLang() : null)
+    || document.documentElement.getAttribute('data-lang')
+    || 'uz';
+  const names = lang === 'ru' ? SMART_MONTH_NAMES_RU : (lang === 'en' ? SMART_MONTH_NAMES_EN : SMART_MONTH_NAMES_UZ);
+  return names[mi] + ' ' + y;
+}
+
+function taskDoneMonthKey(t) {
+  if (!t || (t.status !== 'bajarildi' && effectiveStatus(t) !== 'bajarildi')) return null;
+  const raw = t.completed_at || t.created_at;
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw).slice(0, 7);
+  return currentMonthKey(d);
+}
+
+function taskCreatedMonthKey(t) {
+  if (!t?.created_at) return null;
+  const d = new Date(t.created_at);
+  if (isNaN(d.getTime())) return String(t.created_at).slice(0, 7);
+  return currentMonthKey(d);
+}
+
+/** Oylar ro'yxati: eng eski topshiriqdan joriy oygacha (max 24) */
+function listSmartMonthKeys(tasks) {
+  const cur = currentMonthKey();
+  let minKey = cur;
+  (tasks || []).forEach(t => {
+    const a = taskCreatedMonthKey(t);
+    const b = taskDoneMonthKey(t);
+    if (a && a < minKey) minKey = a;
+    if (b && b < minKey) minKey = b;
+  });
+  const keys = [];
+  let [y, m] = minKey.split('-').map(Number);
+  const [cy, cm] = cur.split('-').map(Number);
+  let guard = 0;
+  while (guard++ < 36) {
+    const k = y + '-' + pad2(m);
+    keys.push(k);
+    if (y === cy && m === cm) break;
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  if (keys.length > 24) return keys.slice(-24);
+  return keys;
+}
+
+function rankingDoneByAssignee(tasks, monthKey) {
+  const map = new Map();
+  (tasks || []).forEach(t => {
+    if (taskDoneMonthKey(t) !== monthKey) return;
+    const name = t.assignee || (userById(t.assignee_user_id)?.display_name) || '';
+    if (!name) return;
+    map.set(name, (map.get(name) || 0) + 1);
+  });
+  return Array.from(map.entries())
+    .map(([name, done]) => ({ name, done }))
+    .sort((a, b) => b.done - a.done || a.name.localeCompare(b.name, 'uz'));
+}
+
+function fillSmartMonthSelect(monthKeys, selected) {
+  const sel = document.getElementById('smart-active-month');
+  if (!sel) return;
+  const keys = (monthKeys && monthKeys.length) ? monthKeys.slice().reverse() : [currentMonthKey()];
+  const cur = selected && keys.includes(selected) ? selected : keys[0];
+  sel.innerHTML = keys.map(k =>
+    `<option value="${k}" ${k === cur ? 'selected' : ''}>${escapeHtml(monthKeyLabel(k))}</option>`
+  ).join('');
+  state.smartActiveMonth = cur;
+}
+
+function renderSmartMvpBanner(mvp, monthKey) {
+  const el = document.getElementById('smart-mvp-banner');
+  if (!el) return;
+  if (!mvp || !mvp.done) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="smart-mvp-badge">🏆</div>
+    <div>
+      <div class="smart-mvp-meta">${escapeHtml(t('smart.mvpBanner') || "Oy g'olibi")} · ${escapeHtml(monthKeyLabel(monthKey))}</div>
+      <strong>${escapeHtml(mvp.name)}</strong>
+      <div class="smart-mvp-meta">${mvp.done} ${escapeHtml(t('kpi.done') || 'Bajarildi')}</div>
+    </div>`;
+}
+
+function renderSmartMvpHistory(tasks, currentKey) {
+  const tbody = document.getElementById('smart-mvp-history-tbody');
+  if (!tbody) return;
+  const months = listSmartMonthKeys(tasks).slice().reverse();
+  const rows = months.map(key => {
+    const rank = rankingDoneByAssignee(tasks, key);
+    const mvp = rank[0];
+    if (!mvp || !mvp.done) {
+      return `<tr class="${key === currentKey ? 'mvp-current' : ''}">
+        <td>${escapeHtml(monthKeyLabel(key))}</td>
+        <td colspan="2" class="empty-msg" style="text-align:left;">${escapeHtml(t('smart.mvpNone') || "Bajarilgan yo'q")}</td>
+      </tr>`;
+    }
+    return `<tr class="${key === currentKey ? 'mvp-current' : ''}">
+      <td>${escapeHtml(monthKeyLabel(key))}${key === currentKey ? ' <span class="smart-mvp-crown">●</span>' : ''}</td>
+      <td><span class="smart-mvp-crown">🏆</span> ${escapeHtml(mvp.name)}</td>
+      <td><b>${mvp.done}</b></td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML = rows || `<tr><td colspan="3" class="empty-msg">${escapeHtml(t('smart.mvpNone') || '—')}</td></tr>`;
+}
+
 function renderSmartAnalytics() {
   // SMART: faqat rahbarlar bergan topshiriqlar (o'ziga yaratilganlar chiqariladi)
   let tasks = state.tasks.filter(isSmartCountedTask);
@@ -4407,6 +4595,13 @@ function renderSmartAnalytics() {
     const names = new Set(deptUsers.map(u => u.display_name));
     tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
   }
+  const monthKeys = listSmartMonthKeys(tasks);
+  if (!state.smartActiveMonth || !monthKeys.includes(state.smartActiveMonth)) {
+    state.smartActiveMonth = currentMonthKey();
+  }
+  fillSmartMonthSelect(monthKeys, state.smartActiveMonth);
+  const activeMonth = state.smartActiveMonth || currentMonthKey();
+
   const m = computeSmartMetrics(tasks);
   const stats = document.getElementById('smart-stats');
   if (stats) {
@@ -4447,6 +4642,11 @@ function renderSmartAnalytics() {
       : 'Hali tahlil uchun ma\'lumot yetarli emas.';
   }
 
+  const monthRank = rankingDoneByAssignee(tasks, activeMonth);
+  const mvp = monthRank[0] || null;
+  renderSmartMvpBanner(mvp, activeMonth);
+  renderSmartMvpHistory(tasks, activeMonth);
+
   if (typeof Chart === 'undefined') return;
   destroySmartCharts();
   const accent = cssVar('--accent') || '#4C8DFF';
@@ -4458,29 +4658,23 @@ function renderSmartAnalytics() {
   const grid = cssVar('--border') || '#232C3D';
   const panel2 = cssVar('--panel-2') || '#171F2E';
 
-  // --- Chart 1: Eng faol ijrochilar (bajarilgan topshiriqlar soni) ---
+  // --- Chart 1: Eng faol xodimlar (tanlangan oy) ---
   const smartCtx = document.getElementById('chart-smart');
   if (smartCtx) {
-    const names = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean)));
-    const userDone = names
-      .map(name => ({
-        name,
-        done: tasks.filter(t => t.assignee === name && effectiveStatus(t) === 'bajarildi').length
-      }))
-      .filter(u => u.done > 0)
-      .sort((a, b) => b.done - a.done)
-      .slice(0, 10);
+    const userDone = monthRank.filter(u => u.done > 0).slice(0, 10);
 
     if (userDone.length) {
-      const palette = [accent, success, warning, accent2, danger, '#60A5FA', '#34D399', '#FBBF24', '#A78BFA', '#F472B6'];
+      const palette = [warning, accent, success, accent2, danger, '#60A5FA', '#34D399', '#FBBF24', '#A78BFA', '#F472B6'];
       smartCharts.smart = new Chart(smartCtx, {
         type: 'bar',
         data: {
-          labels: userDone.map(u => u.name),
+          labels: userDone.map((u, i) => (i === 0 ? '🏆 ' : '') + u.name),
           datasets: [{
             label: 'Bajarilgan',
             data: userDone.map(u => u.done),
-            backgroundColor: userDone.map((_, i) => palette[i % palette.length]),
+            backgroundColor: userDone.map((_, i) => i === 0 ? warning : palette[(i + 1) % palette.length]),
+            borderColor: userDone.map((_, i) => i === 0 ? warning : 'transparent'),
+            borderWidth: userDone.map((_, i) => i === 0 ? 2 : 0),
             borderRadius: 6,
           }]
         },
@@ -4496,14 +4690,15 @@ function renderSmartAnalytics() {
         }
       });
     } else {
-      // hali bajarilgan topshiriq yo'q
       const ctx2d = smartCtx.getContext('2d');
       if (ctx2d) {
-        ctx2d.clearRect(0, 0, smartCtx.width, smartCtx.height);
+        const w = smartCtx.clientWidth || smartCtx.width || 300;
+        const h = smartCtx.clientHeight || smartCtx.height || 120;
+        ctx2d.clearRect(0, 0, w, h);
         ctx2d.fillStyle = tick;
         ctx2d.font = '13px sans-serif';
         ctx2d.textAlign = 'center';
-        ctx2d.fillText("Hali bajarilgan topshiriq yo'q", smartCtx.width / 2, 60);
+        ctx2d.fillText(t('smart.mvpNone') || "Hali bajarilgan topshiriq yo'q", w / 2, 60);
       }
     }
   }
@@ -4589,33 +4784,16 @@ function renderSmartAnalytics() {
     });
   }
 
-  // --- Chart 4: Kunlik trend (so'nggi 30 kun) ---
+  // --- Chart 4: Oylik trend (har oyning 1-sanasida davr yangilanadi) ---
   const trendCtx = document.getElementById('chart-trend');
   if (trendCtx) {
-    // So'nggi 30 kunni sanab chiqamiz
-    const days = 30;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const labels = [];
-    const createdCounts = [];
-    const doneCounts = [];
-
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dayStr = d.toISOString().slice(0, 10);
-      labels.push(pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1));
-
-      createdCounts.push(
-        tasks.filter(t => (t.created_at || '').slice(0, 10) === dayStr).length
-      );
-      doneCounts.push(
-        tasks.filter(t => {
-          if (effectiveStatus(t) !== 'bajarildi' && t.status !== 'bajarildi') return false;
-          const doneDay = (t.completed_at || t.created_at || '').slice(0, 10);
-          return doneDay === dayStr;
-        }).length
-      );
-    }
+    const labels = monthKeys.map(monthKeyLabel);
+    const createdCounts = monthKeys.map(key =>
+      tasks.filter(t => taskCreatedMonthKey(t) === key).length
+    );
+    const doneCounts = monthKeys.map(key =>
+      tasks.filter(t => taskDoneMonthKey(t) === key).length
+    );
 
     smartCharts.trend = new Chart(trendCtx, {
       type: 'line',
@@ -4623,25 +4801,25 @@ function renderSmartAnalytics() {
         labels,
         datasets: [
           {
-            label: 'Jami topshiriqlar',
+            label: 'Yaratilgan',
             data: createdCounts,
             borderColor: accent,
             backgroundColor: accent + '22',
             fill: true,
-            tension: 0.4,
-            pointRadius: 3,
-            pointHoverRadius: 5,
+            tension: 0.35,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             borderWidth: 2,
           },
           {
-            label: 'Bajarilgan topshiriqlar',
+            label: 'Bajarilgan',
             data: doneCounts,
             borderColor: success,
             backgroundColor: success + '22',
             fill: true,
-            tension: 0.4,
-            pointRadius: 3,
-            pointHoverRadius: 5,
+            tension: 0.35,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             borderWidth: 2,
           }
         ]
@@ -4651,7 +4829,7 @@ function renderSmartAnalytics() {
         maintainAspectRatio: false,
         scales: {
           x: {
-            ticks: { color: tick, maxTicksLimit: 10 },
+            ticks: { color: tick, maxRotation: 45, minRotation: 0 },
             grid: { color: grid }
           },
           y: {
@@ -4721,7 +4899,7 @@ function setupPwaInstall() {
     toast('Taskoman ilova sifatida o\'rnatildi');
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=15').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=16').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -4729,7 +4907,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v12')
+        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v13')
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

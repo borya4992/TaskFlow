@@ -1,4 +1,4 @@
-﻿const CACHE = 'taskoman-v12';
+﻿const CACHE = 'taskoman-v13';
 const PRECACHE = [
   '/',
   '/index.html',
