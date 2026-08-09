@@ -786,6 +786,17 @@
   .smart-mvp-history{margin-top:4px;}
   .smart-mvp-history tr.mvp-current td{background:color-mix(in srgb, var(--warning) 12%, transparent);}
   .smart-mvp-crown{color:var(--warning);font-weight:800;}
+  .smart-period-total{
+    display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;
+    margin:0 0 12px;padding:8px 12px;border-radius:10px;
+    background:var(--panel-2);border:1px solid var(--border);
+    font-size:12.5px;color:var(--text-soft);font-weight:600;
+  }
+  .smart-period-total b{color:var(--text);font-weight:800;}
+  .smart-period-total .pt-done{color:var(--success);}
+  .smart-period-total .pt-created{color:var(--accent);}
+  .incoming-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 0;align-items:center;}
+  .incoming-toolbar input[type=text]{flex:1;min-width:160px;}
   @media(max-width:900px){.smart-charts{grid-template-columns:1fr;}}
   .add-row input[type=datetime-local]{min-width:190px;}
 
@@ -1150,6 +1161,21 @@
     <div class="panel">
       <h2><span class="dot" style="background:var(--warning)"></span> <span data-i18n="incoming.title">Kiruvchi — tasdiqlash</span></h2>
       <p class="help-text" style="margin-top:0;" data-i18n="incoming.help">Sizga tasdiqlash uchun yuborilgan topshiriqlar shu yerda.</p>
+      <div class="incoming-toolbar">
+        <input type="text" id="incoming-search" data-i18n-placeholder="incoming.search" placeholder="Qidirish (ijrochi, topshiriq)…" oninput="onIncomingSearch(this.value)">
+        <div class="task-sort-wrap">
+          <label for="incoming-sort" data-i18n="tasks.sortLabel">Saralash</label>
+          <select id="incoming-sort" onchange="onIncomingSortChange(this.value)">
+            <option value="deadline_asc" data-i18n="tasks.sortDeadlineAsc">Muddat ↑ (yaqin)</option>
+            <option value="deadline_desc" data-i18n="tasks.sortDeadlineDesc">Muddat ↓ (uzoq)</option>
+            <option value="created_desc" data-i18n="tasks.sortCreatedDesc">Yaratilgan ↓ (yangi)</option>
+            <option value="created_asc" data-i18n="tasks.sortCreatedAsc">Yaratilgan ↑ (eski)</option>
+            <option value="priority_desc" data-i18n="tasks.sortPriorityDesc">Ustuvorlik ↓</option>
+            <option value="assignee" data-i18n="tasks.sortAssignee">Ijrochi (A–Z)</option>
+            <option value="title" data-i18n="tasks.sortTitle">Nom (A–Z)</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div class="task-list" id="review-list"></div>
   </div>
@@ -1204,6 +1230,7 @@
           <select id="smart-active-month" class="smart-month-select" onchange="onSmartActiveMonth(this.value)"></select>
         </div>
         <div id="smart-mvp-banner" class="smart-mvp-banner hidden"></div>
+        <div class="smart-period-total" id="smart-active-period-total"></div>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
@@ -1221,6 +1248,7 @@
         <select id="smart-trend-month" class="smart-month-select" onchange="onSmartTrendMonth(this.value)"></select>
       </div>
       <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Tanlangan oyda 1–31 kun kesimida: yaratilgan va bajarilgan topshiriqlar.</p>
+      <div class="smart-period-total" id="smart-trend-period-total"></div>
       <div class="chart-wrap" style="height:240px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel smart-mvp-history">
@@ -1451,6 +1479,8 @@ const I18N = {
     'incoming.title': 'Kiruvchi — tasdiqlash',
     'incoming.help': 'Sizga tasdiqlash uchun yuborilgan topshiriqlar shu yerda.',
     'incoming.empty': "Sizga tasdiqlash uchun kelgan topshiriq yo'q",
+    'incoming.search': 'Qidirish (ijrochi, topshiriq)…',
+    'incoming.emptyFiltered': 'Qidiruv bo‘yicha topshiriq topilmadi',
     'kpi.total': 'Jami',
     'kpi.progress': 'Jarayonda',
     'kpi.review': 'Tekshiruvda',
@@ -1511,6 +1541,8 @@ const I18N = {
     'smart.colMvp': 'Eng faol xodim',
     'smart.mvpBanner': 'Oy g\'olibi',
     'smart.mvpNone': 'Bu oyda bajarilgan topshiriq yo\'q',
+    'smart.periodDoneTotal': 'Davr jami: <b>{n}</b> bajarilgan',
+    'smart.periodTrendTotal': 'Davr jami: <b class="pt-created">{created}</b> yaratilgan · <b class="pt-done">{done}</b> bajarilgan',
     'smart.byExec': 'Ijrochi kesimida monitoring',
     'smart.colExec': 'Bajaruvchi',
     'smart.risk': 'SMART risk',
@@ -1611,6 +1643,8 @@ const I18N = {
     'incoming.title': 'Входящие — подтверждение',
     'incoming.help': 'Задачи, отправленные вам на подтверждение, находятся здесь.',
     'incoming.empty': 'Нет задач, ожидающих вашего подтверждения',
+    'incoming.search': 'Поиск (исполнитель, задача)…',
+    'incoming.emptyFiltered': 'По поиску задач не найдено',
     'kpi.total': 'Всего',
     'kpi.progress': 'В работе',
     'kpi.review': 'На проверке',
@@ -1671,6 +1705,8 @@ const I18N = {
     'smart.colMvp': 'Самый активный',
     'smart.mvpBanner': 'Победитель месяца',
     'smart.mvpNone': 'В этом месяце нет выполненных задач',
+    'smart.periodDoneTotal': 'Итого за период: <b>{n}</b> выполнено',
+    'smart.periodTrendTotal': 'Итого за период: <b class="pt-created">{created}</b> создано · <b class="pt-done">{done}</b> выполнено',
     'smart.byExec': 'Мониторинг по исполнителям',
     'smart.colExec': 'Исполнитель',
     'smart.risk': 'SMART риск',
@@ -1771,6 +1807,8 @@ const I18N = {
     'incoming.title': 'Inbox — approval',
     'incoming.help': 'Tasks sent to you for approval appear here.',
     'incoming.empty': 'No tasks awaiting your approval',
+    'incoming.search': 'Search (assignee, task)…',
+    'incoming.emptyFiltered': 'No tasks match your search',
     'kpi.total': 'Total',
     'kpi.progress': 'In progress',
     'kpi.review': 'In review',
@@ -1831,6 +1869,8 @@ const I18N = {
     'smart.colMvp': 'Most active',
     'smart.mvpBanner': 'Month winner',
     'smart.mvpNone': 'No completed tasks this month',
+    'smart.periodDoneTotal': 'Period total: <b>{n}</b> done',
+    'smart.periodTrendTotal': 'Period total: <b class="pt-created">{created}</b> created · <b class="pt-done">{done}</b> done',
     'smart.byExec': 'Monitoring by executor',
     'smart.colExec': 'Executor',
     'smart.risk': 'SMART risk',
@@ -3140,7 +3180,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc', incomingSearch:'', incomingSort:'deadline_asc' };
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
@@ -3792,6 +3832,22 @@ function getIncomingReviewTasks() {
     .filter(t => !t.deleted_at)
     .filter(t => t.status === 'tekshiruvda' && canReviewTask(t));
 }
+function matchesIncomingSearch(t) {
+  const q = (state.incomingSearch || '').trim().toLowerCase();
+  if (!q) return true;
+  const creator = userById(t.created_by_user_id);
+  const hay = [t.title, t.assignee, creator?.display_name, t.priority].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(q);
+}
+function onIncomingSearch(v) {
+  state.incomingSearch = v || '';
+  renderReviewList();
+}
+function onIncomingSortChange(v) {
+  state.incomingSort = v || 'deadline_asc';
+  try { localStorage.setItem('incoming_sort', state.incomingSort); } catch (e) {}
+  renderReviewList();
+}
 function updateIncomingBadge() {
   const badge = document.getElementById('nav-incoming-badge');
   if (!badge) return;
@@ -3802,10 +3858,22 @@ function updateIncomingBadge() {
 function renderReviewList() {
   const list = document.getElementById('review-list');
   if (!list) return;
-  const reviewTasks = getIncomingReviewTasks();
+  const sortSel = document.getElementById('incoming-sort');
+  if (sortSel && sortSel.value !== state.incomingSort) sortSel.value = state.incomingSort || 'deadline_asc';
+  const searchEl = document.getElementById('incoming-search');
+  if (searchEl && searchEl.value !== (state.incomingSearch || '')) searchEl.value = state.incomingSearch || '';
+
+  const all = getIncomingReviewTasks();
   updateIncomingBadge();
-  if (!reviewTasks.length) {
+  let reviewTasks = all.filter(matchesIncomingSearch);
+  reviewTasks = sortTasksList(reviewTasks, state.incomingSort || 'deadline_asc');
+
+  if (!all.length) {
     list.innerHTML = `<div class="empty-msg">${escapeHtml(t('incoming.empty'))}</div>`;
+    return;
+  }
+  if (!reviewTasks.length) {
+    list.innerHTML = `<div class="empty-msg">${escapeHtml(t('incoming.emptyFiltered'))}</div>`;
     return;
   }
   list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
@@ -4972,6 +5040,25 @@ function renderSmartAnalytics() {
   renderSmartMvpBanner(mvp, activeMonth);
   renderSmartMvpHistory(tasks, activeMonth);
 
+  const activePeriodEl = document.getElementById('smart-active-period-total');
+  if (activePeriodEl) {
+    const periodDone = monthRank.reduce((s, u) => s + (u.done || 0), 0);
+    activePeriodEl.innerHTML = t('smart.periodDoneTotal', { n: periodDone });
+  }
+
+  const trendDim = daysInMonthKey(trendMonth);
+  let trendCreatedTotal = 0;
+  let trendDoneTotal = 0;
+  for (let day = 1; day <= trendDim; day++) {
+    const dk = dayKeyInMonth(trendMonth, day);
+    trendCreatedTotal += tasks.filter(t => taskCreatedDayKey(t) === dk).length;
+    trendDoneTotal += tasks.filter(t => taskDoneDayKey(t) === dk).length;
+  }
+  const trendPeriodEl = document.getElementById('smart-trend-period-total');
+  if (trendPeriodEl) {
+    trendPeriodEl.innerHTML = t('smart.periodTrendTotal', { created: trendCreatedTotal, done: trendDoneTotal });
+  }
+
   if (typeof Chart === 'undefined') return;
   destroySmartCharts();
   const accent = cssVar('--accent') || '#4C8DFF';
@@ -5265,9 +5352,13 @@ async function init() {
   try {
     const savedSort = localStorage.getItem('task_sort');
     if (savedSort) state.taskSort = savedSort;
+    const savedIncomingSort = localStorage.getItem('incoming_sort');
+    if (savedIncomingSort) state.incomingSort = savedIncomingSort;
   } catch (e) {}
   const sortSel = document.getElementById('task-sort');
   if (sortSel) sortSel.value = state.taskSort || 'deadline_asc';
+  const incomingSortSel = document.getElementById('incoming-sort');
+  if (incomingSortSel) incomingSortSel.value = state.incomingSort || 'deadline_asc';
   setupPwaInstall();
   setupExecCardClicks();
   initSupabase();
