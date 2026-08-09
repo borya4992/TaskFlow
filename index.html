@@ -226,6 +226,20 @@
     width:36px;height:36px;object-fit:contain;border-radius:8px;
     flex-shrink:0;background:#0a0a0a;display:block;
   }
+  .brand-wordmark{
+    font-family:'Orbitron',sans-serif;
+    font-weight:800;
+    font-size:1.05em;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    background:linear-gradient(105deg,#e8eefc 0%,#a5b4fc 28%,#67e8f9 52%,#c084fc 78%,#e2e8f0 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 10px rgba(103,232,249,.28)) drop-shadow(0 0 18px rgba(168,85,247,.18));
+    line-height:1.1;
+  }
   header p{margin:4px 0 0;color:var(--subtitle);font-size:12.5px;}
   header .credit-line{
     margin:6px 0 0;
@@ -571,7 +585,7 @@
     box-shadow:0 24px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04) inset;
     animation:landingIn .35s ease both;position:relative;
   }
-  .auth-card h1{margin:0 0 6px;font-size:20px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Orbitron',sans-serif;letter-spacing:.04em;}
+  .auth-card h1{margin:0 0 6px;font-size:20px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;}
   .auth-card h1 .brand-logo{
     width:40px;height:40px;object-fit:contain;border-radius:8px;
     flex-shrink:0;background:#0a0a0a;display:block;
@@ -866,7 +880,7 @@
   <div id="login-backdrop" class="login-backdrop" onclick="if(event.target===this)closeLoginPanel()">
     <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
       <button type="button" class="auth-close" onclick="closeLoginPanel()" aria-label="Yopish">✕</button>
-      <h1 id="login-title"><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> TASKOMAN</h1>
+      <h1 id="login-title"><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span></h1>
       <p class="auth-sub" data-i18n="auth.sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')" data-i18n="auth.tabPassword">Parol</button>
@@ -892,7 +906,7 @@
 
   <header>
     <div class="titles">
-      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span data-i18n="app.title">Taskoman</span></h1>
+      <h1><img class="brand-logo" src="/icons/void-logo.png" width="36" height="36" alt="V.O.I.D"> <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span></h1>
       <p class="credit-line">Created by V.O.I.D — Vision Of Intelligent Development team Owner Bobur Babajanov</p>
     </div>
     <div class="user-bar">
@@ -1256,7 +1270,7 @@ const I18N = {
     'auth.login': 'Kirish',
     'auth.hintPassword': "Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
     'auth.hintTelegram': "Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.",
-    'app.title': 'Taskoman',
+    'app.title': 'TASKOMAN',
     'app.openProfile': 'Profilni ochish',
     'app.install': "Ilovani o'rnatish",
     'app.theme': 'Tema',
@@ -1409,7 +1423,7 @@ const I18N = {
     'auth.login': 'Войти',
     'auth.hintPassword': 'В первый раз: стандартный пароль <b>123456</b>. Затем смените в профиле. Если забыли — сбросит админ.',
     'auth.hintTelegram': 'Для входа через Telegram админ должен добавить ваш Telegram ID.',
-    'app.title': 'Taskoman',
+    'app.title': 'TASKOMAN',
     'app.openProfile': 'Открыть профиль',
     'app.install': 'Установить приложение',
     'app.theme': 'Тема',
@@ -1562,7 +1576,7 @@ const I18N = {
     'auth.login': 'Sign in',
     'auth.hintPassword': 'First time: default password <b>123456</b>. Change it later in your profile. If forgotten — ask an admin to reset.',
     'auth.hintTelegram': 'For Telegram login, an admin must add your Telegram ID first.',
-    'app.title': 'Taskoman',
+    'app.title': 'TASKOMAN',
     'app.openProfile': 'Open profile',
     'app.install': 'Install app',
     'app.theme': 'Theme',
@@ -4958,7 +4972,7 @@ function setupPwaInstall() {
     toast('Taskoman ilova sifatida o\'rnatildi');
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=16').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=17').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
