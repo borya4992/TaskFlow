@@ -267,7 +267,37 @@ async function createProject(payload, memberIds) {
   await loadAllProjectData();
   renderProjectsView();
   toast('Loyiha yaratildi');
+  try {
+    await notifyProjectCreated(project, memberIds || []);
+  } catch (e) { console.error(e); }
   return project;
+}
+
+async function notifyProjectCreated(project, memberIds) {
+  if (typeof notifyUser !== 'function') return;
+  const creator = currentProfile?.display_name || 'Yaratuvchi';
+  const typeLabel = project.is_personal ? 'Shaxsiy' : 'Jamoaviy';
+  const desc = project.description ? `\n${project.description}` : '';
+  const text =
+    `${project.icon || '📋'} <b>Yangi loyiha</b>\n\n` +
+    `<b>${project.name}</b> (${typeLabel})${desc}\n\n` +
+    `Yaratuvchi: ${creator}`;
+
+  const recipientIds = new Set([project.owner_user_id, ...(memberIds || [])]);
+  let sent = 0;
+  for (const uid of recipientIds) {
+    if (!uid || uid === currentProfile?.id) continue; // yaratuvchiga o'ziga yubormaymiz
+    const user = typeof userById === 'function' ? userById(uid) : null;
+    if (!user) continue;
+    const ok = await notifyUser(user, text);
+    if (ok) sent++;
+  }
+  // Asosiy monitoring chatga ham (task yaratilgandagi umumiy kanal kabi)
+  if (typeof sendTelegram === 'function' && state.settings?.telegram_chat_id) {
+    await sendTelegram(text);
+  } else if (!sent && recipientIds.size <= 1) {
+    // faqat egasi — personal loyiha; chat sozlanmagan bo'lsa jim
+  }
 }
 
 async function updateProject(id, patch) {
@@ -387,6 +417,10 @@ async function createColumn(projectId, name, color) {
 }
 
 async function updateColumn(id, patch) {
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'name') && (typeof isAdmin !== 'function' || !isAdmin())) {
+    toast("Ustun nomini faqat admin o'zgartira oladi");
+    return;
+  }
   if (usingLocalFallback) {
     const list = localGet(LOCAL_KEY_PROJECT_COLUMNS);
     const idx = list.findIndex(c => c.id === id);
@@ -739,6 +773,12 @@ function renderKanbanHtml(projectId) {
 
   const columnsHtml = cols.map(col => {
     const cards = projectCardsOf(projectId).filter(c => c.column_id === col.id);
+    const adminRename = typeof isAdmin === 'function' && isAdmin();
+    const nameCtrl = adminRename
+      ? `<input class="pk-col-name" value="${escapeHtml(col.name)}"
+            onchange="renameProjectColumn('${col.id}', this.value)"
+            onclick="event.stopPropagation()" title="Ustun nomini o'zgartirish (admin)">`
+      : `<span class="pk-col-name" title="Ustun nomini faqat admin o'zgartira oladi">${escapeHtml(col.name)}</span>`;
     const cardsHtml = cards.map(card => {
       const assignee = card.assignee_user_id ? userById(card.assignee_user_id) : null;
       const dl = cardDeadlineInfo(card, projectId);
@@ -762,15 +802,14 @@ function renderKanbanHtml(projectId) {
         ondrop="onProjectColDrop(event,'${col.id}')">
         <div class="pk-col-head">
           <span class="pk-col-dot" style="background:${escapeHtml(col.color)}"></span>
-          <input class="pk-col-name" value="${escapeHtml(col.name)}"
-            onchange="renameProjectColumn('${col.id}', this.value)"
-            onclick="event.stopPropagation()">
+          ${nameCtrl}
           <span class="pk-col-count">${cards.length}</span>
           <div class="proj-menu" onclick="event.stopPropagation()">
             <button type="button" class="proj-menu-btn" onclick="toggleProjMenu(event,'col-${col.id}')">⋯</button>
             <div class="proj-menu-drop hidden" id="proj-menu-col-${col.id}">
-              <button type="button" onclick="markDoneColumn('${col.id}')">Bajarildi ustuni</button>
-              ${manage ? `<button type="button" class="danger" onclick="deleteColumn('${col.id}')">O'chirish</button>` : ''}
+              ${adminRename ? `<button type="button" onclick="markDoneColumn('${col.id}')">Bajarildi ustuni</button>` : ''}
+              ${adminRename ? `<button type="button" class="danger" onclick="deleteColumn('${col.id}')">O'chirish</button>` : ''}
+              ${!adminRename ? `<button type="button" disabled style="opacity:.6">Nom — faqat admin</button>` : ''}
             </div>
           </div>
         </div>
@@ -785,7 +824,7 @@ function renderKanbanHtml(projectId) {
       <h2 class="proj-title" style="margin:0;">${escapeHtml(p.icon || '')} ${escapeHtml(p.name)}</h2>
       <div class="pk-toolbar-actions">
         <button type="button" class="btn-ghost" onclick="openProjectProgress('${projectId}')">📊 Progress</button>
-        <button type="button" class="btn-ghost" onclick="promptAddColumn('${projectId}')">+ Ustun</button>
+        ${(typeof isAdmin === 'function' && isAdmin()) ? `<button type="button" class="btn-ghost" onclick="promptAddColumn('${projectId}')">+ Ustun</button>` : ''}
         <button type="button" class="btn-blue" onclick="openCreateCardModal('${projectId}')">+ Kartochka</button>
         ${membersBtn}
       </div>
@@ -794,12 +833,21 @@ function renderKanbanHtml(projectId) {
 }
 
 function renameProjectColumn(id, name) {
+  if (typeof isAdmin !== 'function' || !isAdmin()) {
+    toast("Ustun nomini faqat admin o'zgartira oladi");
+    renderProjectsView();
+    return;
+  }
   const n = (name || '').trim();
   if (!n) return;
   updateColumn(id, { name: n });
 }
 
 function promptAddColumn(projectId) {
+  if (typeof isAdmin !== 'function' || !isAdmin()) {
+    toast("Ustun qo'shish faqat admin uchun");
+    return;
+  }
   const name = prompt('Ustun nomi:');
   if (!name || !name.trim()) return;
   createColumn(projectId, name.trim());
@@ -1094,11 +1142,17 @@ function openEditProjectCardModal(cardId) {
     `<option value="${c.id}" ${c.id === card.column_id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
   ).join('');
 
+  const adminName = typeof isAdmin === 'function' && isAdmin();
+  const titleField = adminName
+    ? `<div class="field"><label>Sarlavha</label><input type="text" id="ec-title" value="${escapeHtml(card.title)}"></div>`
+    : `<div class="field"><label>Sarlavha <span style="color:var(--text-faint);font-weight:500">(faqat admin)</span></label>
+        <input type="text" id="ec-title" value="${escapeHtml(card.title)}" readonly style="opacity:.85;cursor:default;"></div>`;
+
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h3>Kartochkani tahrirlash</h3>
-        <div class="field"><label>Sarlavha</label><input type="text" id="ec-title" value="${escapeHtml(card.title)}"></div>
+        ${titleField}
         <div class="field"><label>Tavsif</label><textarea id="ec-desc" rows="3">${escapeHtml(card.description || '')}</textarea></div>
         <div class="field"><label>Ustun</label><select id="ec-column">${colOpts}</select></div>
         <div class="field"><label>Mas'ul</label><select id="ec-assignee"><option value="">—</option>${assigneeOpts}</select></div>
@@ -1124,7 +1178,9 @@ function openEditProjectCardModal(cardId) {
 async function submitEditCard(cardId) {
   const card = state.projectCards.find(c => c.id === cardId);
   if (!card) return;
-  const title = document.getElementById('ec-title')?.value.trim();
+  const adminName = typeof isAdmin === 'function' && isAdmin();
+  let title = document.getElementById('ec-title')?.value.trim();
+  if (!adminName) title = card.title;
   if (!title) { toast('Sarlavha kiriting'); return; }
   const newCol = document.getElementById('ec-column')?.value;
   const patch = {
