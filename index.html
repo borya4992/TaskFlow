@@ -1230,7 +1230,6 @@
           <select id="smart-active-month" class="smart-month-select" onchange="onSmartActiveMonth(this.value)"></select>
         </div>
         <div id="smart-mvp-banner" class="smart-mvp-banner hidden"></div>
-        <div class="smart-period-total" id="smart-active-period-total"></div>
         <div class="chart-wrap"><canvas id="chart-smart"></canvas></div>
       </div>
       <div class="panel">
@@ -1248,7 +1247,6 @@
         <select id="smart-trend-month" class="smart-month-select" onchange="onSmartTrendMonth(this.value)"></select>
       </div>
       <p class="help-text" style="margin-top:0;" data-i18n="smart.trendHelp">Tanlangan oyda 1–31 kun kesimida: yaratilgan va bajarilgan topshiriqlar.</p>
-      <div class="smart-period-total" id="smart-trend-period-total"></div>
       <div class="chart-wrap" style="height:240px;"><canvas id="chart-trend"></canvas></div>
     </div>
     <div class="panel smart-mvp-history">
@@ -1541,8 +1539,9 @@ const I18N = {
     'smart.colMvp': 'Eng faol xodim',
     'smart.mvpBanner': 'Oy g\'olibi',
     'smart.mvpNone': 'Bu oyda bajarilgan topshiriq yo\'q',
-    'smart.periodDoneTotal': 'Davr jami: <b>{n}</b> bajarilgan',
-    'smart.periodTrendTotal': 'Davr jami: <b class="pt-created">{created}</b> yaratilgan · <b class="pt-done">{done}</b> bajarilgan',
+    'smart.periodAll': 'Jami (barcha davrlar)',
+    'smart.mvpAllBanner': 'Umumiy g\'olib',
+    'smart.trendHelpAll': 'Barcha oylar kesimida: yaratilgan va bajarilgan topshiriqlar.',
     'smart.byExec': 'Ijrochi kesimida monitoring',
     'smart.colExec': 'Bajaruvchi',
     'smart.risk': 'SMART risk',
@@ -1705,8 +1704,9 @@ const I18N = {
     'smart.colMvp': 'Самый активный',
     'smart.mvpBanner': 'Победитель месяца',
     'smart.mvpNone': 'В этом месяце нет выполненных задач',
-    'smart.periodDoneTotal': 'Итого за период: <b>{n}</b> выполнено',
-    'smart.periodTrendTotal': 'Итого за период: <b class="pt-created">{created}</b> создано · <b class="pt-done">{done}</b> выполнено',
+    'smart.periodAll': 'Итого (все периоды)',
+    'smart.mvpAllBanner': 'Общий победитель',
+    'smart.trendHelpAll': 'По всем месяцам: созданные и выполненные задачи.',
     'smart.byExec': 'Мониторинг по исполнителям',
     'smart.colExec': 'Исполнитель',
     'smart.risk': 'SMART риск',
@@ -1869,8 +1869,9 @@ const I18N = {
     'smart.colMvp': 'Most active',
     'smart.mvpBanner': 'Month winner',
     'smart.mvpNone': 'No completed tasks this month',
-    'smart.periodDoneTotal': 'Period total: <b>{n}</b> done',
-    'smart.periodTrendTotal': 'Period total: <b class="pt-created">{created}</b> created · <b class="pt-done">{done}</b> done',
+    'smart.periodAll': 'Total (all periods)',
+    'smart.mvpAllBanner': 'Overall winner',
+    'smart.trendHelpAll': 'Across all months: created vs completed tasks.',
     'smart.byExec': 'Monitoring by executor',
     'smart.colExec': 'Executor',
     'smart.risk': 'SMART risk',
@@ -4046,11 +4047,11 @@ function onSmartFilterDepartment(v){
   renderSmartAnalytics();
 }
 function onSmartActiveMonth(v){
-  state.smartActiveMonth = v || currentMonthKey();
+  state.smartActiveMonth = v || SMART_PERIOD_ALL;
   renderSmartAnalytics();
 }
 function onSmartTrendMonth(v){
-  state.smartTrendMonth = v || currentMonthKey();
+  state.smartTrendMonth = v || SMART_PERIOD_ALL;
   renderSmartAnalytics();
 }
 
@@ -4867,10 +4868,25 @@ function listSmartMonthKeys(tasks) {
   return keys;
 }
 
+const SMART_PERIOD_ALL = '__all__';
+
+function isSmartPeriodAll(key) {
+  return !key || key === SMART_PERIOD_ALL || key === 'all';
+}
+
+function smartPeriodLabel(key) {
+  return isSmartPeriodAll(key) ? t('smart.periodAll') : monthKeyLabel(key);
+}
+
 function rankingDoneByAssignee(tasks, monthKey) {
   const map = new Map();
+  const all = isSmartPeriodAll(monthKey);
   (tasks || []).forEach(t => {
-    if (taskDoneMonthKey(t) !== monthKey) return;
+    if (!all && taskDoneMonthKey(t) !== monthKey) return;
+    if (all) {
+      const done = t.status === 'bajarildi' || effectiveStatus(t) === 'bajarildi';
+      if (!done) return;
+    }
     const name = t.assignee || (userById(t.assignee_user_id)?.display_name) || '';
     if (!name) return;
     map.set(name, (map.get(name) || 0) + 1);
@@ -4884,10 +4900,15 @@ function fillSmartMonthSelect(monthKeys, selected) {
   const sel = document.getElementById('smart-active-month');
   if (!sel) return;
   const keys = (monthKeys && monthKeys.length) ? monthKeys.slice().reverse() : [currentMonthKey()];
-  const cur = selected && keys.includes(selected) ? selected : keys[0];
-  sel.innerHTML = keys.map(k =>
+  const cur = isSmartPeriodAll(selected) || (selected && keys.includes(selected))
+    ? (isSmartPeriodAll(selected) ? SMART_PERIOD_ALL : selected)
+    : SMART_PERIOD_ALL;
+  const opts = [
+    `<option value="${SMART_PERIOD_ALL}" ${cur === SMART_PERIOD_ALL ? 'selected' : ''}>${escapeHtml(t('smart.periodAll'))}</option>`
+  ].concat(keys.map(k =>
     `<option value="${k}" ${k === cur ? 'selected' : ''}>${escapeHtml(monthKeyLabel(k))}</option>`
-  ).join('');
+  ));
+  sel.innerHTML = opts.join('');
   state.smartActiveMonth = cur;
 }
 
@@ -4895,10 +4916,15 @@ function fillSmartTrendMonthSelect(monthKeys, selected) {
   const sel = document.getElementById('smart-trend-month');
   if (!sel) return;
   const keys = (monthKeys && monthKeys.length) ? monthKeys.slice().reverse() : [currentMonthKey()];
-  const cur = selected && keys.includes(selected) ? selected : keys[0];
-  sel.innerHTML = keys.map(k =>
+  const cur = isSmartPeriodAll(selected) || (selected && keys.includes(selected))
+    ? (isSmartPeriodAll(selected) ? SMART_PERIOD_ALL : selected)
+    : SMART_PERIOD_ALL;
+  const opts = [
+    `<option value="${SMART_PERIOD_ALL}" ${cur === SMART_PERIOD_ALL ? 'selected' : ''}>${escapeHtml(t('smart.periodAll'))}</option>`
+  ].concat(keys.map(k =>
     `<option value="${k}" ${k === cur ? 'selected' : ''}>${escapeHtml(monthKeyLabel(k))}</option>`
-  ).join('');
+  ));
+  sel.innerHTML = opts.join('');
   state.smartTrendMonth = cur;
 }
 
@@ -4945,11 +4971,14 @@ function renderSmartMvpBanner(mvp, monthKey) {
     el.innerHTML = '';
     return;
   }
+  const bannerTitle = isSmartPeriodAll(monthKey)
+    ? (t('smart.mvpAllBanner') || t('smart.mvpBanner'))
+    : (t('smart.mvpBanner') || "Oy g'olibi");
   el.classList.remove('hidden');
   el.innerHTML = `
     <div class="smart-mvp-badge">🏆</div>
     <div>
-      <div class="smart-mvp-meta">${escapeHtml(t('smart.mvpBanner') || "Oy g'olibi")} · ${escapeHtml(monthKeyLabel(monthKey))}</div>
+      <div class="smart-mvp-meta">${escapeHtml(bannerTitle)} · ${escapeHtml(smartPeriodLabel(monthKey))}</div>
       <strong>${escapeHtml(mvp.name)}</strong>
       <div class="smart-mvp-meta">${mvp.done} ${escapeHtml(t('kpi.done') || 'Bajarildi')}</div>
     </div>`;
@@ -4962,14 +4991,15 @@ function renderSmartMvpHistory(tasks, currentKey) {
   const rows = months.map(key => {
     const rank = rankingDoneByAssignee(tasks, key);
     const mvp = rank[0];
+    const isCurrent = !isSmartPeriodAll(currentKey) && key === currentKey;
     if (!mvp || !mvp.done) {
-      return `<tr class="${key === currentKey ? 'mvp-current' : ''}">
+      return `<tr class="${isCurrent ? 'mvp-current' : ''}">
         <td>${escapeHtml(monthKeyLabel(key))}</td>
         <td colspan="2" class="empty-msg" style="text-align:left;">${escapeHtml(t('smart.mvpNone') || "Bajarilgan yo'q")}</td>
       </tr>`;
     }
-    return `<tr class="${key === currentKey ? 'mvp-current' : ''}">
-      <td>${escapeHtml(monthKeyLabel(key))}${key === currentKey ? ' <span class="smart-mvp-crown">●</span>' : ''}</td>
+    return `<tr class="${isCurrent ? 'mvp-current' : ''}">
+      <td>${escapeHtml(monthKeyLabel(key))}${isCurrent ? ' <span class="smart-mvp-crown">●</span>' : ''}</td>
       <td><span class="smart-mvp-crown">🏆</span> ${escapeHtml(mvp.name)}</td>
       <td><b>${mvp.done}</b></td>
     </tr>`;
@@ -4987,13 +5017,14 @@ function renderSmartAnalytics() {
     tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
   }
   const monthKeys = listSmartMonthKeys(tasks);
-  if (!state.smartActiveMonth || !monthKeys.includes(state.smartActiveMonth)) {
-    state.smartActiveMonth = currentMonthKey();
-  }
+  const activeOk = isSmartPeriodAll(state.smartActiveMonth) || monthKeys.includes(state.smartActiveMonth);
+  if (!activeOk) state.smartActiveMonth = SMART_PERIOD_ALL;
+  const trendOk = isSmartPeriodAll(state.smartTrendMonth) || monthKeys.includes(state.smartTrendMonth);
+  if (!trendOk) state.smartTrendMonth = SMART_PERIOD_ALL;
   fillSmartMonthSelect(monthKeys, state.smartActiveMonth);
   fillSmartTrendMonthSelect(monthKeys, state.smartTrendMonth);
-  const activeMonth = state.smartActiveMonth || currentMonthKey();
-  const trendMonth = state.smartTrendMonth || currentMonthKey();
+  const activeMonth = state.smartActiveMonth || SMART_PERIOD_ALL;
+  const trendMonth = state.smartTrendMonth || SMART_PERIOD_ALL;
 
   const m = computeSmartMetrics(tasks);
   const stats = document.getElementById('smart-stats');
@@ -5040,23 +5071,11 @@ function renderSmartAnalytics() {
   renderSmartMvpBanner(mvp, activeMonth);
   renderSmartMvpHistory(tasks, activeMonth);
 
-  const activePeriodEl = document.getElementById('smart-active-period-total');
-  if (activePeriodEl) {
-    const periodDone = monthRank.reduce((s, u) => s + (u.done || 0), 0);
-    activePeriodEl.innerHTML = t('smart.periodDoneTotal', { n: periodDone });
-  }
-
-  const trendDim = daysInMonthKey(trendMonth);
-  let trendCreatedTotal = 0;
-  let trendDoneTotal = 0;
-  for (let day = 1; day <= trendDim; day++) {
-    const dk = dayKeyInMonth(trendMonth, day);
-    trendCreatedTotal += tasks.filter(t => taskCreatedDayKey(t) === dk).length;
-    trendDoneTotal += tasks.filter(t => taskDoneDayKey(t) === dk).length;
-  }
-  const trendPeriodEl = document.getElementById('smart-trend-period-total');
-  if (trendPeriodEl) {
-    trendPeriodEl.innerHTML = t('smart.periodTrendTotal', { created: trendCreatedTotal, done: trendDoneTotal });
+  const trendHelpEl = document.querySelector('#view-smart [data-i18n="smart.trendHelp"]');
+  if (trendHelpEl) {
+    trendHelpEl.textContent = isSmartPeriodAll(trendMonth)
+      ? t('smart.trendHelpAll')
+      : t('smart.trendHelp');
   }
 
   if (typeof Chart === 'undefined') return;
@@ -5196,18 +5215,30 @@ function renderSmartAnalytics() {
     });
   }
 
-  // --- Chart 4: Tanlangan oy — kunlik trend (1..28/31) ---
+  // --- Chart 4: Trend — oy (kunlik) yoki barcha davrlar (oylik) ---
   const trendCtx = document.getElementById('chart-trend');
   if (trendCtx) {
-    const dim = daysInMonthKey(trendMonth);
     const labels = [];
     const createdCounts = [];
     const doneCounts = [];
-    for (let day = 1; day <= dim; day++) {
-      const dk = dayKeyInMonth(trendMonth, day);
-      labels.push(String(day));
-      createdCounts.push(tasks.filter(t => taskCreatedDayKey(t) === dk).length);
-      doneCounts.push(tasks.filter(t => taskDoneDayKey(t) === dk).length);
+    let xTitle = smartPeriodLabel(trendMonth);
+
+    if (isSmartPeriodAll(trendMonth)) {
+      const keysAsc = (monthKeys && monthKeys.length) ? monthKeys.slice() : [currentMonthKey()];
+      keysAsc.forEach(mk => {
+        labels.push(monthKeyLabel(mk));
+        createdCounts.push(tasks.filter(t => taskCreatedMonthKey(t) === mk).length);
+        doneCounts.push(tasks.filter(t => taskDoneMonthKey(t) === mk).length);
+      });
+      xTitle = t('smart.periodAll');
+    } else {
+      const dim = daysInMonthKey(trendMonth);
+      for (let day = 1; day <= dim; day++) {
+        const dk = dayKeyInMonth(trendMonth, day);
+        labels.push(String(day));
+        createdCounts.push(tasks.filter(t => taskCreatedDayKey(t) === dk).length);
+        doneCounts.push(tasks.filter(t => taskDoneDayKey(t) === dk).length);
+      }
     }
 
     smartCharts.trend = new Chart(trendCtx, {
@@ -5244,8 +5275,8 @@ function renderSmartAnalytics() {
         maintainAspectRatio: false,
         scales: {
           x: {
-            title: { display: true, text: monthKeyLabel(trendMonth), color: tick },
-            ticks: { color: tick, maxTicksLimit: 16 },
+            title: { display: true, text: xTitle, color: tick },
+            ticks: { color: tick, maxTicksLimit: isSmartPeriodAll(trendMonth) ? 12 : 16 },
             grid: { color: grid }
           },
           y: {
