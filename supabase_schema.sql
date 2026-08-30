@@ -687,3 +687,13 @@ do $$ begin alter publication supabase_realtime add table projects; exception wh
 do $$ begin alter publication supabase_realtime add table project_members; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table project_columns; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table project_cards; exception when duplicate_object then null; end $$;
+
+-- PERFORMANCE: tasks jadvali indekslari (bazada allaqachon mavjud, shu yerda
+-- hujjatlashtirish uchun aks ettirilgan)
+create index if not exists idx_tasks_active on tasks (deleted_at) where deleted_at is null;
+create index if not exists idx_tasks_assignee on tasks (assignee_user_id) where deleted_at is null;
+create index if not exists idx_tasks_status on tasks (status) where deleted_at is null;
+create index if not exists idx_tasks_deadline on tasks (deadline) where deleted_at is null;
+create index if not exists idx_tasks_created_by on tasks (created_by_user_id) where deleted_at is null;
+create index if not exists idx_tasks_reviewer on tasks (reviewer_user_id) where deleted_at is null;
+create index if not exists idx_tasks_created_at on tasks (created_at) where deleted_at is null;
