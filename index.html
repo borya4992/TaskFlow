@@ -527,6 +527,14 @@
 
   #toast-root{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;}
   .toast{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);}
+  .pwd-chip{
+    display:block;width:100%;margin:8px 0 0;padding:12px 14px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:16px;letter-spacing:.06em;font-weight:700;
+    color:var(--text);background:var(--panel-2);border:1px dashed var(--accent);
+    border-radius:10px;cursor:pointer;text-align:center;
+  }
+  .pwd-chip:hover{border-style:solid;background:var(--accent-tint);}
 
   .modal-backdrop{
     position:fixed;inset:0;background:var(--modal-scrim);display:flex;align-items:flex-start;justify-content:center;z-index:400;
@@ -1026,7 +1034,7 @@
         <div class="auth-field"><label data-i18n="auth.email">Email</label><input type="email" id="login-email" data-i18n-placeholder="auth.emailPh" placeholder="siz@kompaniya.uz" autocomplete="username"></div>
         <div class="auth-field"><label data-i18n="auth.password">Parol</label><input type="password" id="login-password" data-i18n-placeholder="auth.passwordPh" placeholder="Parol" autocomplete="current-password"></div>
         <button class="auth-btn" onclick="loginWithPassword()" data-i18n="auth.login">Kirish</button>
-        <p class="auth-hint" style="margin-top:10px;" data-i18n-html="auth.hintPassword">Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
+        <p class="auth-hint" style="margin-top:10px;" data-i18n-html="auth.hintPassword">Parolni admin beradi. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.</p>
       </div>
       <div id="auth-panel-telegram" class="hidden">
         <div class="auth-telegram-wrap" id="telegram-login-container"></div>
@@ -1319,7 +1327,7 @@
   <div id="view-admin" class="view-pane">
   <div class="panel" id="admin-panel">
     <h2><span class="dot" style="background:var(--amber)"></span> <span data-i18n="admin.usersTitle">Foydalanuvchilarni boshqarish</span> <span class="admin-badge">ADMIN</span></h2>
-    <p class="help-text" style="margin-top:0;" data-i18n-html="admin.usersHelp"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.</p>
+    <p class="help-text" style="margin-top:0;" data-i18n-html="admin.usersHelp"><b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol yaratilganda ko'rsatiladi — xodimga yetkazing. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.</p>
     <div class="user-form">
       <div class="auth-field"><label data-i18n="admin.name">Ism</label><input type="text" id="u-name" placeholder="Ali Valiyev"></div>
       <div class="auth-field"><label data-i18n="admin.role">Rol</label>
@@ -1493,7 +1501,7 @@ const I18N = {
     'auth.emailPh': 'siz@kompaniya.uz',
     'auth.passwordPh': 'Parol',
     'auth.login': 'Kirish',
-    'auth.hintPassword': "Birinchi marta: standart parol <b>123456</b>. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
+    'auth.hintPassword': "Parolni admin beradi. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
     'auth.hintTelegram': "Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.",
     'app.title': 'TASKOMAN',
     'app.openProfile': 'Profilni ochish',
@@ -1591,7 +1599,14 @@ const I18N = {
     'smart.colExec': 'Bajaruvchi',
     'smart.risk': 'SMART risk',
     'admin.usersTitle': 'Foydalanuvchilarni boshqarish',
-    'admin.usersHelp': "<b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol: <b>123456</b>. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.",
+    'admin.usersHelp': "<b>Email majburiy</b> (parol orqali kirish uchun). Birinchi parol yaratilganda ko'rsatiladi — xodimga yetkazing. Bo'limlar: <b>Xodimlar bo'limi</b>, <b>Ishga qabul qilish bo'limi</b>, <b>Kompensatsiya bo'limi</b>.",
+    'admin.userAddedPwd': "Foydalanuvchi qo'shildi. Standart parol:",
+    'admin.pwdResetTitle': 'Parol tiklandi:',
+    'admin.pwdResetConfirm': '{email} uchun yangi tasodifiy parol o\'rnatilsinmi?',
+    'admin.tempPasswordHint': 'Parolni xodimga xavfsiz yetkazing. Bosib nusxalash mumkin.',
+    'admin.copyPassword': 'Parolni nusxalash',
+    'admin.passwordCopied': 'Parol nusxalandi',
+    'auth.loginFailed': 'Login xato. Parolni tekshiring yoki admindan tiklashni so\'rang.',
     'admin.name': 'Ism',
     'admin.role': 'Rol',
     'admin.department': "Bo'lim",
@@ -1673,7 +1688,7 @@ const I18N = {
     'auth.emailPh': 'you@company.uz',
     'auth.passwordPh': 'Пароль',
     'auth.login': 'Войти',
-    'auth.hintPassword': 'В первый раз: стандартный пароль <b>123456</b>. Затем смените в профиле. Если забыли — сбросит админ.',
+    'auth.hintPassword': 'Пароль выдаёт админ. Затем смените его в профиле. Если забыли — сбросит админ.',
     'auth.hintTelegram': 'Для входа через Telegram админ должен добавить ваш Telegram ID.',
     'app.title': 'TASKOMAN',
     'app.openProfile': 'Открыть профиль',
@@ -1771,7 +1786,14 @@ const I18N = {
     'smart.colExec': 'Исполнитель',
     'smart.risk': 'SMART риск',
     'admin.usersTitle': 'Управление пользователями',
-    'admin.usersHelp': '<b>Email обязателен</b> (для входа по паролю). Первый пароль: <b>123456</b>. Отделы: <b>Отдел кадров</b>, <b>Отдел найма</b>, <b>Отдел компенсаций</b>.',
+    'admin.usersHelp': '<b>Email обязателен</b> (для входа по паролю). Первый пароль показывается при создании — передайте его сотруднику. Отделы: <b>Отдел кадров</b>, <b>Отдел найма</b>, <b>Отдел компенсаций</b>.',
+    'admin.userAddedPwd': 'Пользователь добавлен. Стандартный пароль:',
+    'admin.pwdResetTitle': 'Пароль сброшен:',
+    'admin.pwdResetConfirm': 'Установить новый случайный пароль для {email}?',
+    'admin.tempPasswordHint': 'Передайте пароль сотруднику безопасным способом. Нажмите, чтобы скопировать.',
+    'admin.copyPassword': 'Скопировать пароль',
+    'admin.passwordCopied': 'Пароль скопирован',
+    'auth.loginFailed': 'Ошибка входа. Проверьте пароль или попросите админа сбросить его.',
     'admin.name': 'Имя',
     'admin.role': 'Роль',
     'admin.department': 'Отдел',
@@ -1853,7 +1875,7 @@ const I18N = {
     'auth.emailPh': 'you@company.uz',
     'auth.passwordPh': 'Password',
     'auth.login': 'Sign in',
-    'auth.hintPassword': 'First time: default password <b>123456</b>. Change it later in your profile. If forgotten — ask an admin to reset.',
+    'auth.hintPassword': 'The admin gives you the password. Change it later in your profile. If forgotten — ask an admin to reset.',
     'auth.hintTelegram': 'For Telegram login, an admin must add your Telegram ID first.',
     'app.title': 'TASKOMAN',
     'app.openProfile': 'Open profile',
@@ -1951,7 +1973,14 @@ const I18N = {
     'smart.colExec': 'Executor',
     'smart.risk': 'SMART risk',
     'admin.usersTitle': 'User management',
-    'admin.usersHelp': '<b>Email is required</b> (for password login). First password: <b>123456</b>. Departments: <b>Staff</b>, <b>Recruiting</b>, <b>Compensation</b>.',
+    'admin.usersHelp': '<b>Email is required</b> (for password login). The first password is shown when the user is created — share it with them. Departments: <b>Staff</b>, <b>Recruiting</b>, <b>Compensation</b>.',
+    'admin.userAddedPwd': 'User added. Default password:',
+    'admin.pwdResetTitle': 'Password reset:',
+    'admin.pwdResetConfirm': 'Set a new random password for {email}?',
+    'admin.tempPasswordHint': 'Share this password with the employee securely. Click to copy.',
+    'admin.copyPassword': 'Copy password',
+    'admin.passwordCopied': 'Password copied',
+    'auth.loginFailed': 'Login failed. Check the password or ask an admin to reset it.',
     'admin.name': 'Name',
     'admin.role': 'Role',
     'admin.department': 'Department',
@@ -2294,8 +2323,6 @@ function initSupabase() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-const DEFAULT_USER_PASSWORD = '123456';
-
 /* =========================================================
    AUTH
 ========================================================= */
@@ -2354,6 +2381,57 @@ async function adminManageAuthUser(action, email, display_name) {
   return data;
 }
 
+async function copyGeneratedPassword(password) {
+  const pwd = String(password || '');
+  if (!pwd) return;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(pwd);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = pwd;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast(t('admin.passwordCopied'));
+  } catch (e) {
+    toast(pwd);
+  }
+}
+
+function showGeneratedPassword(prefix, password) {
+  const pwd = String(password || '').trim();
+  const title = String(prefix || '').replace(/:\s*$/, '');
+  if (!pwd) {
+    toast(title);
+    return;
+  }
+  toast(title + ' ' + pwd);
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>${escapeHtml(title)}</h3>
+          <button type="button" class="btn-ghost" onclick="closeModal()">✕</button>
+        </div>
+        <p class="help-text" style="margin-top:0;">${escapeHtml(t('admin.tempPasswordHint'))}</p>
+        <button type="button" class="pwd-chip" data-password="${escapeHtml(pwd)}"
+          onclick="copyGeneratedPassword(this.dataset.password)" title="${escapeHtml(t('admin.copyPassword'))}">
+          ${escapeHtml(pwd)}
+        </button>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" onclick="closeModal()">Yopish</button>
+          <button type="button" class="btn-blue" data-password="${escapeHtml(pwd)}"
+            onclick="copyGeneratedPassword(this.dataset.password)">${escapeHtml(t('admin.copyPassword'))}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function loginWithPassword() {
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const password = document.getElementById('login-password').value;
@@ -2365,7 +2443,7 @@ async function loginWithPassword() {
   setAuthMessage('Kirilmoqda...');
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    setAuthMessage('Login xato. Standart parol 123456. Admin parolni tiklashi mumkin.', true);
+    setAuthMessage(t('auth.loginFailed'), true);
     return;
   }
   pendingOtp = { method: 'email', contact: email };
@@ -3201,8 +3279,9 @@ async function addAppUser() {
   if (!email) { toast('Email majburiy (parol orqali kirish uchun)'); return; }
   const { error } = await sb.from('app_users').insert([{ display_name, email, phone, telegram_id, role, department, gender, position_level, is_active: true }]);
   if (error) { toast('Xatolik: ' + error.message); return; }
+  let authData = null;
   try {
-    await adminManageAuthUser('create', email, display_name);
+    authData = await adminManageAuthUser('create', email, display_name);
   } catch (e) {
     alert('User jadvalga qo\'shildi, lekin kirish paroli yaratilmadi:\n' + e.message + '\n\nJadvaldagi "Parolni tiklash" tugmasini bosing.\nVercel env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY');
     await renderUsersTable();
@@ -3221,15 +3300,15 @@ async function addAppUser() {
   fillDepartmentSelects();
   await renderUsersTable();
   if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
-  toast('Foydalanuvchi qo\'shildi. Standart parol: ' + DEFAULT_USER_PASSWORD);
+  showGeneratedPassword(t('admin.userAddedPwd'), authData && authData.default_password);
 }
 
 async function resetUserPassword(email) {
   if (!email) { toast('Email yo\'q'); return; }
-  if (!confirm(email + ' uchun parolni 123456 ga tiklashni xohlaysizmi?')) return;
+  if (!confirm(t('admin.pwdResetConfirm', { email }))) return;
   try {
-    await adminManageAuthUser('reset', email);
-    toast('Parol tiklandi: 123456 — endi user shu parol bilan kira oladi');
+    const data = await adminManageAuthUser('reset', email);
+    showGeneratedPassword(t('admin.pwdResetTitle'), data.default_password);
   } catch (e) {
     toast('Tiklash xatosi: ' + e.message);
     alert('Parol tiklanmadi:\n' + e.message + '\n\nVercel → Settings → Environment Variables da SUPABASE_URL va SUPABASE_SERVICE_ROLE_KEY borligini tekshiring.');
