@@ -1370,6 +1370,10 @@
       </tr></thead>
       <tbody id="users-tbody"></tbody>
     </table>
+    <div class="notif-row" style="margin-top:16px;">
+      <button type="button" class="btn-ghost" id="btn-sync-assignees" onclick="syncAssigneeNamesFromAdmin()" data-i18n="admin.syncAssignees">🔧 Bajaruvchi nomlarini sinxronlashtirish</button>
+    </div>
+    <p class="help-text" style="margin-top:8px;" data-i18n="admin.syncAssigneesHelp">Topshiriqlardagi bajaruvchi ismini joriy foydalanuvchi nomiga moslashtiradi. Faqat nomuvofiq yozuvlarni yangilaydi.</p>
   </div>
 
   <div class="panel" id="settings-panel">
@@ -1597,6 +1601,12 @@ const I18N = {
     'admin.phone': 'Telefon',
     'admin.telegram': 'Telegram ID',
     'admin.addUser': "Foydalanuvchi qo'shish",
+    'admin.syncAssignees': '🔧 Bajaruvchi nomlarini sinxronlashtirish',
+    'admin.syncAssigneesHelp': 'Topshiriqlardagi bajaruvchi ismini joriy foydalanuvchi nomiga moslashtiradi. Faqat nomuvofiq yozuvlarni yangilaydi.',
+    'admin.syncAssigneesDone': '{n} ta topshiriq sinxronlandi',
+    'admin.syncAssigneesNone': '0 ta tuzatildi — barcha yozuvlar allaqachon to\'g\'ri',
+    'admin.syncAssigneesBusy': 'Sinxronlash ketyapti…',
+    'admin.syncAssigneesError': 'Sinxronlashda xato',
     'role.executor': 'Ijrochi',
     'role.dept_head': "Bo'lim boshlig'i",
     'role.deputy_director': "Direktor o'rinbosari",
@@ -1771,6 +1781,12 @@ const I18N = {
     'admin.phone': 'Телефон',
     'admin.telegram': 'Telegram ID',
     'admin.addUser': 'Добавить пользователя',
+    'admin.syncAssignees': '🔧 Синхронизировать имена исполнителей',
+    'admin.syncAssigneesHelp': 'Приводит имя исполнителя в задачах к текущему имени пользователя. Обновляет только несовпадающие записи.',
+    'admin.syncAssigneesDone': 'Синхронизировано задач: {n}',
+    'admin.syncAssigneesNone': '0 исправлено — все записи уже верны',
+    'admin.syncAssigneesBusy': 'Идёт синхронизация…',
+    'admin.syncAssigneesError': 'Ошибка синхронизации',
     'role.executor': 'Исполнитель',
     'role.dept_head': 'Руководитель отдела',
     'role.deputy_director': 'Заместитель директора',
@@ -1945,6 +1961,12 @@ const I18N = {
     'admin.phone': 'Phone',
     'admin.telegram': 'Telegram ID',
     'admin.addUser': 'Add user',
+    'admin.syncAssignees': '🔧 Sync assignee names',
+    'admin.syncAssigneesHelp': 'Aligns task assignee names with the current user display name. Updates only mismatched rows.',
+    'admin.syncAssigneesDone': '{n} task(s) synced',
+    'admin.syncAssigneesNone': '0 fixed — all records already match',
+    'admin.syncAssigneesBusy': 'Sync in progress…',
+    'admin.syncAssigneesError': 'Sync failed',
     'role.executor': 'Executor',
     'role.dept_head': 'Department head',
     'role.deputy_director': 'Deputy director',
@@ -2855,7 +2877,6 @@ async function enterApp() {
   state.appUsers = await fetchTeamUsers();
   state.tasks = await fetchTasks();
   if (typeof loadAllProjectData === 'function') await loadAllProjectData();
-  await reconcileAssigneeNameDuplicates();
   showApp();
   document.getElementById('tg-token').value = state.settings.telegram_token || '';
   document.getElementById('tg-chat').value = state.settings.telegram_chat_id || '';
@@ -3805,6 +3826,28 @@ async function reconcileAssigneeNameDuplicates() {
   }
   return fixed;
 }
+let assigneeSyncBusy = false;
+async function syncAssigneeNamesFromAdmin() {
+  if (!canManageUsers()) return;
+  if (assigneeSyncBusy) {
+    toast(t('admin.syncAssigneesBusy'));
+    return;
+  }
+  assigneeSyncBusy = true;
+  const btn = document.getElementById('btn-sync-assignees');
+  if (btn) btn.disabled = true;
+  try {
+    const fixed = await reconcileAssigneeNameDuplicates();
+    renderAll();
+    toast(fixed > 0 ? t('admin.syncAssigneesDone', { n: fixed }) : t('admin.syncAssigneesNone'));
+  } catch (err) {
+    console.error(err);
+    toast(t('admin.syncAssigneesError'));
+  } finally {
+    assigneeSyncBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
 function openAssigneeTasksModal(name) {
   const key = normalizePersonName(name);
   const own = state.tasks
@@ -4139,7 +4182,6 @@ async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
   if (typeof loadAllProjectData === 'function') await loadAllProjectData();
-  await reconcileAssigneeNameDuplicates();
   fillDepartmentSelects();
   renderAll();
   if (window.Office3D && Office3D.isOpen()) {
