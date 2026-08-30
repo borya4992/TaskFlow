@@ -155,6 +155,14 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const authHeader = req.headers.authorization || '';
+  const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!jwt) { res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' }); return; }
+  const meRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
+  });
+  if (!meRes.ok) { res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' }); return; }
+
   let stagedPath = null;
   let requestBody = {};
 

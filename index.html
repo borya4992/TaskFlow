@@ -3429,7 +3429,10 @@ async function uploadViaSignedStaging(file) {
 
   const res = await fetch('/api/telegram-upload', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + accessToken,
+    },
     body: JSON.stringify({
       storagePath: signJson.storagePath,
       filename: file.name,
@@ -3469,7 +3472,13 @@ async function uploadTaskAttachment(file, statusEl) {
         setAttachStatus(statusEl, 'To\'g\'ridan-to\'g\'ri yuklanmoqda...', 'busy');
         const form = new FormData();
         form.append('file', file, file.name);
-        const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+        const directToken = await getAccessToken();
+        if (!directToken) throw new Error("Sessiya yo'q");
+        const res = await fetch('/api/telegram-upload', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + directToken },
+          body: form
+        });
         json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok || !json.file_id) {
           throw new Error(json.error || stageErr.message || ('HTTP ' + res.status));
@@ -3481,7 +3490,13 @@ async function uploadTaskAttachment(file, statusEl) {
       }
       const form = new FormData();
       form.append('file', file, file.name);
-      const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+      const localToken = await getAccessToken();
+      if (!localToken) throw new Error("Sessiya yo'q");
+      const res = await fetch('/api/telegram-upload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + localToken },
+        body: form
+      });
       json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok || !json.file_id) {
         throw new Error(json.error || ('HTTP ' + res.status));
@@ -3562,11 +3577,37 @@ function attachmentLinkHtml(t) {
     <button type="button" class="btn-ghost" onclick="openTaskAttachment(${fileIdJs}, ${nameJs})">⬇ Yuklab olish</button>
   </div>`;
 }
-function openTaskAttachment(fileId, name) {
+async function openTaskAttachment(fileId, name) {
   if (!fileId) return;
+  const token = await getAccessToken();
+  if (!token) {
+    toast("Sessiya tugagan — qayta kiring");
+    return;
+  }
   const url = '/api/telegram-file?file_id=' + encodeURIComponent(fileId) +
     '&name=' + encodeURIComponent(name || 'fayl');
-  window.open(url, '_blank', 'noopener');
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast(data.error || 'Faylni ochib bo\'lmadi');
+      return;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = name || 'fayl';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (e) {
+    console.error(e);
+    toast('Faylni ochib bo\'lmadi');
+  }
 }
 
 /* =========================================================
@@ -4746,11 +4787,8 @@ async function notifyCreatorReview(task) {
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
   let fileNote = '';
   if (task.attachment_file_id) {
-    const url = attachmentDownloadUrl(task);
     const fname = escapeHtml(task.attachment_name || 'fayl');
-    fileNote = url
-      ? `\n📎 Fayl (Telegram): <a href="${url}">${fname} — yuklab olish</a>`
-      : `\n📎 Fayl: ${fname} (saytdagi tekshiruv bo'limidan yuklab oling)`;
+    fileNote = `\n📎 Fayl: ${fname} (saytdagi tekshiruv bo'limidan yuklab oling)`;
   }
   const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
   if (!reviewer) {
