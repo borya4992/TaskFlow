@@ -34,6 +34,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="/projects.js?v=2"></script>
+<script src="/planner.js?v=1"></script>
 <style>
   /* =========================================================
      THEME TOKENS — yangi tema qo'shish: [data-theme="..."] bloki
@@ -903,6 +904,79 @@
     .pk-col{flex-basis:240px;max-width:240px;}
   }
 
+  /* Planner */
+  .planner-page{max-width:920px;}
+  .pl-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+  .pl-title{margin:0 0 4px;font-size:20px;font-weight:800;color:var(--text);}
+  .pl-sub{margin:0;font-size:12.5px;color:var(--text-faint);}
+  .pl-focus{
+    min-width:min(100%,280px);background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);
+  }
+  .pl-focus-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px;}
+  .pl-focus-label{font-size:12px;font-weight:700;color:var(--text-soft);}
+  .pl-focus-stats{font-size:11px;color:var(--text-faint);}
+  .pl-focus-clock{
+    font-size:42px;font-weight:800;letter-spacing:.04em;line-height:1.1;
+    color:var(--text);font-variant-numeric:tabular-nums;text-align:center;margin:4px 0 10px;
+  }
+  .pl-focus-clock.running{color:var(--accent);}
+  .pl-focus-clock.paused{color:var(--warning);}
+  .pl-focus-controls{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .pl-mins{font-size:11px;color:var(--text-faint);display:flex;align-items:center;gap:6px;}
+  .pl-mins input{width:64px;padding:6px 8px;}
+  .pl-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;}
+  .pl-tab{
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text-soft);
+    border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:650;cursor:pointer;
+  }
+  .pl-tab:hover{color:var(--text);border-color:var(--accent);}
+  .pl-tab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
+  .pl-composer{
+    display:flex;gap:8px;align-items:center;margin-bottom:16px;
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;
+  }
+  .pl-composer input[type=text]{flex:1;min-width:0;border:0;background:transparent;font-size:15px;padding:6px 0;}
+  .pl-cal{position:relative;cursor:pointer;font-size:18px;line-height:1;color:var(--text-soft);}
+  .pl-cal input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .pl-body{display:flex;flex-direction:column;gap:4px;}
+  .pl-group{margin-bottom:14px;}
+  .pl-group-title{font-size:12px;font-weight:800;color:var(--text-soft);margin:10px 0 6px;letter-spacing:.02em;}
+  .pl-group-title.danger{color:var(--danger);}
+  .pl-row{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+    background:var(--panel);border:1px solid transparent;
+  }
+  .pl-row:hover{border-color:var(--border);background:var(--panel-2);}
+  .pl-row:hover .pl-del{opacity:1;}
+  .pl-row.overdue{background:var(--danger-tint);}
+  .pl-row.done .pl-title{text-decoration:line-through;color:var(--text-faint);}
+  .pl-check{
+    width:20px;height:20px;border-radius:50%;border:2px solid var(--text-faint);
+    background:transparent;padding:0;flex-shrink:0;cursor:pointer;
+  }
+  .pl-check.on{background:var(--success);border-color:var(--success);box-shadow:inset 0 0 0 3px var(--panel);}
+  .pl-title{flex:1;min-width:0;font-size:14px;color:var(--text);}
+  .pl-badge{
+    font-size:10px;font-weight:800;color:var(--danger);background:var(--danger-tint);
+    border:1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+    border-radius:999px;padding:2px 7px;
+  }
+  .pl-date{font-size:11px;color:var(--text-faint);white-space:nowrap;}
+  .pl-del{
+    opacity:0;border:0;background:transparent;color:var(--text-faint);font-size:18px;
+    line-height:1;padding:0 4px;cursor:pointer;
+  }
+  .pl-del:hover{color:var(--danger);}
+  .pl-empty{color:var(--text-faint);font-size:13px;padding:18px 8px;margin:0;}
+  .pl-done-wrap{margin-top:12px;}
+  .pl-done-toggle{
+    border:0;background:transparent;color:var(--text-faint);font-size:12px;cursor:pointer;padding:4px 0;
+  }
+  .pl-done-toggle:hover{color:var(--text-soft);}
+  .pl-done-list{opacity:.75;margin-top:4px;}
+  @media (hover:none){.pl-del{opacity:.65;}}
+
   /* 3D Ofis */
   .office3d-overlay{
     position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
@@ -1059,6 +1133,7 @@
       <button type="button" class="app-nav-btn hidden" id="nav-create-btn" data-view="create" onclick="switchAppView('create')"><span class="nav-ico">➕</span><span class="nav-label" data-i18n="nav.create">Topshiriq yaratish</span></button>
       <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')"><span class="nav-ico">📈</span><span class="nav-label" data-i18n="nav.smart">SMART</span></button>
       <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span class="nav-label" data-i18n="nav.projects">Loyihalar</span></button>
+      <button type="button" class="app-nav-btn" data-view="planner" onclick="switchAppView('planner')"><span class="nav-ico">🎯</span><span class="nav-label" data-i18n="nav.planner">Planner</span></button>
       <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D();closeSidebar()"><span class="nav-ico">🧑‍💼</span><span class="nav-label" data-i18n="nav.office">3D Ofis</span></button>
       <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')"><span class="nav-ico">⚙️</span><span class="nav-label" data-i18n="nav.admin">Boshqaruv</span></button>
     </nav>
@@ -1445,6 +1520,10 @@
     <div id="projects-root"></div>
   </div>
 
+  <div id="view-planner" class="view-pane">
+    <div id="planner-root"></div>
+  </div>
+
     </div><!-- /.app-content -->
   </div><!-- /.app-main -->
 </div><!-- /.app-shell -->
@@ -1516,6 +1595,38 @@ const I18N = {
     'nav.create': 'Topshiriq yaratish',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Loyihalar',
+    'nav.planner': '🎯 Planner',
+    'planner.title': '🎯 Planner',
+    'planner.sub': "Faqat sizga ko'rinadigan shaxsiy vazifalar va fokus",
+    'planner.tabToday': '📅 Bugun',
+    'planner.tabSched': '🗓 Rejalashtirilgan',
+    'planner.tabInbox': '📥 Muddatisiz',
+    'planner.tabGoals': '🎯 Maqsadlar',
+    'planner.today': 'Bugun',
+    'planner.tomorrow': 'Ertaga',
+    'planner.overdue': 'Kechikkan',
+    'planner.todayPh': "Bugungi vazifa… Enter bilan qo'shing",
+    'planner.schedPh': 'Kelajakdagi vazifa…',
+    'planner.inboxPh': 'Muddatisiz vazifa…',
+    'planner.goalPh': 'Yangi maqsad…',
+    'planner.add': "Qo'shish",
+    'planner.pickDate': 'Sana',
+    'planner.show': "ko'rsatish",
+    'planner.hide': 'yashirish',
+    'planner.emptyToday': "Bugun uchun vazifa yo'q",
+    'planner.emptySched': "Kelajakdagi vazifa yo'q",
+    'planner.emptyInbox': "Muddatisiz vazifa yo'q",
+    'planner.emptyGoals': "Maqsad qo'shilmagan",
+    'planner.focus': 'Fokus',
+    'planner.minutes': 'Daqiqa',
+    'planner.start': 'Boshlash',
+    'planner.resume': 'Davom ettirish',
+    'planner.running': 'Davom etmoqda',
+    'planner.pause': 'Pauza',
+    'planner.cancel': 'Bekor qilish',
+    'planner.focusToday': 'Bugun: {n} ta seans, jami {m} daqiqa fokus',
+    'planner.focusDone': 'Fokus seansi tugadi! 🎉',
+    'planner.needProfile': 'Profil topilmadi',
     'nav.office': '🧑‍💼 3D Ofis',
     'nav.admin': 'Boshqaruv',
     'incoming.title': 'Kiruvchi — tasdiqlash',
@@ -1703,6 +1814,38 @@ const I18N = {
     'nav.create': 'Создать задачу',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Проекты',
+    'nav.planner': '🎯 Planner',
+    'planner.title': '🎯 Planner',
+    'planner.sub': 'Личные задачи и фокус — видны только вам',
+    'planner.tabToday': '📅 Сегодня',
+    'planner.tabSched': '🗓 Запланировано',
+    'planner.tabInbox': '📥 Без срока',
+    'planner.tabGoals': '🎯 Цели',
+    'planner.today': 'Сегодня',
+    'planner.tomorrow': 'Завтра',
+    'planner.overdue': 'Просрочено',
+    'planner.todayPh': 'Задача на сегодня… Enter чтобы добавить',
+    'planner.schedPh': 'Задача на будущее…',
+    'planner.inboxPh': 'Задача без срока…',
+    'planner.goalPh': 'Новая цель…',
+    'planner.add': 'Добавить',
+    'planner.pickDate': 'Дата',
+    'planner.show': 'показать',
+    'planner.hide': 'скрыть',
+    'planner.emptyToday': 'На сегодня задач нет',
+    'planner.emptySched': 'Будущих задач нет',
+    'planner.emptyInbox': 'Задач без срока нет',
+    'planner.emptyGoals': 'Цели не добавлены',
+    'planner.focus': 'Фокус',
+    'planner.minutes': 'Минуты',
+    'planner.start': 'Старт',
+    'planner.resume': 'Продолжить',
+    'planner.running': 'Идёт',
+    'planner.pause': 'Пауза',
+    'planner.cancel': 'Отмена',
+    'planner.focusToday': 'Сегодня: {n} сеансов, всего {m} мин фокуса',
+    'planner.focusDone': 'Сеанс фокуса завершён! 🎉',
+    'planner.needProfile': 'Профиль не найден',
     'nav.office': '🧑‍💼 3D Офис',
     'nav.admin': 'Управление',
     'incoming.title': 'Входящие — подтверждение',
@@ -1890,6 +2033,38 @@ const I18N = {
     'nav.create': 'Create task',
     'nav.smart': 'SMART',
     'nav.projects': '📋 Projects',
+    'nav.planner': '🎯 Planner',
+    'planner.title': '🎯 Planner',
+    'planner.sub': 'Private tasks and focus — visible only to you',
+    'planner.tabToday': '📅 Today',
+    'planner.tabSched': '🗓 Scheduled',
+    'planner.tabInbox': '📥 No date',
+    'planner.tabGoals': '🎯 Goals',
+    'planner.today': 'Today',
+    'planner.tomorrow': 'Tomorrow',
+    'planner.overdue': 'Overdue',
+    'planner.todayPh': 'Today’s task… press Enter to add',
+    'planner.schedPh': 'Future task…',
+    'planner.inboxPh': 'Dateless task…',
+    'planner.goalPh': 'New goal…',
+    'planner.add': 'Add',
+    'planner.pickDate': 'Date',
+    'planner.show': 'show',
+    'planner.hide': 'hide',
+    'planner.emptyToday': 'No tasks for today',
+    'planner.emptySched': 'No upcoming tasks',
+    'planner.emptyInbox': 'No dateless tasks',
+    'planner.emptyGoals': 'No goals yet',
+    'planner.focus': 'Focus',
+    'planner.minutes': 'Minutes',
+    'planner.start': 'Start',
+    'planner.resume': 'Resume',
+    'planner.running': 'Running',
+    'planner.pause': 'Pause',
+    'planner.cancel': 'Cancel',
+    'planner.focusToday': 'Today: {n} sessions, {m} min focus',
+    'planner.focusDone': 'Focus session finished! 🎉',
+    'planner.needProfile': 'Profile not found',
     'nav.office': '🧑‍💼 3D Office',
     'nav.admin': 'Admin',
     'incoming.title': 'Inbox — approval',
@@ -2864,7 +3039,7 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'incoming', 'outgoing', 'create', 'smart', 'admin', 'projects'];
+  const allowed = ['monitoring', 'incoming', 'outgoing', 'create', 'smart', 'admin', 'projects', 'planner'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   if (view === 'create' && !canCreateTasks()) view = 'monitoring';
@@ -2903,6 +3078,7 @@ function switchAppView(view) {
   } else if (typeof destroyProjectChart === 'function') {
     destroyProjectChart();
   }
+  if (view === 'planner' && typeof openPlannerView === 'function') openPlannerView();
 }
 
 function openMyProfileModal() {
@@ -2955,6 +3131,7 @@ async function enterApp() {
   state.appUsers = await fetchTeamUsers();
   state.tasks = await fetchTasks();
   if (typeof loadAllProjectData === 'function') await loadAllProjectData();
+  if (typeof loadPlannerData === 'function') await loadPlannerData();
   showApp();
   document.getElementById('tg-token').value = state.settings.telegram_token || '';
   document.getElementById('tg-chat').value = state.settings.telegram_chat_id || '';
@@ -4215,6 +4392,8 @@ function renderAll() {
   if (smartPane && smartPane.classList.contains('active')) renderSmartAnalytics();
   const projPane = document.getElementById('view-projects');
   if (projPane && projPane.classList.contains('active') && typeof renderProjectsView === 'function') renderProjectsView();
+  const plannerPane = document.getElementById('view-planner');
+  if (plannerPane && plannerPane.classList.contains('active') && typeof renderPlannerView === 'function') renderPlannerView();
 }
 function filterByStatus(status) {
   state.filterStatus = status || '';
@@ -4261,6 +4440,7 @@ async function refreshFromDB() {
   state.tasks = await fetchTasks();
   state.appUsers = await fetchTeamUsers();
   if (typeof loadAllProjectData === 'function') await loadAllProjectData();
+  if (typeof loadPlannerData === 'function') await loadPlannerData();
   fillDepartmentSelects();
   renderAll();
   if (window.Office3D && Office3D.isOpen()) {
