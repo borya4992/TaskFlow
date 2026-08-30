@@ -1047,6 +1047,7 @@
     <nav class="sidebar-nav" id="app-nav">
       <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')"><span class="nav-ico">📊</span><span class="nav-label" data-i18n="nav.monitoring">Monitoring</span></button>
       <button type="button" class="app-nav-btn" data-view="incoming" id="nav-incoming-btn" onclick="switchAppView('incoming')"><span class="nav-ico">📥</span><span class="nav-label" data-i18n="nav.incoming">Kiruvchi</span><span class="nav-badge hidden" id="nav-incoming-badge">0</span></button>
+      <button type="button" class="app-nav-btn" data-view="outgoing" id="nav-outgoing-btn" onclick="switchAppView('outgoing')"><span class="nav-ico">📤</span><span class="nav-label" data-i18n="nav.outgoing">Chiquvchi</span><span class="nav-badge hidden" id="nav-outgoing-badge">0</span></button>
       <button type="button" class="app-nav-btn hidden" id="nav-create-btn" data-view="create" onclick="switchAppView('create')"><span class="nav-ico">➕</span><span class="nav-label" data-i18n="nav.create">Topshiriq yaratish</span></button>
       <button type="button" class="app-nav-btn" data-view="smart" onclick="switchAppView('smart')"><span class="nav-ico">📈</span><span class="nav-label" data-i18n="nav.smart">SMART</span></button>
       <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span class="nav-label" data-i18n="nav.projects">Loyihalar</span></button>
@@ -1178,6 +1179,33 @@
       </div>
     </div>
     <div class="task-list" id="review-list"></div>
+  </div>
+
+  <!-- CHIQUVCHI — o'zim yaratgan topshiriqlar -->
+  <div id="view-outgoing" class="view-pane">
+    <div class="panel">
+      <h2><span class="dot" style="background:var(--accent)"></span> <span data-i18n="outgoing.title">Chiquvchi — men yaratganlar</span></h2>
+      <p class="help-text" style="margin-top:0;" data-i18n="outgoing.help">Siz yaratgan topshiriqlar va ularning holati shu yerda.</p>
+      <div class="incoming-toolbar">
+        <input type="text" id="outgoing-search" data-i18n-placeholder="outgoing.search" placeholder="Qidirish (ijrochi, topshiriq)…" oninput="onOutgoingSearch(this.value)">
+        <select id="outgoing-assignee" onchange="onOutgoingAssignee(this.value)"></select>
+        <div class="task-sort-wrap">
+          <label for="outgoing-sort" data-i18n="tasks.sortLabel">Saralash</label>
+          <select id="outgoing-sort" onchange="onOutgoingSortChange(this.value)">
+            <option value="assignee" data-i18n="tasks.sortAssignee">Ijrochi (A–Z)</option>
+            <option value="deadline_asc" data-i18n="tasks.sortDeadlineAsc">Muddat ↑ (yaqin)</option>
+            <option value="deadline_desc" data-i18n="tasks.sortDeadlineDesc">Muddat ↓ (uzoq)</option>
+            <option value="created_desc" data-i18n="tasks.sortCreatedDesc">Yaratilgan ↓ (yangi)</option>
+            <option value="created_asc" data-i18n="tasks.sortCreatedAsc">Yaratilgan ↑ (eski)</option>
+            <option value="priority_desc" data-i18n="tasks.sortPriorityDesc">Ustuvorlik ↓</option>
+            <option value="status" data-i18n="tasks.sortStatus">Holat bo'yicha</option>
+            <option value="title" data-i18n="tasks.sortTitle">Nom (A–Z)</option>
+          </select>
+        </div>
+      </div>
+      <div class="smart-period-total" id="outgoing-summary"></div>
+    </div>
+    <div class="task-list" id="outgoing-list"></div>
   </div>
 
   <!-- TOPSHIRIQ YARATISH -->
@@ -1483,6 +1511,14 @@ const I18N = {
     'incoming.empty': "Sizga tasdiqlash uchun kelgan topshiriq yo'q",
     'incoming.search': 'Qidirish (ijrochi, topshiriq)…',
     'incoming.emptyFiltered': 'Qidiruv bo‘yicha topshiriq topilmadi',
+    'nav.outgoing': 'Chiquvchi',
+    'outgoing.title': 'Chiquvchi — men yaratganlar',
+    'outgoing.help': 'Siz yaratgan topshiriqlar va ularning holati shu yerda.',
+    'outgoing.search': 'Qidirish (ijrochi, topshiriq)…',
+    'outgoing.allAssignees': 'Barcha xodimlar',
+    'outgoing.empty': 'Siz hali topshiriq yaratmagansiz',
+    'outgoing.emptyFiltered': 'Qidiruv bo‘yicha topshiriq topilmadi',
+    'outgoing.summary': 'Jami: <b>{total}</b> · <b class="pt-created">{active}</b> faol · <b class="pt-done">{done}</b> bajarilgan',
     'kpi.total': 'Jami',
     'kpi.progress': 'Jarayonda',
     'kpi.review': 'Tekshiruvda',
@@ -1649,6 +1685,14 @@ const I18N = {
     'incoming.empty': 'Нет задач, ожидающих вашего подтверждения',
     'incoming.search': 'Поиск (исполнитель, задача)…',
     'incoming.emptyFiltered': 'По поиску задач не найдено',
+    'nav.outgoing': 'Исходящие',
+    'outgoing.title': 'Исходящие — созданные мной',
+    'outgoing.help': 'Здесь задачи, которые вы создали, и их статус.',
+    'outgoing.search': 'Поиск (исполнитель, задача)…',
+    'outgoing.allAssignees': 'Все сотрудники',
+    'outgoing.empty': 'Вы ещё не создали задач',
+    'outgoing.emptyFiltered': 'По поиску задач не найдено',
+    'outgoing.summary': 'Итого: <b>{total}</b> · <b class="pt-created">{active}</b> активных · <b class="pt-done">{done}</b> выполнено',
     'kpi.total': 'Всего',
     'kpi.progress': 'В работе',
     'kpi.review': 'На проверке',
@@ -1815,6 +1859,14 @@ const I18N = {
     'incoming.empty': 'No tasks awaiting your approval',
     'incoming.search': 'Search (assignee, task)…',
     'incoming.emptyFiltered': 'No tasks match your search',
+    'nav.outgoing': 'Outbox',
+    'outgoing.title': 'Outbox — created by me',
+    'outgoing.help': 'Tasks you created and their status appear here.',
+    'outgoing.search': 'Search (assignee, task)…',
+    'outgoing.allAssignees': 'All employees',
+    'outgoing.empty': 'You have not created any tasks yet',
+    'outgoing.emptyFiltered': 'No tasks match your search',
+    'outgoing.summary': 'Total: <b>{total}</b> · <b class="pt-created">{active}</b> active · <b class="pt-done">{done}</b> done',
     'kpi.total': 'Total',
     'kpi.progress': 'In progress',
     'kpi.review': 'In review',
@@ -2537,8 +2589,13 @@ function resolveReviewerOnSubmit(task, executor) {
   ) {
     return executor.id;
   }
+  // Direktor / o'rinbosar ijrochi bo'lsa — tekshiruv to'g'ridan-to'g'ri yaratuvchiga
+  // (bo'lim boshlig'i yuqori rahbariyatni tekshirmaydi)
+  if (isTopManagementUser(executor)) {
+    return task.created_by_user_id || executor?.id || null;
+  }
   const head = findDepartmentHead(executor);
-  if (head && head.id !== executor.id) return head.id;
+  if (head && head.id !== executor.id && !isTopManagementUser(head)) return head.id;
   if (executor?.role === 'dept_head' && task.created_by_user_id) return task.created_by_user_id;
   return task.created_by_user_id || null;
 }
@@ -2727,7 +2784,7 @@ function showApp() {
 }
 
 function switchAppView(view) {
-  const allowed = ['monitoring', 'incoming', 'create', 'smart', 'admin', 'projects'];
+  const allowed = ['monitoring', 'incoming', 'outgoing', 'create', 'smart', 'admin', 'projects'];
   if (!allowed.includes(view)) view = 'monitoring';
   if (view === 'admin' && !canManageUsers()) view = 'monitoring';
   if (view === 'create' && !canCreateTasks()) view = 'monitoring';
@@ -2748,6 +2805,9 @@ function switchAppView(view) {
   }
   if (view === 'incoming') {
     renderReviewList();
+  }
+  if (view === 'outgoing') {
+    renderOutgoingList();
   }
   if (view === 'create') {
     renderExecutorSelect();
@@ -3188,7 +3248,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc', incomingSearch:'', incomingSort:'deadline_asc' };
+let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc', incomingSearch:'', incomingSort:'deadline_asc', outgoingSearch:'', outgoingSort:'assignee', outgoingAssignee:'' };
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
@@ -3886,6 +3946,82 @@ function renderReviewList() {
   }
   list.innerHTML = reviewTasks.map(t => taskRowHtml(t, 'review')).join('');
 }
+function getOutgoingTasks() {
+  if (!currentProfile) return [];
+  return state.tasks.filter(t => !t.deleted_at && t.created_by_user_id === currentProfile.id);
+}
+function matchesOutgoingSearch(t) {
+  const q = (state.outgoingSearch || '').trim().toLowerCase();
+  if (!q) return true;
+  const hay = [t.title, t.assignee, t.priority, t.comment].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(q);
+}
+function onOutgoingSearch(v) {
+  state.outgoingSearch = v || '';
+  renderOutgoingList();
+}
+function onOutgoingAssignee(v) {
+  state.outgoingAssignee = v || '';
+  renderOutgoingList();
+}
+function onOutgoingSortChange(v) {
+  state.outgoingSort = v || 'assignee';
+  try { localStorage.setItem('outgoing_sort', state.outgoingSort); } catch (e) {}
+  renderOutgoingList();
+}
+function fillOutgoingAssigneeSelect(tasks) {
+  const sel = document.getElementById('outgoing-assignee');
+  if (!sel) return;
+  const names = Array.from(new Set((tasks || []).map(t => t.assignee).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'uz'));
+  const cur = names.includes(state.outgoingAssignee) ? state.outgoingAssignee : '';
+  state.outgoingAssignee = cur;
+  sel.innerHTML = `<option value="">${escapeHtml(t('outgoing.allAssignees'))}</option>` +
+    names.map(n => `<option value="${escapeHtml(n)}" ${n === cur ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('');
+  sel.value = cur;
+}
+function updateOutgoingBadge(tasks) {
+  const badge = document.getElementById('nav-outgoing-badge');
+  if (!badge) return;
+  const list = tasks || getOutgoingTasks();
+  const n = list.filter(t => !isArchivedTask(t)).length;
+  badge.textContent = String(n);
+  badge.classList.toggle('hidden', n < 1);
+}
+function renderOutgoingList() {
+  const list = document.getElementById('outgoing-list');
+  const all = getOutgoingTasks();
+  updateOutgoingBadge(all);
+  if (!list) return;
+
+  fillOutgoingAssigneeSelect(all);
+  const sortSel = document.getElementById('outgoing-sort');
+  if (sortSel && sortSel.value !== state.outgoingSort) sortSel.value = state.outgoingSort || 'assignee';
+  const searchEl = document.getElementById('outgoing-search');
+  if (searchEl && searchEl.value !== (state.outgoingSearch || '')) searchEl.value = state.outgoingSearch || '';
+
+  const summary = document.getElementById('outgoing-summary');
+  if (summary) {
+    const done = all.filter(isArchivedTask).length;
+    summary.innerHTML = t('outgoing.summary', { total: all.length, active: all.length - done, done });
+  }
+
+  let tasks = all.filter(matchesOutgoingSearch);
+  if (state.outgoingAssignee) {
+    tasks = tasks.filter(x => assigneesMatch(x.assignee, state.outgoingAssignee));
+  }
+  tasks = sortTasksList(tasks, state.outgoingSort || 'assignee');
+
+  if (!all.length) {
+    list.innerHTML = `<div class="empty-msg">${escapeHtml(t('outgoing.empty'))}</div>`;
+    return;
+  }
+  if (!tasks.length) {
+    list.innerHTML = `<div class="empty-msg">${escapeHtml(t('outgoing.emptyFiltered'))}</div>`;
+    return;
+  }
+  list.innerHTML = tasks.map(x => taskRowHtml(x, 'main')).join('');
+}
 function isArchivedTask(task) {
   return effectiveStatus(task) === 'bajarildi' || task.status === 'bajarildi';
 }
@@ -4008,6 +4144,7 @@ function renderAll() {
   renderExecutorSelect();
   renderExecCards();
   renderReviewList();
+  renderOutgoingList();
   renderTaskList();
   renderOnlineUsers();
   const smartPane = document.getElementById('view-smart');
@@ -5423,11 +5560,15 @@ async function init() {
     if (savedSort) state.taskSort = savedSort;
     const savedIncomingSort = localStorage.getItem('incoming_sort');
     if (savedIncomingSort) state.incomingSort = savedIncomingSort;
+    const savedOutgoingSort = localStorage.getItem('outgoing_sort');
+    if (savedOutgoingSort) state.outgoingSort = savedOutgoingSort;
   } catch (e) {}
   const sortSel = document.getElementById('task-sort');
   if (sortSel) sortSel.value = state.taskSort || 'deadline_asc';
   const incomingSortSel = document.getElementById('incoming-sort');
   if (incomingSortSel) incomingSortSel.value = state.incomingSort || 'deadline_asc';
+  const outgoingSortSel = document.getElementById('outgoing-sort');
+  if (outgoingSortSel) outgoingSortSel.value = state.outgoingSort || 'assignee';
   setupPwaInstall();
   setupExecCardClicks();
   initSupabase();
