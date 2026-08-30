@@ -2524,16 +2524,6 @@ function officeDepartmentOptionsHtml(selected) {
     `<option value="${escapeHtml(d)}" ${d === cur ? 'selected' : ''}>${escapeHtml(d)}</option>`
   ).join('');
 }
-function roleBadge(role) {
-  const cls = {
-    admin: 'role-admin',
-    director: 'role-director',
-    deputy_director: 'role-deputy_director',
-    dept_head: 'role-dept_head',
-    executor: 'role-executor'
-  }[role] || '';
-  return `<span class="role-badge ${cls}">${roleLabel(role)}</span>`;
-}
 function roleOptionsHtml(selected) {
   const roles = ['executor', 'dept_head', 'deputy_director', 'director', 'admin'];
   return roles.map(r =>
@@ -2541,7 +2531,6 @@ function roleOptionsHtml(selected) {
   ).join('');
 }
 function isAdmin() { return currentProfile?.role === 'admin'; }
-function isDirector() { return currentProfile?.role === 'director'; }
 function isExecutor() { return currentProfile?.role === 'executor'; }
 function isDeptHead() { return currentProfile?.role === 'dept_head'; }
 function canCreateTasks() { return !!currentProfile; }
@@ -2614,11 +2603,6 @@ function getExecutors() {
     .slice()
     .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
 }
-function getDirectors() {
-  return state.appUsers.filter(u =>
-    u.role === 'director' || u.role === 'deputy_director' || u.role === 'admin'
-  );
-}
 function assigneeOptionLabel(u) {
   return escapeHtml(u.display_name) + ' (' + roleLabel(u.role) + ')';
 }
@@ -2645,10 +2629,6 @@ function visibleTasks() {
     tasks = tasks.filter(t => ids.has(t.assignee_user_id) || names.has(t.assignee));
   }
   return tasks;
-}
-
-function distinctDepartments() {
-  return OFFICE_DEPARTMENTS.slice();
 }
 
 function refreshDepartmentSuggestions() {
@@ -3294,41 +3274,11 @@ function formatFileSize(n) {
   if (v < 1024 * 1024) return (v / 1024).toFixed(1) + ' KB';
   return (v / (1024 * 1024)).toFixed(1) + ' MB';
 }
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const i = result.indexOf('base64,');
-      resolve(i >= 0 ? result.slice(i + 7) : result);
-    };
-    reader.onerror = () => reject(new Error("Faylni o'qib bo'lmadi"));
-    reader.readAsDataURL(file);
-  });
-}
 function setAttachStatus(el, text, kind) {
   if (!el) return;
   el.textContent = text || '';
   el.classList.toggle('busy', kind === 'busy');
   el.classList.toggle('ok', kind === 'ok');
-}
-async function ensureTaskTempBucket() {
-  try {
-    const token = await getAccessToken();
-    if (!token) {
-      toast("Sessiya tugagan — qayta kiring");
-      return false;
-    }
-    const res = await fetch('/api/ensure-task-temp', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    const json = await res.json().catch(() => ({}));
-    return !!(res.ok && json.ok);
-  } catch (e) {
-    console.warn('ensure-task-temp', e);
-    return false;
-  }
 }
 async function uploadViaSignedStaging(file) {
   const { data: sess } = await sb.auth.getSession();
@@ -3468,14 +3418,6 @@ async function onEditAttachmentChange(input) {
   if (!file) { setAttachStatus(status, '', ''); return; }
   editDraftAttachment = await uploadTaskAttachment(file, status);
   if (!editDraftAttachment) input.value = '';
-}
-async function onModalAttachmentChange(input) {
-  draftAttachment = null;
-  const status = document.getElementById('m-attachment-status');
-  const file = input?.files?.[0];
-  if (!file) { setAttachStatus(status, '', ''); return; }
-  draftAttachment = await uploadTaskAttachment(file, status);
-  if (!draftAttachment) input.value = '';
 }
 async function onSubmitAttachmentChange(input) {
   submitDraftAttachment = null;
@@ -4167,15 +4109,6 @@ function filterByStatus(status) {
   const target = document.getElementById('task-list');
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-function filterByAssignee(name) {
-  state.filterAssignee = name;
-  document.getElementById('filter-assignee').value = name;
-  renderKpis();
-  renderExecCards();
-  renderTaskList();
-  renderReviewList();
-  document.getElementById('task-list').scrollIntoView({ behavior:'smooth' });
-}
 function onSearch(v){ state.search = v; renderTaskList(); renderReviewList(); }
 function onFilterPriority(v){ state.filterPriority = v; renderTaskList(); renderReviewList(); }
 function onFilterDepartment(v){
@@ -4283,29 +4216,6 @@ function openCreateTaskForUser(userId) {
   renderAssigneeCheckList('new-executor-list', 'new-executor-count', [userId]);
   const titleEl = document.getElementById('new-title');
   if (titleEl) titleEl.focus();
-}
-
-async function saveCreateTaskModal() {
-  const executorIds = getSelectedAssigneeIds('m-executor-list');
-  const title = document.getElementById('m-title')?.value.trim();
-  const priority = document.getElementById('m-priority')?.value;
-  const deadlineRaw = document.getElementById('m-deadline')?.value;
-  const deadline = fromDatetimeLocal(deadlineRaw);
-  if (!executorIds.length || !title) { toast('Kamida bitta ijrochi va topshiriq matnini kiriting'); return; }
-  if (!deadlineRaw || !deadline) { toast('Muddat belgilash majburiy'); return; }
-  const statusEl = document.getElementById('m-attachment-status');
-  if (statusEl && statusEl.classList.contains('busy')) {
-    toast('Fayl hali yuklanmoqda — biroz kuting');
-    return;
-  }
-  const created = await createTasksForAssignees(executorIds, { title, priority, deadline });
-  if (!created.length) { toast('Ijrochi topilmadi'); return; }
-  draftAttachment = null;
-  closeModal();
-  await refreshFromDB();
-  toast(created.length === 1
-    ? 'Topshiriq yaratildi va ijrochiga yuborildi'
-    : created.length + ' ta topshiriq yaratildi va ijrochilarga yuborildi');
 }
 
 /* =========================================================
