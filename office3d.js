@@ -64,10 +64,6 @@ const SIT_ROOT_Y = 0;
 
 const WALK_SPEED = 2.6;
 
-function genderOf(u) {
-  return u?.gender === 'ayol' ? 'ayol' : 'erkak';
-}
-
 function normalizeOfficeDepartment(raw) {
   const s = String(raw || '').trim().toLowerCase();
   if (!s || s === 'admin' || s === 'админ' || s === 'boshqa') return "Xodimlar bo'limi";
@@ -102,9 +98,7 @@ function hexToInt(hex, fallback = 0x4c8dff) {
 function positionLevelOf(u) {
   const lv = u?.position_level;
   if (lv && (MANAGEMENT_LEVELS.has(lv) || lv === 'xodim')) return lv;
-  return (
-    { director: 'direktor', deputy_director: 'orinbosar', dept_head: 'bolim_boshligi' }[u?.role] || 'xodim'
-  );
+  return window.positionLevelFromRole(u?.role);
 }
 
 function positionLabel(level) {
@@ -559,7 +553,7 @@ function mat(color, opts = {}) {
 
 /** Low-poly humanoid — oyoqlar y≈0 da, o'tirishda bel/stul/klaviatura moslashadi */
 function createPersonMesh(level, gender) {
-  const g = genderOf({ gender });
+  const g = window.genderOf({ gender });
   const p = CHARACTER_PRESETS[g] || CHARACTER_PRESETS.erkak;
   const root = new THREE.Group();
   root.scale.setScalar(1);
@@ -1325,7 +1319,7 @@ export const Office3D = {
     return officeUsers(users)
       .map(
         (u) =>
-          `${u.id}|${normalizeOfficeDepartment(u.department)}|${positionLevelOf(u)}|${genderOf(u)}|${u.display_name || ''}`
+          `${u.id}|${normalizeOfficeDepartment(u.department)}|${positionLevelOf(u)}|${window.genderOf(u)}|${u.display_name || ''}`
       )
       .sort()
       .join(';');
@@ -1741,7 +1735,7 @@ export const Office3D = {
   _placePerson(user, pose, tasks) {
     const st = this._state;
     const level = positionLevelOf(user);
-    const g = genderOf(user);
+    const g = window.genderOf(user);
     const status = userWorkStatus(user, tasks);
     const person = createPersonMesh(level, g);
     if (wantsSunglasses(user) && person.userData.head) {
@@ -1830,7 +1824,7 @@ export const Office3D = {
         return;
       }
 
-      if (person.userData.gender !== genderOf(u) || person.userData.level !== positionLevelOf(u)) {
+      if (person.userData.gender !== window.genderOf(u) || person.userData.level !== positionLevelOf(u)) {
         st.scene.remove(person);
         disposeObject(person);
         st.people.delete(u.id);
