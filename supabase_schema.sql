@@ -697,3 +697,93 @@ create index if not exists idx_tasks_deadline on tasks (deadline) where deleted_
 create index if not exists idx_tasks_created_by on tasks (created_by_user_id) where deleted_at is null;
 create index if not exists idx_tasks_reviewer on tasks (reviewer_user_id) where deleted_at is null;
 create index if not exists idx_tasks_created_at on tasks (created_at) where deleted_at is null;
+
+-- ============================================================
+-- PLANNER — shaxsiy vazifalar, maqsadlar, fokus seanslari
+-- Har bir user FAQAT o'z qatorlarini ko'radi (admin ham boshqasinikini emas)
+-- ============================================================
+create table if not exists planner_tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  title text not null,
+  due_date date,
+  is_done boolean not null default false,
+  done_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists planner_goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  title text not null,
+  target_date date,
+  is_done boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists focus_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  planned_seconds integer not null default 1500,
+  actual_seconds integer not null default 0,
+  completed boolean not null default false,
+  started_at timestamptz,
+  ended_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_planner_tasks_user on planner_tasks (user_id, is_done, due_date);
+create index if not exists idx_planner_goals_user on planner_goals (user_id, is_done);
+create index if not exists idx_focus_sessions_user on focus_sessions (user_id, started_at);
+
+alter table planner_tasks enable row level security;
+alter table planner_goals enable row level security;
+alter table focus_sessions enable row level security;
+
+drop policy if exists "planner_tasks_select" on planner_tasks;
+drop policy if exists "planner_tasks_insert" on planner_tasks;
+drop policy if exists "planner_tasks_update" on planner_tasks;
+drop policy if exists "planner_tasks_delete" on planner_tasks;
+create policy "planner_tasks_select" on planner_tasks
+  for select using (user_id = public.my_user_id());
+create policy "planner_tasks_insert" on planner_tasks
+  for insert with check (user_id = public.my_user_id());
+create policy "planner_tasks_update" on planner_tasks
+  for update using (user_id = public.my_user_id())
+  with check (user_id = public.my_user_id());
+create policy "planner_tasks_delete" on planner_tasks
+  for delete using (user_id = public.my_user_id());
+
+drop policy if exists "planner_goals_select" on planner_goals;
+drop policy if exists "planner_goals_insert" on planner_goals;
+drop policy if exists "planner_goals_update" on planner_goals;
+drop policy if exists "planner_goals_delete" on planner_goals;
+create policy "planner_goals_select" on planner_goals
+  for select using (user_id = public.my_user_id());
+create policy "planner_goals_insert" on planner_goals
+  for insert with check (user_id = public.my_user_id());
+create policy "planner_goals_update" on planner_goals
+  for update using (user_id = public.my_user_id())
+  with check (user_id = public.my_user_id());
+create policy "planner_goals_delete" on planner_goals
+  for delete using (user_id = public.my_user_id());
+
+drop policy if exists "focus_sessions_select" on focus_sessions;
+drop policy if exists "focus_sessions_insert" on focus_sessions;
+drop policy if exists "focus_sessions_update" on focus_sessions;
+drop policy if exists "focus_sessions_delete" on focus_sessions;
+create policy "focus_sessions_select" on focus_sessions
+  for select using (user_id = public.my_user_id());
+create policy "focus_sessions_insert" on focus_sessions
+  for insert with check (user_id = public.my_user_id());
+create policy "focus_sessions_update" on focus_sessions
+  for update using (user_id = public.my_user_id())
+  with check (user_id = public.my_user_id());
+create policy "focus_sessions_delete" on focus_sessions
+  for delete using (user_id = public.my_user_id());
+
+grant select, insert, update, delete on planner_tasks to authenticated;
+grant select, insert, update, delete on planner_goals to authenticated;
+grant select, insert, update, delete on focus_sessions to authenticated;
+
+notify pgrst, 'reload schema';
