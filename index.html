@@ -1065,7 +1065,7 @@
   <div class="landing">
     <div class="landing-hero-wrap">
       <div class="landing-shot-frame">
-        <img class="landing-shot" src="/assets/taskoman-landing.png?v=13" width="1024" height="570" alt="TRAKSA — From Tasks to Results">
+        <img class="landing-shot" src="/assets/traksa-landing.jpg?v=1" width="1280" height="712" alt="TRAKSA — From Tasks to Results">
         <button type="button" class="landing-hit landing-hit-login" onclick="openLoginPanel()" aria-label="Tizimga kirish"></button>
         <button type="button" class="landing-hit landing-hit-details" onclick="scrollLandingDetails()" aria-label="Batafsil"></button>
       </div>
@@ -5751,7 +5751,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=18').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=19').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5759,7 +5759,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v24'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v25'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }
