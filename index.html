@@ -3636,10 +3636,7 @@ async function uploadViaSignedStaging(file) {
 
   const res = await fetch('/api/telegram-upload', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + accessToken
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       storagePath: signJson.storagePath,
       filename: file.name,
@@ -3679,13 +3676,7 @@ async function uploadTaskAttachment(file, statusEl) {
         setAttachStatus(statusEl, 'To\'g\'ridan-to\'g\'ri yuklanmoqda...', 'busy');
         const form = new FormData();
         form.append('file', file, file.name);
-        const token = await getAccessToken();
-        if (!token) throw new Error("Sessiya yo'q");
-        const res = await fetch('/api/telegram-upload', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token },
-          body: form
-        });
+        const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
         json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok || !json.file_id) {
           throw new Error(json.error || stageErr.message || ('HTTP ' + res.status));
@@ -3697,13 +3688,7 @@ async function uploadTaskAttachment(file, statusEl) {
       }
       const form = new FormData();
       form.append('file', file, file.name);
-      const token = await getAccessToken();
-      if (!token) throw new Error("Sessiya yo'q");
-      const res = await fetch('/api/telegram-upload', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
-        body: form
-      });
+      const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
       json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok || !json.file_id) {
         throw new Error(json.error || ('HTTP ' + res.status));
@@ -3763,14 +3748,22 @@ function attachmentFieldsFromDraft(draft) {
     attachment_size: draft.attachment_size || 0
   };
 }
+function attachmentDownloadUrl(t) {
+  if (!t?.attachment_file_id) return '';
+  const name = t.attachment_name || 'fayl';
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : '';
+  return origin + '/api/telegram-file?file_id=' + encodeURIComponent(t.attachment_file_id) +
+    '&name=' + encodeURIComponent(name);
+}
 function attachmentLinkHtml(t) {
   if (!t?.attachment_file_id) return '';
   const name = t.attachment_name || 'fayl';
   const size = t.attachment_size ? ' · ' + formatFileSize(t.attachment_size) : '';
   const fileIdJs = JSON.stringify(String(t.attachment_file_id));
   const nameJs = JSON.stringify(String(name));
+  const url = attachmentDownloadUrl(t);
   return `<div class="task-attach-wrap" onclick="event.stopPropagation()">
-    <a class="task-attach" href="javascript:void(0)"
+    <a class="task-attach" href="${escapeHtml(url)}" target="_blank" rel="noopener"
        onclick="event.preventDefault();openAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>
     <button type="button" class="btn-ghost" onclick="openAttachment(${fileIdJs}, ${nameJs})">Ko'rish</button>
   </div>`;
@@ -3834,36 +3827,10 @@ function closeAttachmentOverlay() {
   if (url) URL.revokeObjectURL(url);
 }
 async function openAttachment(fileId, fileName) {
-  // MUHIM: oynani DARHOL, hech narsani kutmasdan ochamiz (popup-blocker uchun)
-  const newTab = window.open('', '_blank');
-  if (newTab) {
-    newTab.document.write('Fayl yuklanmoqda...');
-  }
-  try {
-    const token = await getAccessToken();
-    if (!token) { toast("Avval tizimga kiring"); if (newTab) newTab.close(); return; }
-    const res = await fetch(
-      `/api/telegram-file?file_id=${encodeURIComponent(fileId)}&name=${encodeURIComponent(fileName || 'fayl')}`,
-      { headers: { Authorization: 'Bearer ' + token } }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast(err.error || "Faylni ochib bo'lmadi");
-      if (newTab) newTab.close();
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    if (newTab) {
-      newTab.location.href = url;
-    } else {
-      window.open(url, '_blank');
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (e) {
-    toast('Xatolik: ' + e.message);
-    if (newTab) newTab.close();
-  }
+  if (!fileId) return;
+  const url = '/api/telegram-file?file_id=' + encodeURIComponent(fileId) +
+    '&name=' + encodeURIComponent(fileName || 'fayl');
+  window.open(url, '_blank', 'noopener');
 }
 
 /* =========================================================
@@ -5049,8 +5016,11 @@ async function notifyCreatorReview(task) {
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
   let fileNote = '';
   if (task.attachment_file_id) {
+    const url = attachmentDownloadUrl(task);
     const fname = escapeHtml(task.attachment_name || 'fayl');
-    fileNote = `\n📎 Fayl: ${fname}\nSaytdagi tekshiruv bo'limidan oching (tizimga kirish kerak).`;
+    fileNote = url
+      ? `\n📎 Fayl (Telegram): <a href="${url}">${fname} — yuklab olish</a>`
+      : `\n📎 Fayl: ${fname} (saytdagi tekshiruv bo'limidan yuklab oling)`;
   }
   const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
   if (!reviewer) {

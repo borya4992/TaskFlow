@@ -1,21 +1,11 @@
 // file_id orqali Telegramdan faylni oladi va brauzerga uzatadi (proksi / yuklab olish).
 // Bot tokenini brauzerga chiqarmaslik uchun fayl shu server orqali "oqiziladi".
 // Fayl Telegram serverlarida saqlanadi — Supabase Storage ishlatilmaydi.
-// TUZATILDI: endi faqat login qilgan foydalanuvchi faylni ko'ra/yuklay oladi.
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-
-async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
-  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
-  });
-  if (!res.ok) return null;
-  return res.json();
-}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -29,19 +19,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Avtorizatsiya majburiy
-    const authHeader = req.headers.authorization || '';
-    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (!jwt) {
-      res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' });
-      return;
-    }
-    const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
-    if (!me?.id) {
-      res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
-      return;
-    }
-
     const fileId = req.query.file_id;
     const asName = String(req.query.name || 'fayl').replace(/[/\\]/g, '_');
     if (!fileId) {
@@ -78,22 +55,13 @@ module.exports = async function handler(req, res) {
     }
 
     const buf = Buffer.from(await fileRes.arrayBuffer());
-    let ctype = fileRes.headers.get('content-type') || 'application/octet-stream';
-    if (!ctype || /octet-stream/i.test(ctype)) {
-      const ext = asName.split('.').pop().toLowerCase();
-      const byExt = {
-        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
-        webp: 'image/webp', bmp: 'image/bmp', pdf: 'application/pdf',
-        txt: 'text/plain', csv: 'text/csv', mp4: 'video/mp4', mp3: 'audio/mpeg'
-      };
-      if (byExt[ext]) ctype = byExt[ext];
-    }
+    const ctype = fileRes.headers.get('content-type') || 'application/octet-stream';
     const asciiName = asName.replace(/[^\x20-\x7E]/g, '_') || 'fayl';
     res.setHeader('Content-Type', ctype);
     res.setHeader('Content-Length', String(buf.length));
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="${asciiName.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(asName)}`
+      `attachment; filename="${asciiName.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(asName)}`
     );
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.status(200).send(buf);
