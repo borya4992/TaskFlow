@@ -1,11 +1,21 @@
 // file_id orqali Telegramdan faylni oladi va brauzerga uzatadi (proksi / yuklab olish).
 // Bot tokenini brauzerga chiqarmaslik uchun fayl shu server orqali "oqiziladi".
 // Fayl Telegram serverlarida saqlanadi — Supabase Storage ishlatilmaydi.
+// TUZATILDI: endi faqat login qilgan foydalanuvchi faylni ko'ra/yuklay oladi.
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -19,6 +29,19 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    // Avtorizatsiya majburiy
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!jwt) {
+      res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' });
+      return;
+    }
+    const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
+    if (!me?.id) {
+      res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
+      return;
+    }
+
     const fileId = req.query.file_id;
     const asName = String(req.query.name || 'fayl').replace(/[/\\]/g, '_');
     if (!fileId) {

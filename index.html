@@ -3621,7 +3621,10 @@ async function uploadViaSignedStaging(file) {
 
   const res = await fetch('/api/telegram-upload', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + accessToken
+    },
     body: JSON.stringify({
       storagePath: signJson.storagePath,
       filename: file.name,
@@ -3661,7 +3664,13 @@ async function uploadTaskAttachment(file, statusEl) {
         setAttachStatus(statusEl, 'To\'g\'ridan-to\'g\'ri yuklanmoqda...', 'busy');
         const form = new FormData();
         form.append('file', file, file.name);
-        const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+        const token = await getAccessToken();
+        if (!token) throw new Error("Sessiya yo'q");
+        const res = await fetch('/api/telegram-upload', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+          body: form
+        });
         json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok || !json.file_id) {
           throw new Error(json.error || stageErr.message || ('HTTP ' + res.status));
@@ -3673,7 +3682,13 @@ async function uploadTaskAttachment(file, statusEl) {
       }
       const form = new FormData();
       form.append('file', file, file.name);
-      const res = await fetch('/api/telegram-upload', { method: 'POST', body: form });
+      const token = await getAccessToken();
+      if (!token) throw new Error("Sessiya yo'q");
+      const res = await fetch('/api/telegram-upload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: form
+      });
       json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok || !json.file_id) {
         throw new Error(json.error || ('HTTP ' + res.status));
@@ -3733,32 +3748,41 @@ function attachmentFieldsFromDraft(draft) {
     attachment_size: draft.attachment_size || 0
   };
 }
-/** Telegram orqali saqlangan faylni yuklab olish URL (Supabase Storage emas) */
-function attachmentDownloadUrl(t) {
-  if (!t?.attachment_file_id) return '';
-  const name = t.attachment_name || 'fayl';
-  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : '';
-  return origin + '/api/telegram-file?file_id=' + encodeURIComponent(t.attachment_file_id) +
-    '&name=' + encodeURIComponent(name);
-}
 function attachmentLinkHtml(t) {
   if (!t?.attachment_file_id) return '';
   const name = t.attachment_name || 'fayl';
   const size = t.attachment_size ? ' · ' + formatFileSize(t.attachment_size) : '';
   const fileIdJs = JSON.stringify(String(t.attachment_file_id));
   const nameJs = JSON.stringify(String(name));
-  const url = attachmentDownloadUrl(t);
   return `<div class="task-attach-wrap" onclick="event.stopPropagation()">
-    <a class="task-attach" href="${escapeHtml(url)}" target="_blank" rel="noopener"
-       onclick="event.preventDefault();openTaskAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>
-    <button type="button" class="btn-ghost" onclick="openTaskAttachment(${fileIdJs}, ${nameJs})">⬇ Yuklab olish</button>
+    <a class="task-attach" href="#"
+       onclick="event.preventDefault();openAttachment(${fileIdJs}, ${nameJs});">📎 ${escapeHtml(name)}${size}</a>
+    <button type="button" class="btn-ghost" onclick="openAttachment(${fileIdJs}, ${nameJs})">Ko'rish</button>
   </div>`;
 }
-function openTaskAttachment(fileId, name) {
-  if (!fileId) return;
-  const url = '/api/telegram-file?file_id=' + encodeURIComponent(fileId) +
-    '&name=' + encodeURIComponent(name || 'fayl');
-  window.open(url, '_blank', 'noopener');
+async function openAttachment(fileId, fileName) {
+  try {
+    const token = await getAccessToken();
+    if (!token) { toast("Avval tizimga kiring"); return; }
+    const preview = window.open('about:blank', '_blank');
+    const res = await fetch(
+      `/api/telegram-file?file_id=${encodeURIComponent(fileId)}&name=${encodeURIComponent(fileName || 'fayl')}`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!res.ok) {
+      if (preview) preview.close();
+      const err = await res.json().catch(() => ({}));
+      toast(err.error || "Faylni ochib bo'lmadi");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (preview) preview.location = url;
+    else window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    toast('Xatolik: ' + e.message);
+  }
 }
 
 /* =========================================================
@@ -3946,7 +3970,7 @@ function taskRowHtml(t, mode) {
     if (t.attachment_file_id) {
       const fileIdJs = JSON.stringify(String(t.attachment_file_id));
       const nameJs = JSON.stringify(String(t.attachment_name || 'fayl'));
-      parts.unshift(`<button class="btn-blue" onclick="openTaskAttachment(${fileIdJs}, ${nameJs})">📎 Faylni yuklash</button>`);
+      parts.unshift(`<button class="btn-blue" onclick="openAttachment(${fileIdJs}, ${nameJs})">📎 Faylni ko'rish</button>`);
     }
     actions = parts.join('');
   } else {
@@ -4941,11 +4965,8 @@ async function notifyCreatorReview(task) {
   const note = task.comment ? `\nIzoh: ${task.comment}` : '';
   let fileNote = '';
   if (task.attachment_file_id) {
-    const url = attachmentDownloadUrl(task);
     const fname = escapeHtml(task.attachment_name || 'fayl');
-    fileNote = url
-      ? `\n📎 Fayl (Telegram): <a href="${url}">${fname} — yuklab olish</a>`
-      : `\n📎 Fayl: ${fname} (saytdagi tekshiruv bo'limidan yuklab oling)`;
+    fileNote = `\n📎 Fayl: ${fname}\nSaytdagi tekshiruv bo'limidan oching (tizimga kirish kerak).`;
   }
   const lines = `🔍 <b>Tekshiruv kerak</b>\n\n${task.title}\nIjrochi: ${task.assignee}${note}${fileNote}`;
   if (!reviewer) {
@@ -5747,7 +5768,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=20').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=21').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5755,7 +5776,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v26'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v27'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

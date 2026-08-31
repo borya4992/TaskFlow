@@ -142,6 +142,14 @@ function explainTelegramError(tgData) {
   return 'Telegram xatosi: ' + desc;
 }
 
+async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ ok: false, error: 'Method not allowed' });
@@ -152,6 +160,19 @@ module.exports = async function handler(req, res) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
     res.status(500).json({ ok: false, error: 'Server sozlanmagan (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    return;
+  }
+
+  // TUZATILDI: endi faqat login qilgan foydalanuvchi fayl yuklay oladi
+  const authHeader = req.headers.authorization || '';
+  const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!jwt) {
+    res.status(401).json({ ok: false, error: 'Avtorizatsiya kerak' });
+    return;
+  }
+  const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
+  if (!me?.id) {
+    res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' });
     return;
   }
 
