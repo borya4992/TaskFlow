@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Taskoman — Topshiriqlar monitoringi</title>
-<meta name="description" content="Taskoman — jamoa topshiriqlarini monitoring qilish ilovasi">
+<title>TRAKSA — From Tasks to Results</title>
+<meta name="description" content="TRAKSA — From Tasks to Results. Jamoa topshiriqlarini monitoring qilish ilovasi">
 <meta name="theme-color" content="#0B0F17" id="meta-theme-color">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Taskoman">
-<meta name="application-name" content="Taskoman">
+<meta name="apple-mobile-web-app-title" content="TRAKSA">
+<meta name="application-name" content="TRAKSA">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
@@ -234,7 +234,12 @@
   }
   .sidebar-brand{display:flex;align-items:center;gap:10px;padding:8px 10px 16px;border-bottom:1px solid var(--border);margin-bottom:12px;}
   .sidebar-brand .brand-logo{width:34px;height:34px;object-fit:contain;border-radius:8px;background:#0a0a0a;flex-shrink:0;}
+  .brand-lockup{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0;}
   .sidebar-brand .brand-wordmark{font-size:14px;letter-spacing:.1em;}
+  .brand-tagline{
+    font-family:'Manrope',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.03em;
+    color:var(--text-faint);-webkit-text-fill-color:var(--text-faint);background:none;text-transform:none;margin-top:2px;
+  }
   .sidebar-nav{display:flex;flex-direction:column;gap:4px;flex:1;overflow-y:auto;min-height:0;}
   .app-nav-btn{
     display:flex;align-items:center;gap:10px;width:100%;text-align:left;
@@ -632,7 +637,7 @@
     .kpi{flex:1;min-width:0;padding:8px 6px;}
   }
 
-  /* auth / TASKOMAN landing — to'liq rasm */
+  /* auth / TRAKSA landing — to'liq rasm */
   .auth-screen{
     min-height:100vh;min-height:100dvh;position:relative;overflow-x:hidden;overflow-y:auto;
     font-family:'Manrope',system-ui,sans-serif;
@@ -719,6 +724,8 @@
     animation:landingIn .35s ease both;position:relative;
   }
   .auth-card h1{margin:0 0 6px;font-size:20px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;}
+  .auth-card h1 .brand-lockup{align-items:center;}
+  .auth-card h1 .brand-tagline{text-align:center;}
   .auth-card h1 .brand-logo{
     width:40px;height:40px;object-fit:contain;border-radius:8px;
     flex-shrink:0;background:#0a0a0a;display:block;
@@ -1058,7 +1065,7 @@
   <div class="landing">
     <div class="landing-hero-wrap">
       <div class="landing-shot-frame">
-        <img class="landing-shot" src="/assets/taskoman-landing.png?v=13" width="1024" height="570" alt="Taskoman — Plan. Assign. Track. Done.">
+        <img class="landing-shot" src="/assets/taskoman-landing.png?v=13" width="1024" height="570" alt="TRAKSA — From Tasks to Results">
         <button type="button" class="landing-hit landing-hit-login" onclick="openLoginPanel()" aria-label="Tizimga kirish"></button>
         <button type="button" class="landing-hit landing-hit-details" onclick="scrollLandingDetails()" aria-label="Batafsil"></button>
       </div>
@@ -1101,7 +1108,7 @@
   <div id="login-backdrop" class="login-backdrop" onclick="if(event.target===this)closeLoginPanel()">
     <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
       <button type="button" class="auth-close" onclick="closeLoginPanel()" aria-label="Yopish">✕</button>
-      <h1 id="login-title"><img class="brand-logo" src="/icons/void-logo.png" width="40" height="40" alt="V.O.I.D"> <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span></h1>
+      <h1 id="login-title"><img class="brand-logo" src="/icons/logo.png" width="40" height="40" alt="TRAKSA"> <span class="brand-lockup"><span class="brand-wordmark" data-i18n="app.title">TRAKSA</span><span class="brand-tagline" data-i18n="app.tagline">From Tasks to Results</span></span></h1>
       <p class="auth-sub" data-i18n="auth.sub">Tizimga kirish uchun admin tomonidan qo'shilgan bo'lishingiz kerak</p>
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="password" onclick="switchAuthTab('password')" data-i18n="auth.tabPassword">Parol</button>
@@ -1126,8 +1133,11 @@
 <div class="app-shell" id="app-shell">
   <aside class="app-sidebar" id="app-sidebar" aria-label="Asosiy navigatsiya">
     <div class="sidebar-brand">
-      <img class="brand-logo" src="/icons/void-logo.png" width="34" height="34" alt="V.O.I.D">
-      <span class="brand-wordmark" data-i18n="app.title">TASKOMAN</span>
+      <img class="brand-logo" src="/icons/logo.png" width="34" height="34" alt="TRAKSA">
+      <span class="brand-lockup">
+        <span class="brand-wordmark" data-i18n="app.title">TRAKSA</span>
+        <span class="brand-tagline" data-i18n="app.tagline">From Tasks to Results</span>
+      </span>
     </div>
     <nav class="sidebar-nav" id="app-nav">
       <button type="button" class="app-nav-btn active" data-view="monitoring" onclick="switchAppView('monitoring')"><span class="nav-ico">📊</span><span class="nav-label" data-i18n="nav.monitoring">Monitoring</span></button>
@@ -1585,7 +1595,9 @@ const I18N = {
     'auth.login': 'Kirish',
     'auth.hintPassword': "Parolni admin beradi. Keyin profil orqali o'zgartiring. Unutsangiz — admin tiklaydi.",
     'auth.hintTelegram': "Telegram orqali kirish uchun avval admin sizning Telegram ID'ingizni qo'shishi kerak.",
-    'app.title': 'TASKOMAN',
+    'app.title': 'TRAKSA',
+    'app.tagline': 'From Tasks to Results',
+    'app.installed': "TRAKSA ilova sifatida o'rnatildi",
     'app.openProfile': 'Profilni ochish',
     'app.install': "Ilovani o'rnatish",
     'app.theme': 'Tema',
@@ -1804,7 +1816,9 @@ const I18N = {
     'auth.login': 'Войти',
     'auth.hintPassword': 'Пароль выдаёт админ. Затем смените его в профиле. Если забыли — сбросит админ.',
     'auth.hintTelegram': 'Для входа через Telegram админ должен добавить ваш Telegram ID.',
-    'app.title': 'TASKOMAN',
+    'app.title': 'TRAKSA',
+    'app.tagline': 'From Tasks to Results',
+    'app.installed': 'TRAKSA установлено как приложение',
     'app.openProfile': 'Открыть профиль',
     'app.install': 'Установить приложение',
     'app.theme': 'Тема',
@@ -2023,7 +2037,9 @@ const I18N = {
     'auth.login': 'Sign in',
     'auth.hintPassword': 'The admin gives you the password. Change it later in your profile. If forgotten — ask an admin to reset.',
     'auth.hintTelegram': 'For Telegram login, an admin must add your Telegram ID first.',
-    'app.title': 'TASKOMAN',
+    'app.title': 'TRAKSA',
+    'app.tagline': 'From Tasks to Results',
+    'app.installed': 'TRAKSA was installed as an app',
     'app.openProfile': 'Open profile',
     'app.install': 'Install app',
     'app.theme': 'Theme',
@@ -5063,7 +5079,7 @@ async function saveAndTestTelegram() {
   const chat_id = document.getElementById('tg-chat').value.trim();
   const telegram_bot_username = document.getElementById('tg-bot-user').value.trim().replace('@', '');
   await saveSettings({ telegram_token: token, telegram_chat_id: chat_id, telegram_bot_username });
-  const ok = await sendTelegram("✅ Topshiriqlar monitoringi botga ulandi!");
+  const ok = await sendTelegram("✅ TRAKSA botga ulandi!");
   if (ok) toast('Telegram ulandi va test xabar yuborildi');
 }
 async function checkDeadlinesNow() {
@@ -5732,10 +5748,10 @@ function setupPwaInstall() {
     deferredInstallPrompt = null;
     const btn = document.getElementById('btn-install-app');
     if (btn) btn.classList.add('hidden');
-    toast('Taskoman ilova sifatida o\'rnatildi');
+    toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=17').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=18').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5743,7 +5759,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => (k.startsWith('taskflow-') || k.startsWith('taskoman-')) && k !== 'taskoman-v14')
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v24'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

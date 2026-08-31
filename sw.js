@@ -1,4 +1,4 @@
-﻿const CACHE = 'taskoman-v23';
+﻿const CACHE = 'traksa-v24';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -6,7 +6,8 @@ const PRECACHE = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
-  '/icons/favicon-32.png'
+  '/icons/favicon-32.png',
+  '/icons/logo.png'
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,7 +1,7 @@
 ﻿{
-  "name": "Taskoman — Topshiriqlar monitoringi",
-  "short_name": "Taskoman",
-  "description": "Taskoman — jamoa topshiriqlarini monitoring qilish ilovasi",
+  "name": "TRAKSA — From Tasks to Results",
+  "short_name": "TRAKSA",
+  "description": "TRAKSA — From Tasks to Results. Jamoa topshiriqlarini monitoring qilish ilovasi",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
