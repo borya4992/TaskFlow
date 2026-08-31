@@ -3834,27 +3834,35 @@ function closeAttachmentOverlay() {
   if (url) URL.revokeObjectURL(url);
 }
 async function openAttachment(fileId, fileName) {
-  const name = fileName || 'fayl';
-  toast('Fayl yuklanmoqda...');
+  // MUHIM: oynani DARHOL, hech narsani kutmasdan ochamiz (popup-blocker uchun)
+  const newTab = window.open('', '_blank');
+  if (newTab) {
+    newTab.document.write('Fayl yuklanmoqda...');
+  }
   try {
     const token = await getAccessToken();
-    if (!token) { toast("Avval tizimga kiring"); return; }
+    if (!token) { toast("Avval tizimga kiring"); if (newTab) newTab.close(); return; }
     const res = await fetch(
-      `/api/telegram-file?file_id=${encodeURIComponent(fileId)}&name=${encodeURIComponent(name)}`,
+      `/api/telegram-file?file_id=${encodeURIComponent(fileId)}&name=${encodeURIComponent(fileName || 'fayl')}`,
       { headers: { Authorization: 'Bearer ' + token } }
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast(err.error || "Faylni ochib bo'lmadi (" + res.status + ")");
+      toast(err.error || "Faylni ochib bo'lmadi");
+      if (newTab) newTab.close();
       return;
     }
-    const raw = await res.blob();
-    const mime = mimeFromFileName(name, raw.type);
-    const blob = new Blob([raw], { type: mime });
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    showAttachmentOverlay(url, mime, name);
+    if (newTab) {
+      newTab.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     toast('Xatolik: ' + e.message);
+    if (newTab) newTab.close();
   }
 }
 
