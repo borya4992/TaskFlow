@@ -455,17 +455,20 @@
   .task-mini .task-attach{margin-top:4px;font-size:11px;}
   .task-mini .task-attach-wrap{padding:6px 8px;margin-top:6px;}
   .attach-preview{
-    position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;
+    position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;
     background:rgba(2,6,18,.92);
   }
   .attach-preview-bar{
     display:flex;align-items:center;justify-content:space-between;gap:12px;
     padding:10px 14px;background:#0b1220;border-bottom:1px solid var(--border);color:#e2e8f0;
+    flex-shrink:0;
   }
-  .attach-preview-bar b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .attach-preview-bar b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .attach-preview-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
   .attach-preview-body{flex:1;min-height:0;display:grid;place-items:center;background:#020617;}
   .attach-preview-body iframe{width:100%;height:100%;border:0;background:#fff;}
   .attach-preview-body img{max-width:100%;max-height:100%;object-fit:contain;}
+  .attach-preview-empty{color:#94a3b8;font-size:14px;text-align:center;padding:24px;}
 
   .section-title{font-size:15px;font-weight:700;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
   .section-title .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
@@ -3772,37 +3775,37 @@ function attachmentLinkHtml(t) {
     <button type="button" class="btn-ghost" onclick="openAttachment(${fileIdJs}, ${nameJs})">Ko'rish</button>
   </div>`;
 }
-function fillAttachmentPreview(doc, url, mime, name) {
-  const type = String(mime || '').toLowerCase();
-  doc.open();
-  doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title></title></head><body style="margin:0;background:#020617;min-height:100vh"></body></html>');
-  doc.close();
-  doc.title = name || 'fayl';
-  const body = doc.body;
-  body.style.cssText = 'margin:0;background:#020617;min-height:100vh;display:grid;place-items:center';
-  if (type.startsWith('image/')) {
-    const img = doc.createElement('img');
-    img.src = url;
-    img.alt = name || '';
-    img.style.cssText = 'max-width:100%;max-height:100vh;object-fit:contain';
-    body.appendChild(img);
-    return;
-  }
-  const frame = doc.createElement('iframe');
-  frame.src = url;
-  frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff';
-  body.appendChild(frame);
+function mimeFromFileName(name, fallback) {
+  const ext = String(name || '').split('.').pop().toLowerCase();
+  const map = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+    webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml',
+    pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv',
+    html: 'text/html', json: 'application/json',
+    mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav'
+  };
+  return map[ext] || fallback || 'application/octet-stream';
 }
 function showAttachmentOverlay(url, mime, name) {
   closeAttachmentOverlay();
   const wrap = document.createElement('div');
   wrap.id = 'attach-preview';
   wrap.className = 'attach-preview';
+  wrap.dataset.blobUrl = url;
   wrap.innerHTML = `<div class="attach-preview-bar">
     <b></b>
-    <button type="button" class="btn-ghost" id="attach-preview-close">✕ Yopish</button>
+    <div class="attach-preview-actions">
+      <a class="btn-ghost" id="attach-preview-tab" target="_blank" rel="noopener">Yangi tabda</a>
+      <a class="btn-ghost" id="attach-preview-dl" download>Yuklab olish</a>
+      <button type="button" class="btn-ghost" id="attach-preview-close">✕ Yopish</button>
+    </div>
   </div><div class="attach-preview-body"></div>`;
   wrap.querySelector('b').textContent = name || 'fayl';
+  const tab = wrap.querySelector('#attach-preview-tab');
+  const dl = wrap.querySelector('#attach-preview-dl');
+  tab.href = url;
+  dl.href = url;
+  dl.setAttribute('download', name || 'fayl');
   const body = wrap.querySelector('.attach-preview-body');
   const type = String(mime || '').toLowerCase();
   if (type.startsWith('image/')) {
@@ -3810,61 +3813,47 @@ function showAttachmentOverlay(url, mime, name) {
     img.src = url;
     img.alt = name || '';
     body.appendChild(img);
-  } else {
+  } else if (type === 'application/pdf' || type.startsWith('text/') || type.startsWith('video/') || type.startsWith('audio/')) {
     const frame = document.createElement('iframe');
     frame.src = url;
     body.appendChild(frame);
+  } else {
+    const p = document.createElement('div');
+    p.className = 'attach-preview-empty';
+    p.textContent = 'Bu fayl turini brauzerda ko\'rib bo\'lmaydi — «Yuklab olish» ni bosing.';
+    body.appendChild(p);
   }
   wrap.querySelector('#attach-preview-close').onclick = closeAttachmentOverlay;
-  wrap.addEventListener('click', (e) => { if (e.target === wrap) closeAttachmentOverlay(); });
   document.body.appendChild(wrap);
 }
 function closeAttachmentOverlay() {
   const wrap = document.getElementById('attach-preview');
-  if (wrap) wrap.remove();
+  if (!wrap) return;
+  const url = wrap.dataset.blobUrl;
+  wrap.remove();
+  if (url) URL.revokeObjectURL(url);
 }
 async function openAttachment(fileId, fileName) {
   const name = fileName || 'fayl';
-  const preview = window.open('', '_blank');
-  if (preview) {
-    try {
-      preview.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title></title></head><body style="margin:0;background:#020617;color:#94a3b8;font-family:sans-serif;display:grid;place-items:center;height:100vh">Yuklanmoqda...</body></html>');
-      preview.document.close();
-      preview.document.title = name;
-    } catch (_) {}
-  }
+  toast('Fayl yuklanmoqda...');
   try {
     const token = await getAccessToken();
-    if (!token) {
-      if (preview) preview.close();
-      toast("Avval tizimga kiring");
-      return;
-    }
+    if (!token) { toast("Avval tizimga kiring"); return; }
     const res = await fetch(
       `/api/telegram-file?file_id=${encodeURIComponent(fileId)}&name=${encodeURIComponent(name)}`,
       { headers: { Authorization: 'Bearer ' + token } }
     );
     if (!res.ok) {
-      if (preview) preview.close();
       const err = await res.json().catch(() => ({}));
-      toast(err.error || "Faylni ochib bo'lmadi");
+      toast(err.error || "Faylni ochib bo'lmadi (" + res.status + ")");
       return;
     }
-    const blob = await res.blob();
-    const mime = blob.type || res.headers.get('content-type') || '';
+    const raw = await res.blob();
+    const mime = mimeFromFileName(name, raw.type);
+    const blob = new Blob([raw], { type: mime });
     const url = URL.createObjectURL(blob);
-    if (preview && !preview.closed) {
-      try {
-        fillAttachmentPreview(preview.document, url, mime, name);
-      } catch (_) {
-        preview.location.replace(url);
-      }
-    } else {
-      showAttachmentOverlay(url, mime, name);
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+    showAttachmentOverlay(url, mime, name);
   } catch (e) {
-    if (preview && !preview.closed) preview.close();
     toast('Xatolik: ' + e.message);
   }
 }
@@ -4713,10 +4702,13 @@ function closeOffice3D() {
   }
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    const overlay = document.getElementById('office3d-overlay');
-    if (overlay && overlay.classList.contains('open')) closeOffice3D();
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('attach-preview')) {
+    closeAttachmentOverlay();
+    return;
   }
+  const overlay = document.getElementById('office3d-overlay');
+  if (overlay && overlay.classList.contains('open')) closeOffice3D();
 });
 async function openSubmitReviewModal(id) {
   const task = state.tasks.find(t => t.id === id);
@@ -5852,7 +5844,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=22').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=23').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5860,7 +5852,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v28'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v29'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

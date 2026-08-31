@@ -78,13 +78,22 @@ module.exports = async function handler(req, res) {
     }
 
     const buf = Buffer.from(await fileRes.arrayBuffer());
-    const ctype = fileRes.headers.get('content-type') || 'application/octet-stream';
+    let ctype = fileRes.headers.get('content-type') || 'application/octet-stream';
+    if (!ctype || /octet-stream/i.test(ctype)) {
+      const ext = asName.split('.').pop().toLowerCase();
+      const byExt = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+        webp: 'image/webp', bmp: 'image/bmp', pdf: 'application/pdf',
+        txt: 'text/plain', csv: 'text/csv', mp4: 'video/mp4', mp3: 'audio/mpeg'
+      };
+      if (byExt[ext]) ctype = byExt[ext];
+    }
     const asciiName = asName.replace(/[^\x20-\x7E]/g, '_') || 'fayl';
     res.setHeader('Content-Type', ctype);
     res.setHeader('Content-Length', String(buf.length));
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${asciiName.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(asName)}`
+      `inline; filename="${asciiName.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(asName)}`
     );
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.status(200).send(buf);
