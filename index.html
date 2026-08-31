@@ -654,11 +654,11 @@
     background:#050505;animation:landingIn .4s ease both;
   }
   .landing-shot-frame{
-    position:relative;width:min(100%,1920px);line-height:0;
+    position:relative;line-height:0;
+    width:min(100%,1920px,calc(100dvh * 1280 / 712));
   }
   .landing-shot{
-    display:block;width:100%;height:auto;max-height:100dvh;
-    object-fit:contain;object-position:center;
+    display:block;width:100%;height:auto;
     user-select:none;-webkit-user-drag:none;pointer-events:none;
   }
   .landing-hit{
@@ -666,12 +666,12 @@
     background:transparent;border-radius:10px;z-index:4;
   }
   .landing-hit:focus-visible{outline:2px solid #38bdf8;outline-offset:3px;}
-  /* rasm ichidagi TIZIMGA KIRISH / BATAFSIL */
+  /* rasm ichidagi TIZIMGA KIRISH / BATAFSIL (1280x712) */
   .landing-hit-login{
-    left:28%;top:76%;width:21%;height:12%;
+    left:28.5%;top:64%;width:20.5%;height:13.5%;
   }
   .landing-hit-details{
-    left:51%;top:76%;width:18%;height:12%;
+    left:54%;top:64%;width:27%;height:13.5%;
   }
   .landing-ribbon{
     margin:0 auto;padding:22px 16px 18px;border-radius:0;
@@ -697,17 +697,13 @@
     text-transform:uppercase;color:#7dd3fc;
   }
   @media(max-width:900px){
-    .landing-hit-login{left:24%;top:77%;width:26%;height:11%;}
-    .landing-hit-details{left:52%;top:77%;width:22%;height:11%;}
     .landing-ribbon{padding:18px 14px;}
     .landing-ribbon-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
     .landing-feat:last-child{grid-column:1/-1;}
   }
   @media(max-width:560px){
     .landing-hero-wrap{min-height:auto;align-items:flex-start;padding:0;}
-    .landing-shot{max-height:none;}
-    .landing-hit-login{left:22%;top:78%;width:28%;height:12%;}
-    .landing-hit-details{left:52%;top:78%;width:24%;height:12%;}
+    .landing-shot-frame{width:100%;}
     .landing-ribbon-grid{grid-template-columns:1fr;}
     .landing-feat:last-child{grid-column:auto;}
   }
@@ -5751,7 +5747,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=19').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=20').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5759,7 +5755,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v25'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v26'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

@@ -1,4 +1,4 @@
-﻿const CACHE = 'traksa-v25';
+﻿const CACHE = 'traksa-v26';
 const PRECACHE = [
   '/',
   '/index.html',
