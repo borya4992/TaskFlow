@@ -584,6 +584,45 @@
   .modal-head h3{margin:0;font-size:15px;flex:1;min-width:0;line-height:1.35;}
   .modal-head .btn-ghost{flex-shrink:0;min-height:40px;padding:8px 12px;}
 
+  .ai-chat-panel{
+    position:fixed;right:16px;bottom:16px;z-index:360;
+    width:min(400px, calc(100vw - 24px));height:min(560px, calc(100dvh - 32px));
+    display:flex;flex-direction:column;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .ai-chat-panel[hidden]{display:none !important;}
+  .ai-chat-head{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;
+  }
+  .ai-chat-head h3{margin:0;font-size:14px;font-weight:800;}
+  .ai-chat-log{flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg);}
+  .ai-bubble{
+    max-width:86%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word;
+  }
+  .ai-bubble.user{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px;}
+  .ai-bubble.model{align-self:flex-start;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;}
+  .ai-bubble.typing{color:var(--text-faint);font-weight:700;letter-spacing:.12em;}
+  .ai-chat-empty{margin:auto;text-align:center;color:var(--text-faint);font-size:13px;padding:20px;}
+  .ai-chat-form{
+    display:flex;gap:8px;align-items:flex-end;padding:10px 12px;
+    border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;
+  }
+  .ai-chat-form textarea{
+    flex:1;min-width:0;resize:none;min-height:40px;max-height:96px;
+    padding:8px 10px;font-size:13px;
+  }
+  .ai-access-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin-top:8px;}
+  .ai-access-row{
+    display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;
+    background:var(--panel-2);border:1px solid var(--border);font-size:13px;cursor:pointer;
+  }
+  .ai-access-row input{margin:0;}
+  @media(max-width:560px){
+    .ai-chat-panel{right:8px;left:8px;bottom:8px;width:auto;height:min(70dvh, 560px);}
+  }
+
   /* Theme / Language picker */
   .theme-wrap,.lang-wrap{position:relative;}
   .theme-btn,.lang-btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);color:var(--text-soft);border:1px solid var(--border);padding:7px 12px;font-size:12px;border-radius:8px;}
@@ -1190,6 +1229,7 @@
       <button type="button" class="app-nav-btn" data-view="projects" onclick="switchAppView('projects')"><span class="nav-ico">📋</span><span class="nav-label" data-i18n="nav.projects">Loyihalar</span></button>
       <button type="button" class="app-nav-btn" data-view="planner" onclick="switchAppView('planner')"><span class="nav-ico">🎯</span><span class="nav-label" data-i18n="nav.planner">Planner</span></button>
       <button type="button" class="app-nav-btn hidden" id="nav-office-btn" onclick="openOffice3D();closeSidebar()"><span class="nav-ico">🧑‍💼</span><span class="nav-label" data-i18n="nav.office">3D Ofis</span></button>
+      <button type="button" class="app-nav-btn hidden" id="nav-ai-btn" onclick="openAiAssistant();closeSidebar()"><span class="nav-ico">🤖</span><span class="nav-label" data-i18n="nav.ai">AI Yordamchi</span></button>
       <button type="button" class="app-nav-btn hidden" id="nav-admin-btn" data-view="admin" onclick="switchAppView('admin')"><span class="nav-ico">⚙️</span><span class="nav-label" data-i18n="nav.admin">Boshqaruv</span></button>
     </nav>
     <div class="sidebar-foot">
@@ -1538,6 +1578,9 @@
       <span class="status-chip" id="office3d-public-status"><span data-i18n="settings.status">Holat</span>: <b data-i18n="settings.adminOnly">faqat admin</b></span>
     </div>
     <p class="help-text" style="margin-top:8px;" data-i18n="settings.officeHelp">Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.</p>
+    <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent)"></span> <span data-i18n="nav.ai">AI Yordamchi</span></h2>
+    <p class="help-text" style="margin-top:0;" data-i18n="ai.accessHelp">Admin va direktor har doim ko'radi. Boshqa xodimlarga ruxsatni belgilang.</p>
+    <div id="ai-access-list" class="ai-access-list"></div>
   </div>
 
   <div class="panel hidden" id="deleted-tasks-panel">
@@ -1586,6 +1629,18 @@
 
 <div id="modal-root"></div>
 <div id="toast-root"></div>
+
+<div id="ai-chat-panel" class="ai-chat-panel" hidden aria-hidden="true">
+  <div class="ai-chat-head">
+    <h3 data-i18n="ai.title">🤖 AI Yordamchi</h3>
+    <button type="button" class="btn-ghost" onclick="closeAiAssistant()" data-i18n="common.close">✕ Yopish</button>
+  </div>
+  <div class="ai-chat-log" id="ai-chat-log"></div>
+  <form class="ai-chat-form" onsubmit="submitAiChat(event)">
+    <textarea id="ai-chat-input" rows="2" data-i18n-placeholder="ai.placeholder" placeholder="Savolingizni yozing…" onkeydown="onAiChatKey(event)"></textarea>
+    <button type="submit" class="btn-blue" id="ai-chat-send" data-i18n="ai.send">Yuborish</button>
+  </form>
+</div>
 
 <!-- 3D OFIS (faqat admin) -->
 <div id="office3d-overlay" class="office3d-overlay" aria-hidden="true">
@@ -1700,6 +1755,18 @@ const I18N = {
     'planner.dayEmpty': "Avval kunlik qatorlar bo'lsin",
     'planner.daySql': 'Kunlik reja uchun supabase_schema.sql oxiridagi planner_day_slots SQL ni ishga tushiring',
     'nav.office': '3D Ofis',
+    'nav.ai': 'AI Yordamchi',
+    'ai.title': '🤖 AI Yordamchi',
+    'ai.placeholder': 'Savolingizni yozing…',
+    'ai.send': 'Yuborish',
+    'ai.empty': 'Savol yozing — AI topshiriqlar va jamoa haqida yordam beradi.',
+    'ai.accessHelp': "Admin va direktor har doim ko'radi. Boshqa xodimlarga ruxsatni belgilang.",
+    'ai.accessEmpty': "Tanlanadigan xodim yo'q",
+    'ai.grantAccess': 'AI Yordamchidan foydalanish',
+    'ai.accessGranted': 'AI ruxsati berildi',
+    'ai.accessRevoked': 'AI ruxsati olib tashlandi',
+    'ai.noAccess': 'AI Yordamchi hozircha yopiq',
+    'ai.closed': 'AI Yordamchi yopildi',
     'nav.admin': 'Boshqaruv',
     'incoming.title': 'Kiruvchi — tasdiqlash',
     'incoming.help': 'Sizga tasdiqlash uchun yuborilgan topshiriqlar shu yerda.',
@@ -1936,6 +2003,18 @@ const I18N = {
     'planner.dayEmpty': 'Сначала нужны строки дня',
     'planner.daySql': 'Для суточного плана выполните SQL planner_day_slots в конце supabase_schema.sql',
     'nav.office': '3D Офис',
+    'nav.ai': 'ИИ-помощник',
+    'ai.title': '🤖 ИИ-помощник',
+    'ai.placeholder': 'Напишите вопрос…',
+    'ai.send': 'Отправить',
+    'ai.empty': 'Напишите вопрос — ИИ поможет по задачам и команде.',
+    'ai.accessHelp': 'Админ и директор видят всегда. Остальным доступ выдайте из списка.',
+    'ai.accessEmpty': 'Нет сотрудников для выбора',
+    'ai.grantAccess': 'Доступ к ИИ-помощнику',
+    'ai.accessGranted': 'Доступ к ИИ выдан',
+    'ai.accessRevoked': 'Доступ к ИИ снят',
+    'ai.noAccess': 'ИИ-помощник пока закрыт',
+    'ai.closed': 'ИИ-помощник закрыт',
     'nav.admin': 'Управление',
     'incoming.title': 'Входящие — подтверждение',
     'incoming.help': 'Задачи, отправленные вам на подтверждение, находятся здесь.',
@@ -2172,6 +2251,18 @@ const I18N = {
     'planner.dayEmpty': 'Add day rows first',
     'planner.daySql': 'Run the planner_day_slots SQL at the end of supabase_schema.sql',
     'nav.office': '3D Office',
+    'nav.ai': 'AI Assistant',
+    'ai.title': '🤖 AI Assistant',
+    'ai.placeholder': 'Type your question…',
+    'ai.send': 'Send',
+    'ai.empty': 'Ask a question — AI can help with tasks and the team.',
+    'ai.accessHelp': 'Admin and director always see it. Grant access to other staff from the list.',
+    'ai.accessEmpty': 'No employees to choose',
+    'ai.grantAccess': 'Allow AI Assistant',
+    'ai.accessGranted': 'AI access granted',
+    'ai.accessRevoked': 'AI access removed',
+    'ai.noAccess': 'AI Assistant is currently closed',
+    'ai.closed': 'AI Assistant closed',
     'nav.admin': 'Admin',
     'incoming.title': 'Inbox — approval',
     'incoming.help': 'Tasks sent to you for approval appear here.',
@@ -2406,6 +2497,10 @@ function applyLanguage(langId, persist) {
   } catch (e) {}
   try {
     if (typeof updateOffice3DPublicUI === 'function') updateOffice3DPublicUI();
+  } catch (e) {}
+  try {
+    if (typeof renderAiChatLog === 'function') renderAiChatLog();
+    if (typeof renderAiAccessList === 'function') renderAiAccessList();
   } catch (e) {}
 }
 
@@ -2919,6 +3014,27 @@ function canManageUsers() { return isAdmin(); }
 function canViewOffice3D() {
   return isAdmin() || !!state.settings?.office3d_public;
 }
+function canViewAiAssistant() {
+  const role = String(currentProfile?.role || '').toLowerCase();
+  if (role === 'admin' || role === 'director') return true;
+  return !!currentProfile?.can_use_ai;
+}
+function updateAiNavVisibility() {
+  const nav = document.getElementById('nav-ai-btn');
+  if (nav) nav.classList.toggle('hidden', !canViewAiAssistant());
+  if (!canViewAiAssistant()) closeAiAssistant();
+}
+function syncCurrentProfileFromTeam() {
+  if (!currentProfile?.id) return;
+  const me = (state.appUsers || []).find(u => u.id === currentProfile.id);
+  if (!me) return;
+  currentProfile = {
+    ...currentProfile,
+    role: me.role || currentProfile.role,
+    can_use_ai: !!me.can_use_ai
+  };
+  updateAiNavVisibility();
+}
 function isTaskCreator(t) { return !!t && t.created_by_user_id === currentProfile?.id; }
 function isTaskReviewer(t) {
   if (!t || !currentProfile) return false;
@@ -3114,6 +3230,7 @@ function initAppChromeMenus() {
     closeSettingsMenu();
     closeProfileMenu();
     closeSidebar();
+    closeAiAssistant();
   });
 }
 
@@ -3123,6 +3240,7 @@ function showApp() {
   renderProfileChip();
   document.getElementById('nav-admin-btn').classList.toggle('hidden', !canManageUsers());
   document.getElementById('nav-office-btn').classList.toggle('hidden', !canViewOffice3D());
+  updateAiNavVisibility();
   const createNav = document.getElementById('nav-create-btn');
   if (createNav) createNav.classList.toggle('hidden', !canCreateTasks());
   document.getElementById('exec-section-title').classList.toggle('hidden', false);
@@ -3131,6 +3249,7 @@ function showApp() {
     renderUsersTable();
     renderDeletedTasksPanel();
     if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
+    renderAiAccessList();
   }
   renderExecutorSelect();
   fillDepartmentSelects();
@@ -3163,6 +3282,7 @@ function switchAppView(view) {
     renderDeletedTasksPanel();
     if (typeof renderDeletedProjectsPanel === 'function') renderDeletedProjectsPanel();
     updateOffice3DPublicUI();
+    renderAiAccessList();
   }
   if (view === 'incoming') {
     renderReviewList();
@@ -3235,6 +3355,7 @@ async function changeMyPassword() {
 async function enterApp() {
   state.settings = await fetchSettings();
   state.appUsers = await fetchTeamUsers();
+  syncCurrentProfileFromTeam();
   state.tasks = await fetchTasks();
   if (typeof loadAllProjectData === 'function') await loadAllProjectData();
   if (typeof loadPlannerData === 'function') await loadPlannerData();
@@ -3249,6 +3370,8 @@ async function enterApp() {
 
 async function signOut() {
   closeOffice3D();
+  closeAiAssistant();
+  state.aiChatHistory = [];
   stopPresenceHeartbeat();
   if (!usingLocalFallback && sb) await sb.auth.signOut();
   currentProfile = null;
@@ -3285,8 +3408,10 @@ function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => { applyRealtimeTaskChange(payload); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' }, async () => {
       state.appUsers = await fetchTeamUsers();
+      syncCurrentProfileFromTeam();
       renderOnlineUsers();
       fillDepartmentSelects();
+      renderAiAccessList();
       if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
     });
   if (typeof subscribeProjectRealtime === 'function') subscribeProjectRealtime(channel);
@@ -3371,7 +3496,11 @@ async function renderUsersTable() {
   state.appUsers = users;
   fillDepartmentSelects();
   const tbody = document.getElementById('users-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>'; return; }
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>';
+    renderAiAccessList();
+    return;
+  }
   tbody.innerHTML = users.map(u => {
     const actions = [];
     if (u.email) {
@@ -3392,6 +3521,7 @@ async function renderUsersTable() {
       <td>${actions.join('')}</td>
     </tr>`;
   }).join('');
+  renderAiAccessList();
 }
 
 function openUserEditModal(id) {
@@ -3419,6 +3549,11 @@ function openUserEditModal(id) {
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
         <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
         <div class="field"><label>Telegram ID</label><input type="text" id="edit-u-telegram" value="${escapeHtml(u.telegram_id || '')}"></div>
+        ${String(u.role || '').toLowerCase() === 'admin' || String(u.role || '').toLowerCase() === 'director' ? '' : `
+        <label class="ai-access-row" style="margin-top:4px;">
+          <input type="checkbox" id="edit-u-can-use-ai" ${u.can_use_ai ? 'checked' : ''}>
+          <span>${escapeHtml(t('ai.grantAccess'))}</span>
+        </label>`}
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
           <button class="btn-blue" onclick="saveUserEdit('${u.id}')">Saqlash</button>
@@ -3471,10 +3606,12 @@ async function saveUserEdit(id) {
   const phoneRaw = document.getElementById('edit-u-phone').value.trim();
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
   const telegram_id = document.getElementById('edit-u-telegram').value.trim() || null;
+  const aiAccessEl = document.getElementById('edit-u-can-use-ai');
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy'); return; }
 
   const patch = { display_name, role, department, gender, position_level, email, phone, telegram_id };
+  if (aiAccessEl) patch.can_use_ai = !!aiAccessEl.checked;
   const fileInput = document.getElementById('edit-avatar-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file) {
@@ -3501,12 +3638,14 @@ async function saveUserEdit(id) {
 
   closeModal();
   state.appUsers = await fetchTeamUsers();
+  syncCurrentProfileFromTeam();
   if (currentProfile?.id === id) {
     currentProfile = { ...currentProfile, ...patch };
     showApp();
   }
   renderExecutorSelect();
   await renderUsersTable();
+  renderAiAccessList();
   if (window.Office3D && Office3D.isOpen()) Office3D.update(state.appUsers, state.tasks);
   toast('Profil yangilandi');
 }
@@ -3611,7 +3750,7 @@ async function deactivateUser(id) {
 /* =========================================================
    STATE
 ========================================================= */
-let state = { tasks: [], appUsers: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc', incomingSearch:'', incomingSort:'deadline_asc', outgoingSearch:'', outgoingSort:'assignee', outgoingAssignee:'' };
+let state = { tasks: [], appUsers: [], aiChatHistory: [], settings: { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }, search:'', filterAssignee:'', filterPriority:'', filterStatus:'', filterDepartment:'', smartFilterDepartment:'', smartActiveMonth:'', smartTrendMonth:'', taskFolder:'active', taskSort:'deadline_asc', incomingSearch:'', incomingSort:'deadline_asc', outgoingSearch:'', outgoingSort:'assignee', outgoingAssignee:'' };
 /** Yangi / tahrirlash formalari uchun yuklangan fayl (Telegram file_id) */
 let draftAttachment = null;
 let editDraftAttachment = null;
@@ -4758,9 +4897,142 @@ document.addEventListener('keydown', (e) => {
     closeAttachmentOverlay();
     return;
   }
+  const aiPanel = document.getElementById('ai-chat-panel');
+  if (aiPanel && !aiPanel.hidden) {
+    closeAiAssistant();
+    return;
+  }
   const overlay = document.getElementById('office3d-overlay');
   if (overlay && overlay.classList.contains('open')) closeOffice3D();
 });
+
+function renderAiAccessList() {
+  const el = document.getElementById('ai-access-list');
+  if (!el) return;
+  if (!canManageUsers()) { el.innerHTML = ''; return; }
+  const users = (state.appUsers || []).filter(u => {
+    const role = String(u.role || '').toLowerCase();
+    return u.is_active !== false && role !== 'admin' && role !== 'director';
+  }).sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
+  if (!users.length) {
+    el.innerHTML = `<p class="help-text" style="margin:0;">${escapeHtml(t('ai.accessEmpty'))}</p>`;
+    return;
+  }
+  el.innerHTML = users.map(u => `
+    <label class="ai-access-row">
+      <input type="checkbox" ${u.can_use_ai ? 'checked' : ''} onchange="toggleAiAccess('${u.id}', this.checked)">
+      <span>${escapeHtml(u.display_name || '—')}${u.department ? ' · ' + escapeHtml(u.department) : ''}</span>
+    </label>
+  `).join('');
+}
+
+async function toggleAiAccess(userId, checked) {
+  if (!canManageUsers() || !sb) return;
+  const { error } = await sb.from('app_users').update({ can_use_ai: !!checked }).eq('id', userId);
+  if (error) {
+    toast('Xatolik: ' + error.message);
+    renderAiAccessList();
+    return;
+  }
+  const u = (state.appUsers || []).find(x => x.id === userId);
+  if (u) u.can_use_ai = !!checked;
+  if (currentProfile?.id === userId) {
+    currentProfile.can_use_ai = !!checked;
+    updateAiNavVisibility();
+  }
+  toast(checked ? t('ai.accessGranted') : t('ai.accessRevoked'));
+}
+
+let aiChatBusy = false;
+
+async function sendAiMessage(message) {
+  if (!sb) { toast("Avval tizimga kiring"); return null; }
+  const token = await getAccessToken();
+  if (!token) { toast("Avval tizimga kiring"); return null; }
+  const aiChatHistory = state.aiChatHistory;
+  const res = await fetch('/api/ai-assistant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ message, history: aiChatHistory })
+  });
+  const data = await res.json().catch(() => ({ ok: false, error: 'Xatolik' }));
+  if (!data.ok) { toast(data.error || 'Xatolik'); return null; }
+  return data.reply;
+}
+
+function renderAiChatLog(opts) {
+  const log = document.getElementById('ai-chat-log');
+  if (!log) return;
+  const history = state.aiChatHistory || [];
+  const pendingUser = opts && opts.pendingUser;
+  const typing = opts && opts.typing;
+  if (!history.length && !pendingUser && !typing) {
+    log.innerHTML = `<div class="ai-chat-empty">${escapeHtml(t('ai.empty'))}</div>`;
+    return;
+  }
+  const bubbles = history.map(turn => {
+    const text = (turn.parts || []).map(p => p.text || '').join('');
+    const cls = turn.role === 'user' ? 'user' : 'model';
+    return `<div class="ai-bubble ${cls}">${escapeHtml(text)}</div>`;
+  });
+  if (pendingUser) bubbles.push(`<div class="ai-bubble user">${escapeHtml(pendingUser)}</div>`);
+  if (typing) bubbles.push('<div class="ai-bubble model typing" aria-live="polite">...</div>');
+  log.innerHTML = bubbles.join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function openAiAssistant() {
+  if (!canViewAiAssistant()) { toast(t('ai.noAccess')); return; }
+  const panel = document.getElementById('ai-chat-panel');
+  if (!panel) return;
+  panel.hidden = false;
+  panel.setAttribute('aria-hidden', 'false');
+  renderAiChatLog();
+  const input = document.getElementById('ai-chat-input');
+  if (input) setTimeout(() => input.focus(), 50);
+}
+
+function closeAiAssistant() {
+  const panel = document.getElementById('ai-chat-panel');
+  if (!panel || panel.hidden) return;
+  panel.hidden = true;
+  panel.setAttribute('aria-hidden', 'true');
+}
+
+function onAiChatKey(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    submitAiChat(event);
+  }
+}
+
+async function submitAiChat(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  if (aiChatBusy) return;
+  if (!canViewAiAssistant()) { toast(t('ai.noAccess')); return; }
+  const input = document.getElementById('ai-chat-input');
+  const message = (input && input.value || '').trim();
+  if (!message) return;
+  if (input) input.value = '';
+  aiChatBusy = true;
+  const sendBtn = document.getElementById('ai-chat-send');
+  if (sendBtn) sendBtn.disabled = true;
+  renderAiChatLog({ pendingUser: message, typing: true });
+  let reply = null;
+  try {
+    reply = await sendAiMessage(message);
+  } catch (e) {
+    toast(e.message || 'Xatolik');
+  }
+  if (reply) {
+    state.aiChatHistory.push({ role: 'user', parts: [{ text: message }] });
+    state.aiChatHistory.push({ role: 'model', parts: [{ text: reply }] });
+  }
+  renderAiChatLog();
+  aiChatBusy = false;
+  if (sendBtn) sendBtn.disabled = false;
+  if (input) input.focus();
+}
 async function openSubmitReviewModal(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || task.assignee_user_id !== currentProfile.id) return;
@@ -5898,7 +6170,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=23').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=24').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -5906,7 +6178,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v29'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v30'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

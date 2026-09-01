@@ -38,6 +38,7 @@ alter table app_users add column if not exists last_seen timestamptz;
 alter table app_users add column if not exists position_level text default 'xodim';
 alter table app_users add column if not exists gender text default 'erkak';
 alter table app_users add column if not exists birth_date date;
+alter table app_users add column if not exists can_use_ai boolean default false;
 
 -- Jins constraint
 alter table app_users drop constraint if exists app_users_gender_check;
@@ -824,5 +825,18 @@ create policy "planner_day_slots_delete" on planner_day_slots
   for delete using (user_id = public.my_user_id());
 
 grant select, insert, update, delete on planner_day_slots to authenticated;
+
+-- ============================================================
+-- AI YORDAMCHI — suhbat tarixi (server service_role orqali yozadi)
+-- ============================================================
+create table if not exists ai_chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  role text not null,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_ai_chat_messages_user on ai_chat_messages (user_id, created_at);
+alter table ai_chat_messages enable row level security;
 
 notify pgrst, 'reload schema';
