@@ -1,5 +1,4 @@
-// AI ASSISTANT — Google Gemini (bepul daraja) bilan.
-// Ruxsat: role='admin' yoki app_users.ai_assistant_access = true.
+// AI ASSISTANT — Google Gemini (bepul daraja) bilan. Faqat direktor/admin foydalana oladi.
 // Gemini bilan gaplashadi, kerak bo'lsa TOOLS orqali Supabase'ga amal bajaradi.
 //
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY
@@ -8,7 +7,7 @@ const { TOOLS } = require('./_toolExecutors');
 
 // Joriy bepul, tez va vositalarni qo'llaydigan model. Agar xato bersa,
 // https://ai.google.dev/gemini-api/docs/models dan joriy model nomini tekshiring.
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-3.6-flash'; // 2026-yil iyulida Google yangiladi (eskisi: gemini-2.0-flash, endi ishlamaydi)
 
 const SYSTEM_PROMPT = `Sen "Traksa" topshiriqlar monitoring tizimidagi AI yordamchisan.
 Faqat direktor/admin bilan gaplashyapsan. O'zbek tilida, qisqa va aniq javob ber.
@@ -162,7 +161,7 @@ module.exports = async function handler(req, res) {
     const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
     if (!me?.id) { res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' }); return; }
 
-    // 2) Admin yoki alohida berilgan ruxsat
+    // 2) FAQAT direktor/admin
     const staffRow = await getCallerStaffRow(supabaseUrl, serviceKey, me.id);
     // Ruxsat ikki yo'l bilan: (1) role='admin', yoki (2) admin tomonidan
     // Boshqaruv panelidan alohida ruxsat berilgan (ai_assistant_access=true).
@@ -201,7 +200,7 @@ module.exports = async function handler(req, res) {
 
       const functionResponseParts = [];
       for (const p of functionCalls) {
-        const { name, args } = p.functionCall;
+        const { name, args, id: callId } = p.functionCall;
         const executor = TOOLS[name];
         let result;
         if (!executor) {
@@ -213,7 +212,11 @@ module.exports = async function handler(req, res) {
             result = { error: e.message };
           }
         }
-        functionResponseParts.push({ functionResponse: { name, response: result } });
+        // Gemini 3.x talabi: FunctionResponse mos FunctionCall'ning id'sini
+        // ("call_id") o'zida saqlashi kerak, aks holda so'rov rad etilishi mumkin.
+        const responsePart = { functionResponse: { name, response: result } };
+        if (callId) responsePart.functionResponse.id = callId;
+        functionResponseParts.push(responsePart);
       }
       contents.push({ role: 'user', parts: functionResponseParts });
     }
