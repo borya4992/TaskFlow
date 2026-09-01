@@ -39,6 +39,9 @@ alter table app_users add column if not exists position_level text default 'xodi
 alter table app_users add column if not exists gender text default 'erkak';
 alter table app_users add column if not exists birth_date date;
 alter table app_users add column if not exists can_use_ai boolean default false;
+alter table app_users add column if not exists ai_assistant_access boolean default false;
+update app_users set ai_assistant_access = true
+where coalesce(can_use_ai, false) = true and coalesce(ai_assistant_access, false) = false;
 
 -- Jins constraint
 alter table app_users drop constraint if exists app_users_gender_check;

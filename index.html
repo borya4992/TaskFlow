@@ -817,6 +817,10 @@
   .users-table{width:100%;border-collapse:collapse;font-size:12.5px;}
   .users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;color:var(--text);}
   .users-table th{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;}
+  .ai-access-cell{white-space:nowrap;vertical-align:middle;}
+  .ai-access-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-soft);user-select:none;margin:0;}
+  .ai-access-toggle.is-locked{opacity:.8;cursor:default;}
+  .ai-access-toggle input{margin:0;}
   .user-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .user-form .full{grid-column:1/-1;}
   @media(max-width:600px){.user-form{grid-template-columns:1fr;}}
@@ -1544,6 +1548,7 @@
         <th data-i18n="admin.phone">Telefon</th>
         <th>Telegram</th>
         <th data-i18n="admin.role">Rol</th>
+        <th data-i18n="ai.toggleLabel">🤖 AI ruxsati</th>
         <th></th>
       </tr></thead>
       <tbody id="users-tbody"></tbody>
@@ -1579,7 +1584,7 @@
     </div>
     <p class="help-text" style="margin-top:8px;" data-i18n="settings.officeHelp">Yoqilsa, barcha foydalanuvchilar 3D Ofis tugmasini ko'radi. O'chirilsa — faqat admin.</p>
     <h2 style="margin-top:22px;"><span class="dot" style="background:var(--accent)"></span> <span data-i18n="nav.ai">AI Yordamchi</span></h2>
-    <p class="help-text" style="margin-top:0;" data-i18n="ai.accessHelp">Admin va direktor har doim ko'radi. Boshqa xodimlarga ruxsatni belgilang.</p>
+    <p class="help-text" style="margin-top:0;" data-i18n="ai.accessHelp">Admin har doim ko'radi. Boshqa xodimlarga jadvaldagi «AI ruxsati» orqali ruxsat bering.</p>
     <div id="ai-access-list" class="ai-access-list"></div>
   </div>
 
@@ -1760,9 +1765,11 @@ const I18N = {
     'ai.placeholder': 'Savolingizni yozing…',
     'ai.send': 'Yuborish',
     'ai.empty': 'Savol yozing — AI topshiriqlar va jamoa haqida yordam beradi.',
-    'ai.accessHelp': "Admin va direktor har doim ko'radi. Boshqa xodimlarga ruxsatni belgilang.",
+    'ai.accessHelp': "Admin har doim ko'radi. Boshqa xodimlarga jadvaldagi «AI ruxsati» orqali ruxsat bering.",
     'ai.accessEmpty': "Tanlanadigan xodim yo'q",
     'ai.grantAccess': 'AI Yordamchidan foydalanish',
+    'ai.toggleLabel': '🤖 AI ruxsati',
+    'ai.alwaysOn': 'Har doim yoqilgan',
     'ai.accessGranted': 'AI ruxsati berildi',
     'ai.accessRevoked': 'AI ruxsati olib tashlandi',
     'ai.noAccess': 'AI Yordamchi hozircha yopiq',
@@ -2008,9 +2015,11 @@ const I18N = {
     'ai.placeholder': 'Напишите вопрос…',
     'ai.send': 'Отправить',
     'ai.empty': 'Напишите вопрос — ИИ поможет по задачам и команде.',
-    'ai.accessHelp': 'Админ и директор видят всегда. Остальным доступ выдайте из списка.',
+    'ai.accessHelp': 'Админ видит всегда. Остальным доступ выдайте в таблице («AI ruxsati»).',
     'ai.accessEmpty': 'Нет сотрудников для выбора',
     'ai.grantAccess': 'Доступ к ИИ-помощнику',
+    'ai.toggleLabel': '🤖 Доступ к ИИ',
+    'ai.alwaysOn': 'Всегда включён',
     'ai.accessGranted': 'Доступ к ИИ выдан',
     'ai.accessRevoked': 'Доступ к ИИ снят',
     'ai.noAccess': 'ИИ-помощник пока закрыт',
@@ -2256,9 +2265,11 @@ const I18N = {
     'ai.placeholder': 'Type your question…',
     'ai.send': 'Send',
     'ai.empty': 'Ask a question — AI can help with tasks and the team.',
-    'ai.accessHelp': 'Admin and director always see it. Grant access to other staff from the list.',
+    'ai.accessHelp': 'Admin always sees it. Grant others access from the staff table (AI access).',
     'ai.accessEmpty': 'No employees to choose',
     'ai.grantAccess': 'Allow AI Assistant',
+    'ai.toggleLabel': '🤖 AI access',
+    'ai.alwaysOn': 'Always on',
     'ai.accessGranted': 'AI access granted',
     'ai.accessRevoked': 'AI access removed',
     'ai.noAccess': 'AI Assistant is currently closed',
@@ -3015,9 +3026,8 @@ function canViewOffice3D() {
   return isAdmin() || !!state.settings?.office3d_public;
 }
 function canViewAiAssistant() {
-  const role = String(currentProfile?.role || '').toLowerCase();
-  if (role === 'admin' || role === 'director') return true;
-  return !!currentProfile?.can_use_ai;
+  if (String(currentProfile?.role || '').toLowerCase() === 'admin') return true;
+  return currentProfile?.ai_assistant_access === true;
 }
 function updateAiNavVisibility() {
   const nav = document.getElementById('nav-ai-btn');
@@ -3031,7 +3041,7 @@ function syncCurrentProfileFromTeam() {
   currentProfile = {
     ...currentProfile,
     role: me.role || currentProfile.role,
-    can_use_ai: !!me.can_use_ai
+    ai_assistant_access: !!me.ai_assistant_access
   };
   updateAiNavVisibility();
 }
@@ -3491,13 +3501,31 @@ async function fetchTeamUsers() {
   return data || [];
 }
 
+function aiAccessCellHtml(u) {
+  const isAdm = String(u.role || '').toLowerCase() === 'admin';
+  if (isAdm) {
+    return `<td class="ai-access-cell" onclick="event.stopPropagation()">
+      <label class="ai-access-toggle is-locked" title="${escapeHtml(t('ai.alwaysOn'))}">
+        <input type="checkbox" checked disabled>
+        <span>${escapeHtml(t('ai.toggleLabel'))}</span>
+      </label>
+    </td>`;
+  }
+  return `<td class="ai-access-cell" onclick="event.stopPropagation()">
+    <label class="ai-access-toggle">
+      <input type="checkbox" ${u.ai_assistant_access ? 'checked' : ''} data-ai-user="${u.id}" onchange="toggleUserAiAccess('${u.id}')">
+      <span>${escapeHtml(t('ai.toggleLabel'))}</span>
+    </label>
+  </td>`;
+}
+
 async function renderUsersTable() {
   const users = await fetchAppUsers();
   state.appUsers = users;
   fillDepartmentSelects();
   const tbody = document.getElementById('users-tbody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">Hali foydalanuvchi yo\'q</td></tr>';
     renderAiAccessList();
     return;
   }
@@ -3518,6 +3546,7 @@ async function renderUsersTable() {
       <td>${escapeHtml(u.phone || '—')}</td>
       <td>${escapeHtml(u.telegram_id || '—')}${u.telegram_username ? ' (@'+escapeHtml(u.telegram_username)+')' : ''}</td>
       <td>${roleLabel(u.role)}<div class="dept-tag">${positionLevelLabel(positionLevelOf(u))}</div></td>
+      ${aiAccessCellHtml(u)}
       <td>${actions.join('')}</td>
     </tr>`;
   }).join('');
@@ -3549,10 +3578,14 @@ function openUserEditModal(id) {
         <div class="field"><label>Email</label><input type="email" id="edit-u-email" value="${escapeHtml(u.email || '')}"></div>
         <div class="field"><label>Telefon</label><input type="tel" id="edit-u-phone" value="${escapeHtml(u.phone || '')}"></div>
         <div class="field"><label>Telegram ID</label><input type="text" id="edit-u-telegram" value="${escapeHtml(u.telegram_id || '')}"></div>
-        ${String(u.role || '').toLowerCase() === 'admin' || String(u.role || '').toLowerCase() === 'director' ? '' : `
+        ${String(u.role || '').toLowerCase() === 'admin' ? `
+        <label class="ai-access-toggle is-locked" style="margin-top:4px;">
+          <input type="checkbox" checked disabled>
+          <span>${escapeHtml(t('ai.toggleLabel'))} — ${escapeHtml(t('ai.alwaysOn'))}</span>
+        </label>` : `
         <label class="ai-access-row" style="margin-top:4px;">
-          <input type="checkbox" id="edit-u-can-use-ai" ${u.can_use_ai ? 'checked' : ''}>
-          <span>${escapeHtml(t('ai.grantAccess'))}</span>
+          <input type="checkbox" id="edit-u-ai-access" ${u.ai_assistant_access ? 'checked' : ''}>
+          <span>${escapeHtml(t('ai.toggleLabel'))}</span>
         </label>`}
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeModal()">Bekor qilish</button>
@@ -3606,12 +3639,12 @@ async function saveUserEdit(id) {
   const phoneRaw = document.getElementById('edit-u-phone').value.trim();
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
   const telegram_id = document.getElementById('edit-u-telegram').value.trim() || null;
-  const aiAccessEl = document.getElementById('edit-u-can-use-ai');
+  const aiAccessEl = document.getElementById('edit-u-ai-access');
   if (!display_name) { toast('Ism kiriting'); return; }
   if (!email) { toast('Email majburiy'); return; }
 
   const patch = { display_name, role, department, gender, position_level, email, phone, telegram_id };
-  if (aiAccessEl) patch.can_use_ai = !!aiAccessEl.checked;
+  if (aiAccessEl) patch.ai_assistant_access = !!aiAccessEl.checked;
   const fileInput = document.getElementById('edit-avatar-file');
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file) {
@@ -4912,7 +4945,7 @@ function renderAiAccessList() {
   if (!canManageUsers()) { el.innerHTML = ''; return; }
   const users = (state.appUsers || []).filter(u => {
     const role = String(u.role || '').toLowerCase();
-    return u.is_active !== false && role !== 'admin' && role !== 'director';
+    return u.is_active !== false && role !== 'admin';
   }).sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'uz'));
   if (!users.length) {
     el.innerHTML = `<p class="help-text" style="margin:0;">${escapeHtml(t('ai.accessEmpty'))}</p>`;
@@ -4920,27 +4953,32 @@ function renderAiAccessList() {
   }
   el.innerHTML = users.map(u => `
     <label class="ai-access-row">
-      <input type="checkbox" ${u.can_use_ai ? 'checked' : ''} onchange="toggleAiAccess('${u.id}', this.checked)">
+      <input type="checkbox" ${u.ai_assistant_access ? 'checked' : ''} data-ai-user="${u.id}" onchange="toggleUserAiAccess('${u.id}')">
       <span>${escapeHtml(u.display_name || '—')}${u.department ? ' · ' + escapeHtml(u.department) : ''}</span>
     </label>
   `).join('');
 }
 
-async function toggleAiAccess(userId, checked) {
+async function toggleUserAiAccess(userId) {
   if (!canManageUsers() || !sb) return;
-  const { error } = await sb.from('app_users').update({ can_use_ai: !!checked }).eq('id', userId);
+  const u = (state.appUsers || []).find(x => x.id === userId);
+  if (!u || String(u.role || '').toLowerCase() === 'admin') return;
+  const next = !u.ai_assistant_access;
+  const { error } = await sb.from('app_users').update({ ai_assistant_access: next }).eq('id', userId);
   if (error) {
     toast('Xatolik: ' + error.message);
+    renderUsersTable();
     renderAiAccessList();
     return;
   }
-  const u = (state.appUsers || []).find(x => x.id === userId);
-  if (u) u.can_use_ai = !!checked;
+  u.ai_assistant_access = next;
+  document.querySelectorAll('[data-ai-user="' + userId + '"]').forEach((el) => { el.checked = next; });
   if (currentProfile?.id === userId) {
-    currentProfile.can_use_ai = !!checked;
+    currentProfile.ai_assistant_access = next;
     updateAiNavVisibility();
   }
-  toast(checked ? t('ai.accessGranted') : t('ai.accessRevoked'));
+  renderAiAccessList();
+  toast(next ? t('ai.accessGranted') : t('ai.accessRevoked'));
 }
 
 let aiChatBusy = false;
@@ -6170,7 +6208,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=24').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=25').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -6178,7 +6216,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v30'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v31'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

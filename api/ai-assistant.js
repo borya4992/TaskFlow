@@ -1,5 +1,5 @@
 // AI ASSISTANT — Google Gemini (bepul daraja) bilan.
-// Ruxsat: admin, director yoki app_users.can_use_ai = true.
+// Ruxsat: role='admin' yoki app_users.ai_assistant_access = true.
 // Gemini bilan gaplashadi, kerak bo'lsa TOOLS orqali Supabase'ga amal bajaradi.
 //
 // Vercel Environment Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY
@@ -11,7 +11,7 @@ const { TOOLS } = require('./_toolExecutors');
 const MODEL = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `Sen "Traksa" topshiriqlar monitoring tizimidagi AI yordamchisan.
-Ruxsati bor foydalanuvchi bilan gaplashyapsan. O'zbek tilida, qisqa va aniq javob ber.
+Faqat direktor/admin bilan gaplashyapsan. O'zbek tilida, qisqa va aniq javob ber.
 Ma'lumot kerak bo'lsa yoki topshiriq yaratish/o'zgartirish so'ralsa, mos vositadan (function) foydalan.
 Agar xodim ismi noaniq bo'lsa (bir nechta mos keluvchi topilsa), taxmin qilma — foydalanuvchidan
 aniqlashtirishni so'ra. Muddat berilmagan yoki noaniq bo'lsa, aniq sana so'ra.`;
@@ -81,7 +81,7 @@ async function getAuthUserByJwt(supabaseUrl, serviceKey, jwt) {
 
 async function getCallerStaffRow(supabaseUrl, serviceKey, authUserId) {
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/app_users?auth_user_id=eq.${authUserId}&select=id,display_name,role,is_active,can_use_ai`,
+    `${supabaseUrl}/rest/v1/app_users?auth_user_id=eq.${authUserId}&select=id,display_name,role,is_active,ai_assistant_access`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
   );
   const rows = await res.json().catch(() => []);
@@ -162,14 +162,14 @@ module.exports = async function handler(req, res) {
     const me = await getAuthUserByJwt(supabaseUrl, serviceKey, jwt);
     if (!me?.id) { res.status(401).json({ ok: false, error: 'Sessiya yaroqsiz' }); return; }
 
-    // 2) FAQAT direktor/admin
+    // 2) Admin yoki alohida berilgan ruxsat
     const staffRow = await getCallerStaffRow(supabaseUrl, serviceKey, me.id);
-    const role = String(staffRow?.role || '').toLowerCase();
-    const allowedRoles = ['admin', 'director'];
-    const allowed = staffRow && staffRow.is_active !== false &&
-      (allowedRoles.includes(role) || staffRow.can_use_ai === true);
-    if (!allowed) {
-      res.status(403).json({ ok: false, error: 'AI yordamchiga ruxsat yo\'q' });
+    // Ruxsat ikki yo'l bilan: (1) role='admin', yoki (2) admin tomonidan
+    // Boshqaruv panelidan alohida ruxsat berilgan (ai_assistant_access=true).
+    const isAdmin = staffRow?.role === 'admin';
+    const hasGrantedAccess = staffRow?.ai_assistant_access === true;
+    if (!staffRow || !staffRow.is_active || !(isAdmin || hasGrantedAccess)) {
+      res.status(403).json({ ok: false, error: 'Sizda AI Yordamchidan foydalanish huquqi yo\'q. Admin bilan bog\'laning.' });
       return;
     }
 
