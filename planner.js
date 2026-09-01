@@ -7,6 +7,7 @@
 const LOCAL_KEY_PLANNER_TASKS = 'tm_local_planner_tasks';
 const LOCAL_KEY_PLANNER_GOALS = 'tm_local_planner_goals';
 const LOCAL_KEY_FOCUS = 'tm_local_focus_sessions';
+const LOCAL_KEY_PLANNER_DAY = 'tm_local_planner_day_slots';
 
 const PLANNER_WEEKDAYS = {
   uz: ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'],
@@ -61,7 +62,10 @@ function ensurePlannerState() {
   if (!state.plannerTasks) state.plannerTasks = [];
   if (!state.plannerGoals) state.plannerGoals = [];
   if (!state.focusSessions) state.focusSessions = [];
+  if (!state.plannerDaySlots) state.plannerDaySlots = [];
   if (!state.plannerTab) state.plannerTab = 'today';
+  if (!state.plannerDayDate) state.plannerDayDate = todayISO();
+  if (!state.plannerDayMode) state.plannerDayMode = 'day';
 }
 
 function plannerLocalGet(key) {
@@ -154,33 +158,344 @@ async function fetchFocusSessions() {
   return plannerMine(data || []);
 }
 
+function plannerFmtHour(h) {
+  return String(((h % 24) + 24) % 24).padStart(2, '0') + ':00';
+}
+
+function plannerDefaultDaySlots() {
+  const slots = [];
+  for (let i = 0; i < 24; i++) {
+    const startH = 5 + i;
+    slots.push({
+      sort_order: i,
+      start_time: plannerFmtHour(startH),
+      end_time: plannerFmtHour(startH + 1),
+      title: '',
+      is_done: false
+    });
+  }
+  return slots;
+}
+
+function plannerIsTemplateSlot(s) {
+  return !s.plan_date;
+}
+
+function plannerSlotsFor(planDate) {
+  const list = state.plannerDaySlots || [];
+  if (planDate == null) {
+    return list.filter(plannerIsTemplateSlot).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }
+  const d = plannerDateOnly(planDate);
+  return list.filter(s => plannerDateOnly(s.plan_date) === d)
+    .slice()
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+}
+
+function plannerNormTime(raw) {
+  const m = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+}
+
+function plannerTimeToMin(t) {
+  const n = plannerNormTime(t);
+  if (!n) return 0;
+  const p = n.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+}
+
+function plannerSlotIsNow(slot) {
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  let a = plannerTimeToMin(slot.start_time);
+  let b = plannerTimeToMin(slot.end_time);
+  if (b <= a) b += 24 * 60;
+  let c = cur;
+  if (c < a && b > 24 * 60) c += 24 * 60;
+  return c >= a && c < b;
+}
+
+function plannerCloneSlots(fromSlots, planDate) {
+  return (fromSlots || []).map((s, i) => ({
+    id: plannerUid(),
+    plan_date: planDate,
+    sort_order: s.sort_order != null ? s.sort_order : i,
+    start_time: s.start_time || plannerFmtHour(5 + i),
+    end_time: s.end_time || plannerFmtHour(6 + i),
+    title: s.title || '',
+    is_done: false,
+    created_at: new Date().toISOString()
+  }));
+}
+
+async function fetchPlannerDaySlots(date) {
+  const uid = plannerOwnerId();
+  if (!uid) return [];
+  if (usingLocalFallback) return plannerMine(plannerLocalGet(LOCAL_KEY_PLANNER_DAY));
+  const day = date ? plannerDateOnly(date) : todayISO();
+  const { data, error } = await sb.from('planner_day_slots')
+    .select('*')
+    .eq('user_id', uid)
+    .or('plan_date.is.null,plan_date.eq.' + day)
+    .order('sort_order', { ascending: true });
+  if (error) {
+    console.error(error);
+    const msg = error.message || '';
+    if (/schema cache|does not exist|planner_day_slots/i.test(msg)) {
+      toast(plannerT('planner.daySql', 'Kunlik reja uchun supabase_schema.sql oxiridagi planner_day_slots SQL ni ishga tushiring'));
+    } else {
+      toast('Planner: ' + msg);
+    }
+    return [];
+  }
+  return plannerMine(data || []);
+}
+
+async function plannerInsertManyDaySlots(rows) {
+  const uid = plannerOwnerId();
+  if (!uid || !rows.length) return [];
+  rows.forEach(r => { r.user_id = uid; });
+  ensurePlannerState();
+  state.plannerDaySlots = (state.plannerDaySlots || []).concat(rows);
+
+  if (usingLocalFallback) {
+    plannerLocalSet(LOCAL_KEY_PLANNER_DAY, plannerLocalGet(LOCAL_KEY_PLANNER_DAY).concat(rows));
+    return rows;
+  }
+  const payloads = rows.map(r => {
+    const p = Object.assign({}, r);
+    delete p.id;
+    return p;
+  });
+  const { data, error } = await sb.from('planner_day_slots').insert(payloads).select('*');
+  if (error) {
+    const ids = {};
+    rows.forEach(r => { ids[r.id] = true; });
+    state.plannerDaySlots = (state.plannerDaySlots || []).filter(x => !ids[x.id]);
+    toast('Xatolik: ' + error.message);
+    return [];
+  }
+  (data || []).forEach((d, i) => {
+    const temp = rows[i];
+    if (temp) {
+      state.plannerDaySlots = (state.plannerDaySlots || []).map(x => x.id === temp.id ? d : x);
+    }
+  });
+  return data || [];
+}
+
+async function plannerEnsureTemplate() {
+  ensurePlannerState();
+  if (plannerSlotsFor(null).length) return;
+  const created = plannerCloneSlots(plannerDefaultDaySlots(), null);
+  await plannerInsertManyDaySlots(created);
+}
+
+async function plannerEnsureDay(date) {
+  const d = plannerDateOnly(date) || todayISO();
+  ensurePlannerState();
+  await plannerEnsureTemplate();
+  if (plannerSlotsFor(d).length) return;
+  const cloned = plannerCloneSlots(plannerSlotsFor(null), d);
+  if (cloned.length) await plannerInsertManyDaySlots(cloned);
+}
+
+async function plannerEnsureDayView() {
+  ensurePlannerState();
+  const date = state.plannerDayDate || todayISO();
+  if (!usingLocalFallback && sb) {
+    const extra = await fetchPlannerDaySlots(date);
+    const byId = {};
+    (state.plannerDaySlots || []).forEach(s => { byId[s.id] = s; });
+    extra.forEach(s => { byId[s.id] = s; });
+    state.plannerDaySlots = Object.values(byId);
+  }
+  if (state.plannerDayMode !== 'template') await plannerEnsureDay(date);
+  renderPlannerView();
+}
+
+async function plannerSetDayDate(value) {
+  const d = plannerDateOnly(value) || todayISO();
+  state.plannerDayDate = d;
+  state.plannerDayMode = 'day';
+  await plannerEnsureDayView();
+}
+
+function plannerSetDayMode(mode) {
+  state.plannerDayMode = mode === 'template' ? 'template' : 'day';
+  renderPlannerView();
+  if (state.plannerDayMode === 'day') plannerEnsureDayView();
+}
+
+async function plannerSaveSlotField(id, field, value) {
+  const slot = (state.plannerDaySlots || []).find(x => x.id === id);
+  if (!slot) return;
+  let next = value;
+  if (field === 'start_time' || field === 'end_time') {
+    next = plannerNormTime(value);
+    if (!next) return;
+  } else if (field === 'title') {
+    next = String(value || '');
+  }
+  if (slot[field] === next) return;
+  await plannerPatchRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, 'plannerDaySlots', id, { [field]: next }, true);
+}
+
+async function plannerToggleDaySlot(id) {
+  const slot = (state.plannerDaySlots || []).find(x => x.id === id);
+  if (!slot || plannerIsTemplateSlot(slot)) return;
+  const next = !slot.is_done;
+  const row = document.querySelector('.pl-day-row[data-slot="' + id + '"]');
+  if (row) {
+    row.classList.toggle('done', next);
+    const chk = row.querySelector('.pl-check');
+    if (chk) chk.classList.toggle('on', next);
+  }
+  await plannerPatchRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, 'plannerDaySlots', id, { is_done: next }, true);
+}
+
+async function plannerDeleteDaySlot(id) {
+  await plannerRemoveRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, 'plannerDaySlots', id);
+}
+
+async function plannerAddDaySlot() {
+  ensurePlannerState();
+  const isTpl = state.plannerDayMode === 'template';
+  const date = isTpl ? null : (state.plannerDayDate || todayISO());
+  const list = plannerSlotsFor(date);
+  const last = list[list.length - 1];
+  const lastEnd = last ? plannerTimeToMin(last.end_time) : 5 * 60;
+  const startH = Math.floor(lastEnd / 60) % 24;
+  const startM = lastEnd % 60;
+  const start = String(startH).padStart(2, '0') + ':' + String(startM).padStart(2, '0');
+  const endMin = (lastEnd + 60) % (24 * 60);
+  const end = String(Math.floor(endMin / 60)).padStart(2, '0') + ':' + String(endMin % 60).padStart(2, '0');
+  await plannerInsertRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, {
+    id: plannerUid(),
+    plan_date: date,
+    sort_order: list.length ? Math.max.apply(null, list.map(s => s.sort_order || 0)) + 1 : 0,
+    start_time: start,
+    end_time: end,
+    title: '',
+    is_done: false,
+    created_at: new Date().toISOString()
+  }, 'plannerDaySlots');
+}
+
+async function plannerSaveCurrentAsTemplate() {
+  const date = state.plannerDayDate || todayISO();
+  const dayRows = plannerSlotsFor(date);
+  if (!dayRows.length) {
+    toast(plannerT('planner.dayEmpty', 'Avval kunlik qatorlar bo\'lsin'));
+    return;
+  }
+  const oldTpl = plannerSlotsFor(null);
+  for (const s of oldTpl) {
+    await plannerRemoveRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, 'plannerDaySlots', s.id, true);
+  }
+  await plannerInsertManyDaySlots(plannerCloneSlots(dayRows, null));
+  toast(plannerT('planner.templateSaved', 'Shablon saqlandi'));
+  renderPlannerView();
+}
+
+async function plannerResetDayFromTemplate() {
+  if (!confirm(plannerT('planner.confirmReset', 'Shu kunning yozuvlari shablon bilan almashtirilsinmi?'))) return;
+  const date = state.plannerDayDate || todayISO();
+  const existing = plannerSlotsFor(date);
+  for (const s of existing) {
+    await plannerRemoveRow('planner_day_slots', LOCAL_KEY_PLANNER_DAY, 'plannerDaySlots', s.id, true);
+  }
+  await plannerEnsureTemplate();
+  const cloned = plannerCloneSlots(plannerSlotsFor(null), date);
+  if (cloned.length) await plannerInsertManyDaySlots(cloned);
+  renderPlannerView();
+}
+
+function plannerDayRowHtml(slot, showDone, highlight) {
+  const done = !!slot.is_done;
+  const id = slot.id;
+  const start = escapeHtml(slot.start_time || '05:00');
+  const end = escapeHtml(slot.end_time || '06:00');
+  const title = escapeHtml(slot.title || '');
+  return `<div class="pl-day-row${done ? ' done' : ''}${highlight ? ' now' : ''}" data-slot="${id}">
+    ${showDone
+      ? `<button type="button" class="pl-check${done ? ' on' : ''}" onclick="plannerToggleDaySlot('${id}')" aria-label="Bajarildi"></button>`
+      : `<span class="pl-day-spacer"></span>`}
+    <input type="time" class="pl-day-time" value="${start}" onchange="plannerSaveSlotField('${id}', 'start_time', this.value)">
+    <span class="pl-day-dash">–</span>
+    <input type="time" class="pl-day-time" value="${end}" onchange="plannerSaveSlotField('${id}', 'end_time', this.value)">
+    <input type="text" class="pl-day-task" value="${title}" placeholder="${escapeHtml(plannerT('planner.slotPh', 'Vazifa…'))}"
+      onblur="plannerSaveSlotField('${id}', 'title', this.value)"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+    <button type="button" class="pl-del" onclick="plannerDeleteDaySlot('${id}')" title="O'chirish">×</button>
+  </div>`;
+}
+
+function renderPlannerDaily() {
+  const isTpl = state.plannerDayMode === 'template';
+  const date = state.plannerDayDate || todayISO();
+  const slots = plannerSlotsFor(isTpl ? null : date);
+  const today = todayISO();
+  const highlightNow = !isTpl && date === today;
+  const doneCount = slots.filter(s => s.is_done).length;
+  const rows = slots.length
+    ? slots.map(s => plannerDayRowHtml(s, !isTpl, highlightNow && plannerSlotIsNow(s))).join('')
+    : `<p class="pl-empty">${escapeHtml(plannerT('planner.emptyDay', 'Qator yo\'q — shablon yarating yoki qator qo\'shing'))}</p>`;
+  return `
+    <div class="pl-day-toolbar">
+      <div class="pl-day-modes">
+        <button type="button" class="pl-tab${!isTpl ? ' active' : ''}" onclick="plannerSetDayMode('day')">${escapeHtml(plannerT('planner.dayView', 'Kun'))}</button>
+        <button type="button" class="pl-tab${isTpl ? ' active' : ''}" onclick="plannerSetDayMode('template')">${escapeHtml(plannerT('planner.template', 'Shablon'))}</button>
+      </div>
+      ${isTpl ? '' : `<label class="pl-day-date">${escapeHtml(plannerT('planner.pickDate', 'Sana'))}
+        <input type="date" value="${escapeHtml(date)}" onchange="plannerSetDayDate(this.value)">
+      </label>`}
+      ${isTpl ? `<span class="pl-day-hint">${escapeHtml(plannerT('planner.templateHint', 'Har kuni shu soatlar va vazifalar nusxa olinadi. Vaqtni qo\'lda o\'zgartiring.'))}</span>`
+        : `<span class="pl-day-hint">${doneCount}/${slots.length} ${escapeHtml(plannerT('planner.doneShort', 'bajarildi'))}</span>`}
+    </div>
+    <div class="pl-day-actions">
+      ${isTpl ? '' : `<button type="button" class="btn-outline" onclick="plannerSaveCurrentAsTemplate()">${escapeHtml(plannerT('planner.saveTemplate', 'Shablon qilib saqlash'))}</button>
+      <button type="button" class="btn-ghost" onclick="plannerResetDayFromTemplate()">${escapeHtml(plannerT('planner.resetFromTemplate', 'Shablondan tiklash'))}</button>`}
+      <button type="button" class="btn-ghost" onclick="plannerAddDaySlot()">${escapeHtml(plannerT('planner.addSlot', 'Qator qo\'shish'))}</button>
+    </div>
+    <div class="pl-day-list">${rows}</div>`;
+}
+
 async function loadPlannerData() {
   ensurePlannerState();
   if (!plannerOwnerId()) {
     state.plannerTasks = [];
     state.plannerGoals = [];
     state.focusSessions = [];
+    state.plannerDaySlots = [];
     return;
   }
-  const [tasks, goals, sessions] = await Promise.all([
+  const [tasks, goals, sessions, daySlots] = await Promise.all([
     fetchPlannerTasks(),
     fetchPlannerGoals(),
-    fetchFocusSessions()
+    fetchFocusSessions(),
+    fetchPlannerDaySlots(todayISO())
   ]);
   state.plannerTasks = tasks;
   state.plannerGoals = goals;
   state.focusSessions = sessions;
+  state.plannerDaySlots = daySlots;
   state._plannerLoaded = true;
+  await plannerEnsureTemplate();
+  await plannerEnsureDay(state.plannerDayDate || todayISO());
 }
 
 /* ---------- CRUD (optimistic) ---------- */
-async function plannerInsertRow(table, localKey, row, listKey) {
+async function plannerInsertRow(table, localKey, row, listKey, skipRender) {
   const uid = plannerOwnerId();
   if (!uid) { toast(plannerT('planner.needProfile', 'Profil topilmadi')); return null; }
   row.user_id = uid;
   ensurePlannerState();
   state[listKey] = (state[listKey] || []).concat([row]);
-  renderPlannerView();
+  if (!skipRender) renderPlannerView();
 
   if (usingLocalFallback) {
     const all = plannerLocalGet(localKey);
@@ -193,23 +508,23 @@ async function plannerInsertRow(table, localKey, row, listKey) {
   const { data, error } = await sb.from(table).insert([payload]).select('*').single();
   if (error) {
     state[listKey] = (state[listKey] || []).filter(x => x.id !== row.id);
-    renderPlannerView();
+    if (!skipRender) renderPlannerView();
     toast('Xatolik: ' + error.message);
     return null;
   }
   state[listKey] = (state[listKey] || []).map(x => x.id === row.id ? data : x);
-  renderPlannerView();
+  if (!skipRender) renderPlannerView();
   return data;
 }
 
-async function plannerPatchRow(table, localKey, listKey, id, patch) {
+async function plannerPatchRow(table, localKey, listKey, id, patch, skipRender) {
   ensurePlannerState();
   const list = state[listKey] || [];
   const idx = list.findIndex(x => x.id === id);
   if (idx < 0) return false;
   const prev = Object.assign({}, list[idx]);
   list[idx] = Object.assign({}, list[idx], patch);
-  renderPlannerView();
+  if (!skipRender) renderPlannerView();
 
   if (usingLocalFallback) {
     const all = plannerLocalGet(localKey).map(x => x.id === id ? Object.assign({}, x, patch) : x);
@@ -219,21 +534,21 @@ async function plannerPatchRow(table, localKey, listKey, id, patch) {
   const { error } = await sb.from(table).update(patch).eq('id', id).eq('user_id', plannerOwnerId());
   if (error) {
     list[idx] = prev;
-    renderPlannerView();
+    if (!skipRender) renderPlannerView();
     toast('Xatolik: ' + error.message);
     return false;
   }
   return true;
 }
 
-async function plannerRemoveRow(table, localKey, listKey, id) {
+async function plannerRemoveRow(table, localKey, listKey, id, skipRender) {
   ensurePlannerState();
   const list = state[listKey] || [];
   const idx = list.findIndex(x => x.id === id);
   if (idx < 0) return;
   const prev = list[idx];
   list.splice(idx, 1);
-  renderPlannerView();
+  if (!skipRender) renderPlannerView();
 
   if (usingLocalFallback) {
     plannerLocalSet(localKey, plannerLocalGet(localKey).filter(x => x.id !== id));
@@ -242,7 +557,7 @@ async function plannerRemoveRow(table, localKey, listKey, id) {
   const { error } = await sb.from(table).delete().eq('id', id).eq('user_id', plannerOwnerId());
   if (error) {
     state[listKey].splice(idx, 0, prev);
-    renderPlannerView();
+    if (!skipRender) renderPlannerView();
     toast('Xatolik: ' + error.message);
   }
 }
@@ -327,6 +642,10 @@ function plannerOnComposerKey(ev) {
 
 function plannerSwitchTab(tab) {
   state.plannerTab = tab;
+  if (tab === 'daily') {
+    plannerEnsureDayView();
+    return;
+  }
   renderPlannerView();
   const input = document.getElementById('planner-composer');
   if (input) input.focus();
@@ -626,13 +945,15 @@ function renderPlannerView() {
   if (!root) return;
   const tab = state.plannerTab || 'today';
   const tabs = [
+    { id: 'daily', label: plannerT('planner.tabDaily', '⏰ Kunlik') },
     { id: 'today', label: plannerT('planner.tabToday', '📅 Bugun') },
     { id: 'scheduled', label: plannerT('planner.tabSched', '🗓 Rejalashtirilgan') },
     { id: 'inbox', label: plannerT('planner.tabInbox', '📥 Muddatisiz') },
     { id: 'goals', label: plannerT('planner.tabGoals', '🎯 Maqsadlar') }
   ];
   const defaultDate = tab === 'scheduled' ? plannerAddDays(todayISO(), 1) : (tab === 'inbox' || tab === 'goals' ? '' : todayISO());
-  const body = tab === 'today' ? renderPlannerToday()
+  const body = tab === 'daily' ? renderPlannerDaily()
+    : tab === 'today' ? renderPlannerToday()
     : tab === 'scheduled' ? renderPlannerScheduled()
     : tab === 'inbox' ? renderPlannerInbox()
     : renderPlannerGoals();
@@ -645,12 +966,23 @@ function renderPlannerView() {
     ? plannerT('planner.resume', 'Davom ettirish')
     : plannerT('planner.start', 'Boshlash');
 
+  const composer = tab === 'daily' ? '' : `
+      <div class="pl-composer">
+        <input type="text" id="planner-composer" placeholder="${escapeHtml(plannerComposerPlaceholder())}" autocomplete="off" onkeydown="plannerOnComposerKey(event)">
+        <label class="pl-cal" title="${escapeHtml(plannerT('planner.pickDate', 'Sana'))}">📅
+          <input type="date" id="planner-composer-date" value="${escapeHtml(defaultDate)}">
+        </label>
+        <button type="button" class="btn-blue" onclick="plannerAddFromComposer()">${escapeHtml(plannerT('planner.add', 'Qo\'shish'))}</button>
+      </div>`;
+
   root.innerHTML = `
     <div class="planner-page">
       <div class="pl-head">
         <div>
           <h2 class="pl-title">${escapeHtml(plannerT('planner.title', '🎯 Planner'))}</h2>
-          <p class="pl-sub">${escapeHtml(plannerT('planner.sub', 'Faqat sizga ko\'rinadigan shaxsiy vazifalar va fokus'))}</p>
+          <p class="pl-sub">${escapeHtml(tab === 'daily'
+            ? plannerT('planner.daySub', '24 soatlik kundalik reja — vaqt va vazifani o\'zgartiring, bajarilganini belgilang')
+            : plannerT('planner.sub', 'Faqat sizga ko\'rinadigan shaxsiy vazifalar va fokus'))}</p>
         </div>
         <div class="pl-focus" id="planner-focus-widget">
           <div class="pl-focus-top">
@@ -674,20 +1006,10 @@ function renderPlannerView() {
       <div class="pl-tabs" role="tablist">
         ${tabs.map(tb => `<button type="button" class="pl-tab${tb.id === tab ? ' active' : ''}" onclick="plannerSwitchTab('${tb.id}')">${escapeHtml(tb.label)}</button>`).join('')}
       </div>
-      <div class="pl-composer">
-        <input type="text" id="planner-composer" placeholder="${escapeHtml(plannerComposerPlaceholder())}" autocomplete="off" onkeydown="plannerOnComposerKey(event)">
-        <label class="pl-cal" title="${escapeHtml(plannerT('planner.pickDate', 'Sana'))}">📅
-          <input type="date" id="planner-composer-date" value="${escapeHtml(defaultDate)}">
-        </label>
-        <button type="button" class="btn-blue" onclick="plannerAddFromComposer()">${escapeHtml(plannerT('planner.add', 'Qo\'shish'))}</button>
-      </div>
+      ${composer}
       <div class="pl-body">${body}</div>
     </div>`;
   plannerPaintFocus();
-  const input = document.getElementById('planner-composer');
-  if (input && document.activeElement && document.activeElement.id !== 'planner-composer') {
-    /* keep focus only if user is not typing elsewhere */
-  }
 }
 
 async function openPlannerView() {

@@ -34,7 +34,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="/projects.js?v=2"></script>
-<script src="/planner.js?v=1"></script>
+<script src="/planner.js?v=2"></script>
 <style>
   /* =========================================================
      THEME TOKENS — yangi tema qo'shish: [data-theme="..."] bloki
@@ -996,6 +996,37 @@
   }
   .pl-done-toggle:hover{color:var(--text-soft);}
   .pl-done-list{opacity:.75;margin-top:4px;}
+  .pl-day-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;}
+  .pl-day-modes{display:flex;gap:6px;}
+  .pl-day-date{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);font-weight:650;}
+  .pl-day-date input{padding:6px 8px;}
+  .pl-day-hint{font-size:12px;color:var(--text-faint);flex:1;min-width:160px;}
+  .pl-day-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+  .pl-day-list{display:flex;flex-direction:column;gap:4px;}
+  .pl-day-row{
+    display:grid;grid-template-columns:22px 92px 12px 92px minmax(0,1fr) 28px;
+    align-items:center;gap:6px;padding:6px 8px;border-radius:10px;
+    background:var(--panel);border:1px solid transparent;
+  }
+  .pl-day-row:hover{border-color:var(--border);background:var(--panel-2);}
+  .pl-day-row:hover .pl-del{opacity:1;}
+  .pl-day-row.now{border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);}
+  .pl-day-row.done .pl-day-task{text-decoration:line-through;color:var(--text-faint);}
+  .pl-day-spacer{width:20px;height:20px;}
+  .pl-day-dash{text-align:center;color:var(--text-faint);font-weight:700;}
+  .pl-day-time{
+    width:100%;padding:6px 6px;font-size:13px;font-variant-numeric:tabular-nums;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+  }
+  .pl-day-task{
+    width:100%;min-width:0;padding:7px 8px;font-size:14px;
+    background:transparent;border:0;color:var(--text);
+  }
+  .pl-day-task:focus{outline:none;background:var(--panel-2);border-radius:8px;}
+  @media(max-width:640px){
+    .pl-day-row{grid-template-columns:22px 1fr 12px 1fr 28px;grid-template-rows:auto auto;}
+    .pl-day-task{grid-column:1 / -2;grid-row:2;}
+  }
   @media (hover:none){.pl-del{opacity:.65;}}
 
   /* 3D Ofis */
@@ -1653,6 +1684,21 @@ const I18N = {
     'planner.focusToday': 'Bugun: {n} ta seans, jami {m} daqiqa fokus',
     'planner.focusDone': 'Fokus seansi tugadi! 🎉',
     'planner.needProfile': 'Profil topilmadi',
+    'planner.tabDaily': '⏰ Kunlik',
+    'planner.daySub': "24 soatlik kundalik reja — vaqt va vazifani o'zgartiring, bajarilganini belgilang",
+    'planner.dayView': 'Kun',
+    'planner.template': 'Shablon',
+    'planner.templateHint': "Har kuni shu soatlar va vazifalar nusxa olinadi. Vaqtni qo'lda o'zgartiring.",
+    'planner.saveTemplate': 'Shablon qilib saqlash',
+    'planner.resetFromTemplate': 'Shablondan tiklash',
+    'planner.addSlot': "Qator qo'shish",
+    'planner.slotPh': 'Vazifa…',
+    'planner.doneShort': 'bajarildi',
+    'planner.emptyDay': "Qator yo'q — shablon yarating yoki qator qo'shing",
+    'planner.templateSaved': 'Shablon saqlandi',
+    'planner.confirmReset': 'Shu kunning yozuvlari shablon bilan almashtirilsinmi?',
+    'planner.dayEmpty': "Avval kunlik qatorlar bo'lsin",
+    'planner.daySql': 'Kunlik reja uchun supabase_schema.sql oxiridagi planner_day_slots SQL ni ishga tushiring',
     'nav.office': '3D Ofis',
     'nav.admin': 'Boshqaruv',
     'incoming.title': 'Kiruvchi — tasdiqlash',
@@ -1874,6 +1920,21 @@ const I18N = {
     'planner.focusToday': 'Сегодня: {n} сеансов, всего {m} мин фокуса',
     'planner.focusDone': 'Сеанс фокуса завершён! 🎉',
     'planner.needProfile': 'Профиль не найден',
+    'planner.tabDaily': '⏰ Распорядок',
+    'planner.daySub': 'Суточный план на 24 часа — правьте время и задачу, отмечайте выполненное',
+    'planner.dayView': 'День',
+    'planner.template': 'Шаблон',
+    'planner.templateHint': 'Каждый день копируются эти часы и задачи. Время можно менять вручную.',
+    'planner.saveTemplate': 'Сохранить как шаблон',
+    'planner.resetFromTemplate': 'Восстановить из шаблона',
+    'planner.addSlot': 'Добавить строку',
+    'planner.slotPh': 'Задача…',
+    'planner.doneShort': 'готово',
+    'planner.emptyDay': 'Нет строк — создайте шаблон или добавьте строку',
+    'planner.templateSaved': 'Шаблон сохранён',
+    'planner.confirmReset': 'Заменить записи этого дня шаблоном?',
+    'planner.dayEmpty': 'Сначала нужны строки дня',
+    'planner.daySql': 'Для суточного плана выполните SQL planner_day_slots в конце supabase_schema.sql',
     'nav.office': '3D Офис',
     'nav.admin': 'Управление',
     'incoming.title': 'Входящие — подтверждение',
@@ -2095,6 +2156,21 @@ const I18N = {
     'planner.focusToday': 'Today: {n} sessions, {m} min focus',
     'planner.focusDone': 'Focus session finished! 🎉',
     'planner.needProfile': 'Profile not found',
+    'planner.tabDaily': '⏰ Daily',
+    'planner.daySub': '24-hour daily plan — edit times and tasks, strike through what’s done',
+    'planner.dayView': 'Day',
+    'planner.template': 'Template',
+    'planner.templateHint': 'These hours and tasks are copied each day. Times can be edited by hand.',
+    'planner.saveTemplate': 'Save as template',
+    'planner.resetFromTemplate': 'Reset from template',
+    'planner.addSlot': 'Add row',
+    'planner.slotPh': 'Task…',
+    'planner.doneShort': 'done',
+    'planner.emptyDay': 'No rows — create a template or add a row',
+    'planner.templateSaved': 'Template saved',
+    'planner.confirmReset': 'Replace this day’s entries with the template?',
+    'planner.dayEmpty': 'Add day rows first',
+    'planner.daySql': 'Run the planner_day_slots SQL at the end of supabase_schema.sql',
     'nav.office': '3D Office',
     'nav.admin': 'Admin',
     'incoming.title': 'Inbox — approval',

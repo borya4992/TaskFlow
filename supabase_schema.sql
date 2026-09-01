@@ -786,4 +786,43 @@ grant select, insert, update, delete on planner_tasks to authenticated;
 grant select, insert, update, delete on planner_goals to authenticated;
 grant select, insert, update, delete on focus_sessions to authenticated;
 
+-- ============================================================
+-- PLANNER — kunlik 24 soatlik reja (shablon + kun nusxasi)
+-- plan_date IS NULL = tahrirlanadigan shablon
+-- plan_date = sana = o'sha kunning qatorlari (is_done shu kunga tegishli)
+-- SQL Editor'da shu blokni ishga tushiring.
+-- ============================================================
+create table if not exists planner_day_slots (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  plan_date date,
+  sort_order integer not null default 0,
+  start_time text not null default '05:00',
+  end_time text not null default '06:00',
+  title text not null default '',
+  is_done boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_planner_day_slots_user_date
+  on planner_day_slots (user_id, plan_date, sort_order);
+
+alter table planner_day_slots enable row level security;
+
+drop policy if exists "planner_day_slots_select" on planner_day_slots;
+drop policy if exists "planner_day_slots_insert" on planner_day_slots;
+drop policy if exists "planner_day_slots_update" on planner_day_slots;
+drop policy if exists "planner_day_slots_delete" on planner_day_slots;
+create policy "planner_day_slots_select" on planner_day_slots
+  for select using (user_id = public.my_user_id());
+create policy "planner_day_slots_insert" on planner_day_slots
+  for insert with check (user_id = public.my_user_id());
+create policy "planner_day_slots_update" on planner_day_slots
+  for update using (user_id = public.my_user_id())
+  with check (user_id = public.my_user_id());
+create policy "planner_day_slots_delete" on planner_day_slots
+  for delete using (user_id = public.my_user_id());
+
+grant select, insert, update, delete on planner_day_slots to authenticated;
+
 notify pgrst, 'reload schema';
