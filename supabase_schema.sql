@@ -563,6 +563,10 @@ create index if not exists project_columns_project_idx on project_columns (proje
 create index if not exists project_cards_project_idx on project_cards (project_id) where deleted_at is null;
 create index if not exists project_cards_column_idx on project_cards (column_id, position) where deleted_at is null;
 
+alter table tasks add column if not exists project_card_id uuid;
+create unique index if not exists tasks_project_card_id_unique
+  on tasks (project_card_id) where project_card_id is not null;
+
 create or replace function public.is_project_member(p_project_id uuid)
 returns boolean
 language sql

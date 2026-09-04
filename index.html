@@ -33,7 +33,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="/projects.js?v=2"></script>
+<script src="/projects.js?v=4"></script>
 <script src="/planner.js?v=2"></script>
 <style>
   /* =========================================================
@@ -3125,6 +3125,17 @@ function userAvatarHtml(u, cls) {
 }
 function visibleTasks() {
   let tasks = state.tasks.filter(t => !t.deleted_at);
+  const extra = typeof completedProjectCardTasks === 'function' ? completedProjectCardTasks() : [];
+  if (extra.length) {
+    extra.forEach(t => {
+      const already = tasks.some(x =>
+        (x.project_card_id && x.project_card_id === t.project_card_id) ||
+        String(x.id) === t.id ||
+        (t.project_card_id && String(x.comment || '').includes('[pcard:' + t.project_card_id + ']'))
+      );
+      if (!already) tasks.push(t);
+    });
+  }
   // Ijrochi filtri: bo'sh = barcha ijrochilar; tanlangan ism = faqat shu
   if (state.filterAssignee) {
     tasks = tasks.filter(t => assigneesMatch(t.assignee, state.filterAssignee));
@@ -4112,15 +4123,30 @@ async function fetchSettings() {
   if (error) { console.error(error); return { telegram_token:'', telegram_chat_id:'', notifications_enabled:false, office3d_public:false }; }
   return data;
 }
-async function insertTask(task) {
+async function insertTask(task, opts) {
+  const silent = !!(opts && opts.silent);
   if (usingLocalFallback) {
+    const row = Object.assign({ id: uid(), created_at: new Date().toISOString() }, task);
     const list = JSON.parse(localStorage.getItem(LOCAL_KEY_TASKS) || '[]');
-    list.push(Object.assign({ id: uid(), created_at: new Date().toISOString() }, task));
+    list.push(row);
     localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
-    return;
+    if (!state.tasks.some(t => t.id === row.id)) state.tasks.push(row);
+    return row;
   }
-  const { error } = await sb.from('tasks').insert([task]);
-  if (error) toast('Xatolik: ' + error.message);
+  let payload = task;
+  let { data, error } = await sb.from('tasks').insert([payload]).select('*').single();
+  if (error && payload.project_card_id && /project_card_id|schema cache|column/i.test(error.message || '')) {
+    const { project_card_id, ...rest } = payload;
+    payload = rest;
+    ({ data, error } = await sb.from('tasks').insert([payload]).select('*').single());
+  }
+  if (error) {
+    if (!silent) toast('Xatolik: ' + error.message);
+    console.error(error);
+    return null;
+  }
+  if (data && !state.tasks.some(t => t.id === data.id)) state.tasks.push(data);
+  return data;
 }
 async function updateTask(id, patch) {
   if (usingLocalFallback) {
@@ -4128,10 +4154,12 @@ async function updateTask(id, patch) {
     const idx = list.findIndex(t => t.id === id);
     if (idx > -1) list[idx] = Object.assign({}, list[idx], patch);
     localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
-    return;
+  } else {
+    const { error } = await sb.from('tasks').update(patch).eq('id', id);
+    if (error) toast('Xatolik: ' + error.message);
   }
-  const { error } = await sb.from('tasks').update(patch).eq('id', id);
-  if (error) toast('Xatolik: ' + error.message);
+  const i = state.tasks.findIndex(t => t.id === id);
+  if (i > -1) state.tasks[i] = Object.assign({}, state.tasks[i], patch);
 }
 async function deleteTaskRow(id) {
   const deleted_at = new Date().toISOString();
@@ -4140,10 +4168,12 @@ async function deleteTaskRow(id) {
     const idx = list.findIndex(t => t.id === id);
     if (idx > -1) list[idx] = Object.assign({}, list[idx], { deleted_at });
     localStorage.setItem(LOCAL_KEY_TASKS, JSON.stringify(list));
-    return;
+  } else {
+    const { error } = await sb.from('tasks').update({ deleted_at }).eq('id', id);
+    if (error) toast('Xatolik: ' + error.message);
   }
-  const { error } = await sb.from('tasks').update({ deleted_at }).eq('id', id);
-  if (error) toast('Xatolik: ' + error.message);
+  const i = state.tasks.findIndex(t => t.id === id);
+  if (i > -1) state.tasks[i] = Object.assign({}, state.tasks[i], { deleted_at });
 }
 async function restoreTaskRow(id) {
   if (!canManageUsers()) return;
@@ -4227,10 +4257,15 @@ function matchesFilters(t) {
 }
 function distinctAssignees() {
   const map = new Map();
-  state.tasks.filter(t => !t.deleted_at && t.assignee).forEach(t => {
-    const label = canonicalAssigneeLabel(t.assignee);
+  const add = (name) => {
+    if (!name) return;
+    const label = canonicalAssigneeLabel(name);
     map.set(normalizePersonName(label), label);
-  });
+  };
+  state.tasks.filter(t => !t.deleted_at && t.assignee).forEach(t => add(t.assignee));
+  if (typeof completedProjectCardTasks === 'function') {
+    completedProjectCardTasks().forEach(t => add(t.assignee));
+  }
   if (currentProfile?.display_name) {
     map.set(normalizePersonName(currentProfile.display_name), currentProfile.display_name);
   }
@@ -4258,7 +4293,9 @@ function taskRowHtml(t, mode) {
   const creator = userById(t.created_by_user_id);
   const isMine = t.assignee_user_id === currentProfile?.id;
   let actions = '';
-  if (mode === 'review' && canReviewTask(t) && t.status === 'tekshiruvda') {
+  if (t.is_project_card) {
+    actions = `<button class="icon-btn" title="Batafsil" onclick="openTaskDetailModal('${t.id}')">ℹ</button>`;
+  } else if (mode === 'review' && canReviewTask(t) && t.status === 'tekshiruvda') {
     const parts = [
       `<button class="btn-green" onclick="approveTask('${t.id}')">✓ Bajarildi</button>`,
       `<button class="btn-outline" onclick="openReturnModal('${t.id}')">↩ Qayta ishlash</button>`
@@ -5418,6 +5455,11 @@ async function notifyCreatorReview(task) {
 }
 
 function openTaskDetailModal(id) {
+  if (String(id || '').startsWith('pcard_')) {
+    const cardId = String(id).slice(6);
+    if (typeof openEditProjectCardModal === 'function') openEditProjectCardModal(cardId);
+    return;
+  }
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
   const creator = userById(t.created_by_user_id);
@@ -5588,9 +5630,16 @@ function isSelfCreatedTask(t) {
   return false;
 }
 
-/** SMART hisob: faqat rahbar bergan, o'ziga emas */
+function isProjectLinkedTask(t) {
+  if (!t) return false;
+  if (t.is_project_card || t.project_card_id) return true;
+  return /\[pcard:[0-9a-f-]{36}\]/i.test(String(t.comment || ''));
+}
+
+/** SMART hisob: rahbar bergan (o'ziga emas) + loyihada bajarilgan vazifalar */
 function isSmartCountedTask(t) {
   if (!t || t.deleted_at) return false;
+  if (isProjectLinkedTask(t)) return true;
   if (isSelfCreatedTask(t)) return false;
   return isLeadershipUser(userById(t.created_by_user_id));
 }
@@ -5860,8 +5909,20 @@ function renderSmartMvpHistory(tasks, currentKey) {
 }
 
 function renderSmartAnalytics() {
-  // SMART: faqat rahbarlar bergan topshiriqlar (o'ziga yaratilganlar chiqariladi)
+  // SMART: rahbarlar bergan topshiriqlar + loyihada bajarilgan vazifalar
   let tasks = state.tasks.filter(isSmartCountedTask);
+  const projectDone = typeof completedProjectCardTasks === 'function' ? completedProjectCardTasks() : [];
+  if (projectDone.length) {
+    const linked = new Set(tasks.map(t => t.project_card_id).filter(Boolean));
+    const seenIds = new Set(tasks.map(t => t.id));
+    projectDone.forEach(t => {
+      if (linked.has(t.project_card_id) || seenIds.has(t.id)) return;
+      if (isSmartCountedTask(t)) {
+        tasks.push(t);
+        seenIds.add(t.id);
+      }
+    });
+  }
   if (state.smartFilterDepartment) {
     const deptUsers = state.appUsers.filter(u => normalizeDepartment(u.department) === state.smartFilterDepartment);
     const ids = new Set(deptUsers.map(u => u.id));
@@ -6208,7 +6269,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=25').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=27').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -6216,7 +6277,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v31'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v33'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

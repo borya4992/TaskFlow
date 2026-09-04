@@ -89,8 +89,152 @@ function projectColumnsOf(projectId) {
     .sort((a, b) => (a.position || 0) - (b.position || 0));
 }
 
+function isDoneColumn(col) {
+  if (!col) return false;
+  if (col.is_done_column === true || col.is_done_column === 'true' || col.is_done_column === 1) return true;
+  const n = String(col.name || '').trim().toLowerCase();
+  return n === 'bajarildi' || n === 'done' || n === 'готово' || /bajaril/.test(n);
+}
+
 function doneColumnIds(projectId) {
-  return new Set(projectColumnsOf(projectId).filter(c => c.is_done_column).map(c => c.id));
+  return new Set(projectColumnsOf(projectId).filter(isDoneColumn).map(c => c.id));
+}
+
+function isProjectCardDone(card) {
+  if (!card || card.deleted_at) return false;
+  if (card.completed_at) return true;
+  return doneColumnIds(card.project_id).has(card.column_id);
+}
+
+function projectCardToCompletedTask(card) {
+  const project = (state.projects || []).find(p => p.id === card.project_id);
+  const assignee = userById(card.assignee_user_id) || (project ? userById(project.owner_user_id) : null);
+  const projectName = project?.name || (typeof t === 'function' ? t('nav.projects') : 'Loyiha');
+  return {
+    id: 'pcard_' + card.id,
+    project_card_id: card.id,
+    project_id: card.project_id,
+    is_project_card: true,
+    title: card.title,
+    assignee: assignee?.display_name || '',
+    assignee_user_id: card.assignee_user_id || project?.owner_user_id || null,
+    created_by_user_id: project?.owner_user_id || null,
+    priority: card.priority || '',
+    deadline: card.deadline || null,
+    status: 'bajarildi',
+    comment: '📋 ' + projectName,
+    created_at: card.created_at,
+    completed_at: card.completed_at || card.created_at || new Date().toISOString(),
+    deleted_at: null
+  };
+}
+
+function completedProjectCardTasks() {
+  ensureProjectState();
+  return (state.projectCards || [])
+    .filter(isProjectCardDone)
+    .map(projectCardToCompletedTask);
+}
+
+function projectCardTaskMarker(cardId) {
+  return '[pcard:' + cardId + ']';
+}
+
+function findTaskForProjectCard(cardId) {
+  if (!cardId) return null;
+  const marker = projectCardTaskMarker(cardId);
+  const matches = (state.tasks || []).filter(t => {
+    if (!t) return false;
+    if (t.project_card_id === cardId) return true;
+    if (String(t.id) === 'pcard_' + cardId) return true;
+    return String(t.comment || '').includes(marker);
+  });
+  return matches.find(t => !t.deleted_at) || matches[0] || null;
+}
+
+function buildProjectCardTaskPayload(card) {
+  const project = (state.projects || []).find(p => p.id === card.project_id);
+  const assigneeUser = (typeof userById === 'function' ? userById(card.assignee_user_id) : null)
+    || currentProfile;
+  const projectName = (project && project.name) || 'Loyiha';
+  const now = new Date().toISOString();
+  return {
+    assignee_user_id: (assigneeUser && assigneeUser.id) || currentProfile.id,
+    assignee: (assigneeUser && assigneeUser.display_name) || currentProfile.display_name || '—',
+    created_by_user_id: currentProfile.id,
+    reviewer_user_id: currentProfile.id,
+    title: card.title || 'Loyiha vazifasi',
+    priority: card.priority || '',
+    deadline: card.deadline || null,
+    status: 'bajarildi',
+    start_date: (typeof todayISO === 'function' ? todayISO() : now.slice(0, 10)),
+    comment: '📋 ' + projectName + '\n' + projectCardTaskMarker(card.id),
+    completed_at: card.completed_at || now,
+    project_card_id: card.id
+  };
+}
+
+function applyTaskToState(row) {
+  if (!row || !row.id) return;
+  const i = state.tasks.findIndex(t => t.id === row.id);
+  if (i > -1) state.tasks[i] = Object.assign({}, state.tasks[i], row);
+  else state.tasks.push(row);
+}
+
+async function syncProjectCardCompletion(card, isDone) {
+  if (!card || !currentProfile || typeof insertTask !== 'function') return;
+  const existing = findTaskForProjectCard(card.id);
+  if (isDone) {
+    const payload = buildProjectCardTaskPayload(card);
+    if (existing) {
+      const patch = {
+        title: payload.title,
+        assignee: payload.assignee,
+        assignee_user_id: payload.assignee_user_id,
+        priority: payload.priority,
+        deadline: payload.deadline,
+        status: 'bajarildi',
+        comment: payload.comment,
+        completed_at: payload.completed_at
+      };
+      if (existing.deleted_at) patch.deleted_at = null;
+      await updateTask(existing.id, patch);
+      applyTaskToState(Object.assign({}, existing, patch, { deleted_at: null }));
+    } else {
+      let row = await insertTask(payload, { silent: true });
+      if (!row && payload.project_card_id) {
+        const { project_card_id, ...rest } = payload;
+        row = await insertTask(rest, { silent: false });
+      }
+      if (row) applyTaskToState(row);
+    }
+  } else if (existing && !existing.deleted_at) {
+    await deleteTaskRow(existing.id);
+    applyTaskToState(Object.assign({}, existing, { deleted_at: new Date().toISOString() }));
+  }
+}
+
+async function backfillCompletedProjectCardTasks() {
+  if (!currentProfile || typeof insertTask !== 'function') return;
+  const cards = (state.projectCards || []).filter(isProjectCardDone);
+  for (const card of cards) {
+    if (findTaskForProjectCard(card.id)) continue;
+    await syncProjectCardCompletion(card, true);
+  }
+}
+
+function refreshTaskSurfacesFromProjects() {
+  if (typeof renderAll === 'function') {
+    renderAll();
+    return;
+  }
+  if (typeof renderExecCards === 'function') renderExecCards();
+  if (typeof renderTaskList === 'function') renderTaskList();
+  if (typeof renderOutgoingList === 'function') renderOutgoingList();
+  const smartPane = document.getElementById('view-smart');
+  if (smartPane && smartPane.classList.contains('active') && typeof renderSmartAnalytics === 'function') {
+    renderSmartAnalytics();
+  }
 }
 
 function projectProgressPct(projectId) {
@@ -202,6 +346,9 @@ async function loadAllProjectData() {
   state.projectMembers = await fetchProjectMembers();
   state.projectColumns = await fetchProjectColumns();
   state.projectCards = await fetchProjectCards();
+  if (typeof backfillCompletedProjectCardTasks === 'function') {
+    await backfillCompletedProjectCardTasks();
+  }
 }
 
 /* ---------- CRUD ---------- */
@@ -512,6 +659,8 @@ async function createCard(projectId, columnId, payload) {
   }
   state.projectCards.push(row);
   renderProjectsView();
+  if (done.has(columnId)) await syncProjectCardCompletion(row, true);
+  refreshTaskSurfacesFromProjects();
   return row;
 }
 
@@ -528,12 +677,15 @@ async function updateCard(id, patch) {
   const i = state.projectCards.findIndex(c => c.id === id);
   if (i > -1) state.projectCards[i] = Object.assign({}, state.projectCards[i], patch);
   renderProjectsView();
+  refreshTaskSurfacesFromProjects();
 }
 
 async function deleteCard(id) {
+  const card = state.projectCards.find(c => c.id === id);
   const deleted_at = new Date().toISOString();
   await updateCard(id, { deleted_at });
   state.projectCards = state.projectCards.filter(c => c.id !== id);
+  if (card) await syncProjectCardCompletion(card, false);
   toast("Kartochka o'chirildi");
 }
 
@@ -588,9 +740,12 @@ async function moveCard(cardId, toColumnId, toIndex) {
     }
   }
   renderProjectsView();
+  if (wasDone !== willDone) {
+    const updated = state.projectCards.find(c => c.id === cardId);
+    if (updated) await syncProjectCardCompletion(updated, willDone);
+  }
+  refreshTaskSurfacesFromProjects();
 }
-
-/* ---------- Realtime ---------- */
 function applyRealtimeProjectChange(table, payload) {
   ensureProjectState();
   const { eventType, new: newRow, old: oldRow } = payload;
@@ -652,6 +807,7 @@ function applyRealtimeProjectChange(table, payload) {
   const pane = document.getElementById('view-projects');
   if (pane && pane.classList.contains('active')) renderProjectsView();
   if (isAdmin()) renderDeletedProjectsPanel();
+  if (table === 'project_cards' || table === 'project_columns') refreshTaskSurfacesFromProjects();
 }
 
 function subscribeProjectRealtime(channel) {
