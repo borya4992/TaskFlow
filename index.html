@@ -34,7 +34,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="/projects.js?v=4"></script>
-<script src="/planner.js?v=2"></script>
+<script src="/planner.js?v=3"></script>
 <style>
   /* =========================================================
      THEME TOKENS — yangi tema qo'shish: [data-theme="..."] bloki
@@ -996,6 +996,12 @@
   }
   .pl-tab:hover{color:var(--text);border-color:var(--accent);}
   .pl-tab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
+  .pl-stats{margin:-4px 0 14px;display:flex;flex-direction:column;gap:8px;}
+  .pl-stat-caption{font-size:12px;color:var(--text-faint);font-weight:650;}
+  .pl-stat-meter{height:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:99px;overflow:hidden;}
+  .pl-stat-meter-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--success));border-radius:99px;transition:width .35s ease;}
+  .pl-kpi-row{margin-bottom:0;}
+  .pl-kpi-row .kpi{font:inherit;min-width:88px;flex:1;}
   .pl-composer{
     display:flex;gap:8px;align-items:center;margin-bottom:16px;
     background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;
@@ -1759,6 +1765,15 @@ const I18N = {
     'planner.confirmReset': 'Shu kunning yozuvlari shablon bilan almashtirilsinmi?',
     'planner.dayEmpty': "Avval kunlik qatorlar bo'lsin",
     'planner.daySql': 'Kunlik reja uchun supabase_schema.sql oxiridagi planner_day_slots SQL ni ishga tushiring',
+    'planner.soonTitle': '20 daqiqa qoldi',
+    'planner.soonTask': '«{title}» muddati tez orada tugaydi',
+    'planner.soonSlot': 'Kunlik reja: «{title}» — {time} da tugaydi',
+    'planner.statToday': 'Bugun',
+    'planner.statSched': 'Rejalashtirilgan',
+    'planner.statDaily': 'Kunlik',
+    'planner.statOverdue': 'Kechikkan',
+    'planner.statRate': 'Bugungi bajarilish: {done}/{all} ({p}%)',
+    'planner.statNone': "Bugun rejalashtirilgan vazifa yo'q",
     'nav.office': '3D Ofis',
     'nav.ai': 'AI Yordamchi',
     'ai.title': '🤖 AI Yordamchi',
@@ -2009,6 +2024,15 @@ const I18N = {
     'planner.confirmReset': 'Заменить записи этого дня шаблоном?',
     'planner.dayEmpty': 'Сначала нужны строки дня',
     'planner.daySql': 'Для суточного плана выполните SQL planner_day_slots в конце supabase_schema.sql',
+    'planner.soonTitle': 'Осталось 20 минут',
+    'planner.soonTask': '«{title}» скоро истекает',
+    'planner.soonSlot': 'Распорядок: «{title}» — до {time}',
+    'planner.statToday': 'Сегодня',
+    'planner.statSched': 'Запланировано',
+    'planner.statDaily': 'Распорядок',
+    'planner.statOverdue': 'Просрочено',
+    'planner.statRate': 'Сегодня: {done}/{all} ({p}%)',
+    'planner.statNone': 'На сегодня запланированных задач нет',
     'nav.office': '3D Офис',
     'nav.ai': 'ИИ-помощник',
     'ai.title': '🤖 ИИ-помощник',
@@ -2259,6 +2283,15 @@ const I18N = {
     'planner.confirmReset': 'Replace this day’s entries with the template?',
     'planner.dayEmpty': 'Add day rows first',
     'planner.daySql': 'Run the planner_day_slots SQL at the end of supabase_schema.sql',
+    'planner.soonTitle': '20 minutes left',
+    'planner.soonTask': '“{title}” is due soon',
+    'planner.soonSlot': 'Daily: “{title}” ends at {time}',
+    'planner.statToday': 'Today',
+    'planner.statSched': 'Scheduled',
+    'planner.statDaily': 'Daily',
+    'planner.statOverdue': 'Overdue',
+    'planner.statRate': 'Today: {done}/{all} ({p}%)',
+    'planner.statNone': 'No planned tasks for today',
     'nav.office': '3D Office',
     'nav.ai': 'AI Assistant',
     'ai.title': '🤖 AI Assistant',
@@ -6269,7 +6302,7 @@ function setupPwaInstall() {
     toast(t('app.installed'));
   });
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=27').then((reg) => {
+    navigator.serviceWorker.register('/sw.js?v=28').then((reg) => {
       // Yangi SW darhol faol bo'lsin (eski keshdan chiqish)
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.update().catch(() => {});
@@ -6277,7 +6310,7 @@ function setupPwaInstall() {
     // Eski keshlar (taskflow-*, eski taskoman) ni tozalash
     if (window.caches && caches.keys) {
       caches.keys().then((keys) => {
-        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v33'))
+        keys.filter((k) => k.startsWith('taskflow-') || k.startsWith('taskoman-') || (k.startsWith('traksa-') && k !== 'traksa-v34'))
           .forEach((k) => caches.delete(k));
       }).catch(() => {});
     }

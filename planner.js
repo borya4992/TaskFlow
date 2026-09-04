@@ -37,6 +37,13 @@ let plannerShowDone = {
   goals: false
 };
 
+const PLANNER_DUE_END_TIME = '18:00';
+const PLANNER_ALERT_LEAD_MS = 20 * 60 * 1000;
+const PLANNER_ALERT_STORE = 'tm_planner_deadline_alerts';
+let plannerAudioCtx = null;
+let plannerAlertTimer = null;
+let plannerAudioGestureBound = false;
+
 function plannerUid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return (typeof uid === 'function' ? uid() : ('id_' + Date.now())).replace(/^id_/, '00000000-0000-4000-8000-');
@@ -193,7 +200,7 @@ function plannerSlotsFor(planDate) {
 }
 
 function plannerNormTime(raw) {
-  const m = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  const m = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (!m) return null;
   const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
   const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
@@ -486,6 +493,7 @@ async function loadPlannerData() {
   state._plannerLoaded = true;
   await plannerEnsureTemplate();
   await plannerEnsureDay(state.plannerDayDate || todayISO());
+  plannerStartAlertWatch();
 }
 
 /* ---------- CRUD (optimistic) ---------- */
@@ -715,32 +723,163 @@ async function plannerSaveFocusSession(completed) {
   renderPlannerView();
 }
 
-function plannerBeep() {
+function plannerEnsureAudio() {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-  } catch (e) {}
+    if (!Ctx) return null;
+    if (!plannerAudioCtx) plannerAudioCtx = new Ctx();
+    if (plannerAudioCtx.state === 'suspended') plannerAudioCtx.resume().catch(function () {});
+    return plannerAudioCtx;
+  } catch (e) {
+    return null;
+  }
+}
+
+function plannerBindAudioUnlock() {
+  if (plannerAudioGestureBound) return;
+  plannerAudioGestureBound = true;
+  const unlock = function () {
+    plannerEnsureAudio();
+  };
+  document.addEventListener('pointerdown', unlock, { passive: true });
+  document.addEventListener('keydown', unlock, { passive: true });
+}
+
+function plannerPlayChime(kind) {
+  const ctx = plannerEnsureAudio();
+  if (!ctx) return;
+  const run = function () {
+    try {
+      const now = ctx.currentTime;
+      const notes = kind === 'warn'
+        ? [523.25, 659.25, 783.99]
+        : [880, 1174.66, 1396.91, 1760];
+      notes.forEach(function (freq, i) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t0 = now + i * 0.16;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.2, t0 + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.3);
+      });
+    } catch (e) {}
+  };
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(run).catch(function () {});
+  } else {
+    run();
+  }
+}
+
+function plannerBeep() {
+  plannerPlayChime('done');
+}
+
+function plannerDesktopNotify(title, body) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  try { new Notification(title, { body: body || '' }); } catch (e) {}
 }
 
 function plannerNotifyFocusDone() {
-  toast(plannerT('planner.focusDone', 'Fokus seansi tugadi! 🎉'));
-  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    try { new Notification(plannerT('planner.focusDone', 'Fokus seansi tugadi! 🎉')); } catch (e) { plannerBeep(); }
-  } else {
-    plannerBeep();
+  const msg = plannerT('planner.focusDone', 'Fokus seansi tugadi! 🎉');
+  toast(msg);
+  plannerPlayChime('done');
+  plannerDesktopNotify(msg);
+}
+
+function plannerLocalMs(isoDate, hhmm) {
+  const t = plannerNormTime(hhmm);
+  if (!isoDate || !t) return NaN;
+  const d = new Date(isoDate + 'T' + t + ':00');
+  return d.getTime();
+}
+
+function plannerSlotEndMs(slot, isoDate) {
+  const start = plannerNormTime(slot && slot.start_time);
+  const end = plannerNormTime(slot && slot.end_time);
+  if (!end) return NaN;
+  let ms = plannerLocalMs(isoDate, end);
+  if (start && plannerTimeToMin(end) <= plannerTimeToMin(start)) {
+    ms = plannerLocalMs(plannerAddDays(isoDate, 1), end);
   }
+  return ms;
+}
+
+function plannerAlertFiredMap() {
+  try { return JSON.parse(sessionStorage.getItem(PLANNER_ALERT_STORE) || '{}'); } catch (e) { return {}; }
+}
+
+function plannerAlertWasFired(key) {
+  return !!plannerAlertFiredMap()[key];
+}
+
+function plannerAlertMarkFired(key) {
+  try {
+    const map = plannerAlertFiredMap();
+    map[key] = Date.now();
+    sessionStorage.setItem(PLANNER_ALERT_STORE, JSON.stringify(map));
+  } catch (e) {}
+}
+
+function plannerFireDeadlineAlert(key, title, body) {
+  if (plannerAlertWasFired(key)) return;
+  plannerAlertMarkFired(key);
+  toast(body);
+  plannerPlayChime('warn');
+  plannerDesktopNotify(title, body);
+}
+
+function plannerCheckUpcomingAlerts() {
+  if (!plannerOwnerId()) return;
+  ensurePlannerState();
+  const now = Date.now();
+  const today = todayISO();
+  const titleSoon = plannerT('planner.soonTitle', '20 daqiqa qoldi');
+
+  (state.plannerTasks || []).forEach(function (task) {
+    if (!task || task.is_done) return;
+    const due = plannerDateOnly(task.due_date);
+    if (!due) return;
+    const endMs = plannerLocalMs(due, PLANNER_DUE_END_TIME);
+    if (!endMs) return;
+    if (now < endMs - PLANNER_ALERT_LEAD_MS || now >= endMs) return;
+    const name = (task.title || '').trim() || plannerT('planner.slotPh', 'Vazifa');
+    plannerFireDeadlineAlert(
+      'task:' + task.id + ':' + due,
+      titleSoon,
+      plannerT('planner.soonTask', '«{title}» muddati tez orada tugaydi').replace('{title}', name)
+    );
+  });
+
+  plannerSlotsFor(today).forEach(function (slot) {
+    if (!slot || slot.is_done) return;
+    const name = (slot.title || '').trim();
+    if (!name) return;
+    const endMs = plannerSlotEndMs(slot, today);
+    if (!endMs) return;
+    if (now < endMs - PLANNER_ALERT_LEAD_MS || now >= endMs) return;
+    const timeLabel = plannerNormTime(slot.end_time) || '';
+    plannerFireDeadlineAlert(
+      'slot:' + slot.id + ':' + today,
+      titleSoon,
+      plannerT('planner.soonSlot', 'Kunlik reja: «{title}» — {time} da tugaydi')
+        .replace('{title}', name)
+        .replace('{time}', timeLabel)
+    );
+  });
+}
+
+function plannerStartAlertWatch() {
+  plannerBindAudioUnlock();
+  plannerCheckUpcomingAlerts();
+  if (plannerAlertTimer) return;
+  plannerAlertTimer = setInterval(plannerCheckUpcomingAlerts, 15000);
 }
 
 function plannerStopTick() {
@@ -764,6 +903,7 @@ function plannerTick() {
 }
 
 function plannerStartFocus() {
+  plannerEnsureAudio();
   const input = document.getElementById('planner-focus-mins');
   let mins = parseInt(input && input.value, 10);
   if (!Number.isFinite(mins) || mins < 1) mins = 25;
@@ -939,6 +1079,70 @@ function renderPlannerGoals() {
   return html;
 }
 
+function plannerComputeStats() {
+  ensurePlannerState();
+  const today = todayISO();
+  const tasks = state.plannerTasks || [];
+  const todayAll = tasks.filter(function (x) { return plannerDateOnly(x.due_date) === today; });
+  const todayDone = todayAll.filter(function (x) { return !!x.is_done; }).length;
+  const schedAll = tasks.filter(function (x) {
+    const d = plannerDateOnly(x.due_date);
+    return d && d > today;
+  });
+  const schedDone = schedAll.filter(function (x) { return !!x.is_done; }).length;
+  const overdue = tasks.filter(function (x) {
+    const d = plannerDateOnly(x.due_date);
+    return !x.is_done && d && d < today;
+  }).length;
+  const slots = plannerSlotsFor(today);
+  const slotDone = slots.filter(function (s) { return !!s.is_done; }).length;
+  const todayPct = todayAll.length ? Math.round((todayDone / todayAll.length) * 100) : 0;
+  return {
+    todayAll: todayAll.length,
+    todayDone: todayDone,
+    todayPct: todayPct,
+    schedAll: schedAll.length,
+    schedDone: schedDone,
+    overdue: overdue,
+    slotTotal: slots.length,
+    slotDone: slotDone
+  };
+}
+
+function plannerStatsHtml() {
+  const s = plannerComputeStats();
+  const rate = s.todayAll
+    ? plannerT('planner.statRate', 'Bugungi bajarilish: {done}/{all} ({p}%)')
+      .replace('{done}', String(s.todayDone))
+      .replace('{all}', String(s.todayAll))
+      .replace('{p}', String(s.todayPct))
+    : plannerT('planner.statNone', 'Bugun rejalashtirilgan vazifa yo\'q');
+  return `<div class="pl-stats">
+    <div class="pl-stat-caption">${escapeHtml(rate)}</div>
+    <div class="pl-stat-meter" role="progressbar" aria-valuenow="${s.todayPct}" aria-valuemin="0" aria-valuemax="100">
+      <div class="pl-stat-meter-fill" style="width:${s.todayPct}%"></div>
+    </div>
+    <div class="kpi-row pl-kpi-row">
+      <button type="button" class="kpi k-progress" onclick="plannerSwitchTab('today')">
+        <b>${s.todayDone}/${s.todayAll}</b>
+        <span>${escapeHtml(plannerT('planner.statToday', 'Bugun'))}</span>
+      </button>
+      <button type="button" class="kpi k-done" onclick="plannerSwitchTab('scheduled')">
+        <b>${s.schedDone}/${s.schedAll}</b>
+        <span>${escapeHtml(plannerT('planner.statSched', 'Rejalashtirilgan'))}</span>
+      </button>
+      <button type="button" class="kpi" onclick="plannerSwitchTab('daily')">
+        <b>${s.slotDone}/${s.slotTotal}</b>
+        <span>${escapeHtml(plannerT('planner.statDaily', 'Kunlik'))}</span>
+      </button>
+      <button type="button" class="kpi k-overdue" onclick="plannerSwitchTab('today')">
+        <b>${s.overdue}</b>
+        <span>${escapeHtml(plannerT('planner.statOverdue', 'Kechikkan'))}</span>
+      </button>
+    </div>
+  </div>`;
+}
+
 function renderPlannerView() {
   ensurePlannerState();
   const root = document.getElementById('planner-root');
@@ -1006,6 +1210,7 @@ function renderPlannerView() {
       <div class="pl-tabs" role="tablist">
         ${tabs.map(tb => `<button type="button" class="pl-tab${tb.id === tab ? ' active' : ''}" onclick="plannerSwitchTab('${tb.id}')">${escapeHtml(tb.label)}</button>`).join('')}
       </div>
+      ${plannerStatsHtml()}
       ${composer}
       <div class="pl-body">${body}</div>
     </div>`;
